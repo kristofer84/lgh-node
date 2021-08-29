@@ -2,14 +2,16 @@ const mqtt = require('mqtt');
 const client = mqtt.connect('mqtt://192.168.0.116');
 const fs = require('fs');
 const http = require('http');
+const concat = require('concat-stream');
+const qs = require('querystring');
 
-const hostname = '192.168.0.115';
+const hostname = 'localhost';
 const port = 8080;
 
 process.stdin.resume();
 
 client.on('connect', function () {
-	client.subscribe('#', function(err) {
+	client.subscribe('#', function (err) {
 		if (!err) {
 			console.log('connected');
 		}
@@ -33,10 +35,10 @@ client.on('message', function (topic, message) {
 	messages++;
 	if (split[1] === 'homey') {
 
-//		let deviceType = split[2];
-//		let deviceZone = split[3];
-//		let device = split[4];
-//		let valueType = split[5];
+		//		let deviceType = split[2];
+		//		let deviceZone = split[3];
+		//		let device = split[4];
+		//		let valueType = split[5];
 
 		let device = split[2];
 		let valueType = split[3];
@@ -59,7 +61,7 @@ client.on('message', function (topic, message) {
 });
 
 function log() {
-	console.clear();
+	//console.clear();
 	console.log(`Received messages: ${messages}`);
 	console.log(`Received web requests: ${requests}`);
 }
@@ -76,7 +78,14 @@ const server = http.createServer((req, res) => {
 	}
 
 	if (method === 'POST') {
-		console.log(JSON.stringify(req.data));
+		const chunks = [];
+		req.on('data', chunk => chunks.push(chunk));
+		req.on('end', () => {
+		  const data = Buffer.concat(chunks);
+		  var obj = JSON.parse(data.toString());
+		  publish(`homie/homey/${obj.name}/onoff/set`, obj.value);
+		});
+
 		res.statusCode = 204;
 		res.end();
 		return;
@@ -102,18 +111,18 @@ const server = http.createServer((req, res) => {
 		res.setHeader('Content-Type', 'text/html');
 		let temp = getTemperatures();
 		let sorted = Object.keys(temp).sort();
-		var body = `<html><body><table>`;
+		var html = `<html><body><table>`;
 
 		Object.values(sorted).forEach(key => {
-			body += `<tr><td>`;
-			body += key;
-			body += `<td><td>`;
-			body += temp[key];
-			body += `</td></tr>`;
+			html += `<tr><td>`;
+			html += key;
+			html += `<td><td>`;
+			html += temp[key];
+			html += `</td></tr>`;
 		});
 
-		body += `</table></body></html>`;
-		res.end(body);
+		html += `</table></body></html>`;
+		res.end(html);
 		return;
 	}
 
@@ -154,15 +163,17 @@ const server = http.createServer((req, res) => {
 	res.end(method);
 });
 
-server.listen(port, hostname, () => {
-	console.log(`Server running at http://${hostname}:${port}/`);
+// server.listen(port, hostname, () => {
+// console.log(`Server running at http://${hostname}:${port}/`);
+server.listen(port, () => {
+	console.log(`Server running at port ${port}`);
 });
 
 function getTemperatures() {
 	let retObj = {}
-	Object.keys(devices).forEach(function(key) {
+	Object.keys(devices).forEach(function (key) {
 		var device = devices[key];
-		Object.keys(device).forEach(function(valueKey) {
+		Object.keys(device).forEach(function (valueKey) {
 			if (valueKey === 'measure-temperature') {
 				let name = device['$name'];
 				retObj[name] = device[valueKey];
@@ -174,7 +185,7 @@ function getTemperatures() {
 
 function getLights() {
 	let retObj = {}
-	Object.keys(devices).forEach(function(key) {
+	Object.keys(devices).forEach(function (key) {
 		var device = devices[key];
 		if (device['$type'] === 'light') {
 			let name = device['$name'];
@@ -201,8 +212,8 @@ function publish(topic, message) {
 	client.publish(topic, message);
 }
 
-process.on('exit', exitHandler.bind(null,{ devices:devices }));
-process.on('SIGINT', exitHandler.bind(null,{ devices:devices, exit:true }));
-process.on('SIGINT1', exitHandler.bind(null,{ devices:devices, exit:true }));
-process.on('SIGINT2', exitHandler.bind(null,{ devices:devices, exit:true }));
-process.on('uncaughtException', exitHandler.bind(null,{ devices:devices, exit:true }));
+process.on('exit', exitHandler.bind(null, { devices: devices }));
+process.on('SIGINT', exitHandler.bind(null, { devices: devices, exit: true }));
+process.on('SIGINT1', exitHandler.bind(null, { devices: devices, exit: true }));
+process.on('SIGINT2', exitHandler.bind(null, { devices: devices, exit: true }));
+process.on('uncaughtException', exitHandler.bind(null, { devices: devices, exit: true }));

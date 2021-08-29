@@ -1,1 +1,1 @@
-{"dependencies":{"mqtt":"^4.2.8"}}
+{"dependencies":{"concat-stream":"^2.0.0","mqtt":"^4.2.8"}}
