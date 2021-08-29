@@ -209,7 +209,7 @@ function exitHandler(options, exitCode) {
 }
 
 function publish(topic, message) {
-	client.publish(topic, message);
+	client.publish(topic, message.toString());
 }
 
 process.on('exit', exitHandler.bind(null, { devices: devices }));
