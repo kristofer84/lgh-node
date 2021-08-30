@@ -61,7 +61,7 @@ client.on('message', function (topic, message) {
 });
 
 function log() {
-	//console.clear();
+	console.clear();
 	console.log(`Received messages: ${messages}`);
 	console.log(`Received web requests: ${requests}`);
 }
