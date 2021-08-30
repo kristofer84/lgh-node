@@ -21,12 +21,18 @@ client.on('connect', function () {
 	});
 });
 
-var devices = {};
+//var devices = {};
 let buffer = fs.readFileSync('mqtt.log');
 let json = buffer.toString();
-devices = JSON.parse(json);
+var devices = JSON.parse(json);
+
+let buffer2 = fs.readFileSync('config.json');
+var config = JSON.parse(buffer2.toString());
+
 var raw = [];
 
+var configValues = 0;
+var values = 0;
 var messages = 0;
 var requests = 0;
 
@@ -45,8 +51,14 @@ client.on('message', function (topic, message) {
 
 		if (devices[device] === undefined) { devices[device] = {}; }
 
-		devices[device][valueType] = message.toString();
 
+		if (split.length >= 5 || device.startsWith('$') || valueType.startsWith('$')) {
+			configValues++;
+		}
+		else {
+			values++;
+			devices[device][valueType] = message.toString();
+		}
 		//devices[device][valueType] = message.toString();
 
 		//if (deviceType != undefined) { devices[device]['$type'] = deviceType; }
@@ -61,8 +73,8 @@ client.on('message', function (topic, message) {
 });
 
 function log() {
-	console.clear();
-	console.log(`Received messages: ${messages}`);
+	//console.clear();
+	console.log(`Received messages (config/values): ${messages} (${configValues}/${values})`);
 	console.log(`Received web requests: ${requests}`);
 }
 
@@ -83,7 +95,8 @@ const server = http.createServer((req, res) => {
 		req.on('end', () => {
 		  const data = Buffer.concat(chunks);
 		  var obj = JSON.parse(data.toString());
-		  publish(`homie/homey/${obj.name}/onoff/set`, obj.value);
+		  toggle(obj.name, obj.value);
+//		  publish(obj.name, 'onoff', obj.value);
 		});
 
 		res.statusCode = 204;
@@ -212,7 +225,16 @@ function exitHandler(options, exitCode) {
 	}
 }
 
-function publish(topic, message) {
+function toggle(zone, value) {
+	if (config.zones[zone] === undefined) {
+		console.log(`Missing zone: ${zone}`);
+		return;
+	}
+	config.zones[zone].forEach(device => publish(device, 'onoff', value));
+}
+
+function publish(device, property, message) {
+	var topic = `homie/homey/${device}/${property}/set`;
 	client.publish(topic, message.toString());
 }
 

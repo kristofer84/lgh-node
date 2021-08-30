@@ -1,0 +1,61 @@
+{
+	"zones": {
+		"garderob": [
+			"garderob-skap",
+			"garderob-tak"
+		],
+		"sovrum": [
+			"garderob-2-skap",
+			"garderob-2-tak"
+		],
+		"sovrum-mk": [
+			"garderob-2-skap",
+			"garderob-2-tak"
+		],
+		"hall-sovrum": [
+			"garderob-2-skap",
+			"garderob-2-tak"
+		],
+		"badrum": [
+			"badrum-spegel",
+			"badrum-tak"
+		],
+		"vardagsrum": [
+			"garderob-2-skap",
+			"garderob-2-tak"
+		],
+		"kok": [
+			"garderob-2-skap",
+			"garderob-2-tak"
+		],
+		"orangeri": [
+			"garderob-2-skap",
+			"garderob-2-tak"
+		],
+		"entre": [
+			"garderob-2-skap",
+			"garderob-2-tak"
+		],
+		"dusch": [
+			"garderob-2-skap",
+			"garderob-2-tak"
+		],
+		"hall-tvattstuga": [
+			"garderob-2-skap",
+			"garderob-2-tak"
+		],
+		"tvattstuga": [
+			"garderob-2-skap",
+			"garderob-2-tak"
+		],
+		"kontor": [
+			"kontor",
+			"hylla-hoger",
+			"hylla-vanster"
+		],
+		"garderob-kontor": [
+			"garderob-2-skap",
+			"garderob-2-tak"
+		]
+	}
+}
