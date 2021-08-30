@@ -197,13 +197,17 @@ function getLights() {
 
 //Save all on exit
 function exitHandler(options, exitCode) {
-	console.log(`Exiting: ${exitCode}`);
+	//Close MQTT
+	client.end();
+
+	let rawstr = JSON.stringify(options.raw, null, '\t');
+	fs.writeFileSync('mqtt-raw.log', rawstr);
+
 	let str = JSON.stringify(options.devices, null, '\t');
 	fs.writeFileSync('mqtt.log', str);
-	//console.log(devices);
-	client.end();
+
 	if (options.exit) {
-		console.log('Exiting');
+		console.log(`Exiting: ${exitCode}`);
 		process.exit();
 	}
 }
@@ -212,8 +216,8 @@ function publish(topic, message) {
 	client.publish(topic, message.toString());
 }
 
-process.on('exit', exitHandler.bind(null, { devices: devices }));
-process.on('SIGINT', exitHandler.bind(null, { devices: devices, exit: true }));
-process.on('SIGINT1', exitHandler.bind(null, { devices: devices, exit: true }));
-process.on('SIGINT2', exitHandler.bind(null, { devices: devices, exit: true }));
-process.on('uncaughtException', exitHandler.bind(null, { devices: devices, exit: true }));
+process.on('exit', exitHandler.bind(null, { devices: devices, raw: raw }));
+process.on('SIGINT', exitHandler.bind(null, { devices: devices, raw: raw, exit: true }));
+process.on('SIGINT1', exitHandler.bind(null, { devices: devices, raw: raw, exit: true }));
+process.on('SIGINT2', exitHandler.bind(null, { devices: devices, raw: raw, exit: true }));
+process.on('uncaughtException', exitHandler.bind(null, { devices: devices, raw: raw, exit: true }));

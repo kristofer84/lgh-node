@@ -1,5 +1,6 @@
 # Custom
 mqtt.log
+mqtt-raw.log
 *.swp
 
 # Logs
