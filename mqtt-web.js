@@ -198,13 +198,24 @@ function getTemperatures() {
 
 function getLights() {
 	let retObj = {}
-	Object.keys(devices).forEach(function (key) {
-		var device = devices[key];
-		if (device['$type'] === 'light') {
-			let name = device['$name'];
-			retObj[name] = device['onoff'];
-		}
+
+	Object.keys(config.zones).forEach(zone => {
+		zoneDevices = {};
+		let values = config.zones[zone];
+
+		values.forEach(light => {
+			let device =  devices[light];
+			let onoff = undefined;
+			let hue = undefined;
+			if (device != undefined) {
+				onoff = device['onoff'];
+				dim = device['dim'];
+			}
+			zoneDevices[light] = { onoff: (onoff === 'true'), dim: dim, hue: hue };
+		});
+		retObj[zone] = zoneDevices;
 	});
+
 	return retObj;
 }
 

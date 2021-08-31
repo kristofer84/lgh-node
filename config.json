@@ -5,48 +5,52 @@
 			"garderob-tak"
 		],
 		"sovrum": [
-			"garderob-2-skap",
-			"garderob-2-tak"
+			"sang-hoger",
+			"sang-vanster",
+			"sovrum",
+			"sovrum-tak"
 		],
 		"sovrum-mk": [
-			"garderob-2-skap",
-			"garderob-2-tak"
+			"sovrum-mk",
+			"lampa-byra"
 		],
 		"hall-sovrum": [
-			"garderob-2-skap",
-			"garderob-2-tak"
+			"hall-sovrum"
 		],
 		"badrum": [
 			"badrum-spegel",
 			"badrum-tak"
 		],
 		"vardagsrum": [
-			"garderob-2-skap",
-			"garderob-2-tak"
+			"golvlampa",
+			"v1",
+			"v2",
+			"skapbelysning",
+			"vardagsrum-tak",
+			"vardagsrum-vaggar"
 		],
 		"kok": [
-			"garderob-2-skap",
-			"garderob-2-tak"
+			"kok-tak",
+			"koksbank",
+			"koksbord"
 		],
 		"orangeri": [
-			"garderob-2-skap",
-			"garderob-2-tak"
+			"orangeri",
+			"bordslampa"
 		],
 		"entre": [
-			"garderob-2-skap",
-			"garderob-2-tak"
+			"hall-entre"
 		],
 		"dusch": [
-			"garderob-2-skap",
-			"garderob-2-tak"
+			"dusch-tak",
+			"dusch-spegel"
 		],
 		"hall-tvattstuga": [
-			"garderob-2-skap",
-			"garderob-2-tak"
+			"hall-tvattstuga"
 		],
 		"tvattstuga": [
-			"garderob-2-skap",
-			"garderob-2-tak"
+			"tvattstuga",
+			"tvattstuga-bank"
 		],
 		"kontor": [
 			"kontor",
