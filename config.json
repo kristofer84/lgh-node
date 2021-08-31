@@ -5,9 +5,9 @@
 			"garderob-tak"
 		],
 		"sovrum": [
-			"sang-hoger",
-			"sang-vanster",
-			"sovrum",
+			"sang-hoger.mood",
+			"sang-vanster.mood",
+			"sovrum.mood",
 			"sovrum-tak"
 		],
 		"sovrum-mk": [
@@ -22,21 +22,21 @@
 			"badrum-tak"
 		],
 		"vardagsrum": [
-			"golvlampa",
-			"v1",
-			"v2",
-			"skapbelysning",
+			"golvlampa.mood",
+			"v1.mood",
+			"v2.mood",
+			"skapbelysning.night",
 			"vardagsrum-tak",
 			"vardagsrum-vaggar"
 		],
 		"kok": [
 			"kok-tak",
-			"koksbank",
+			"koksbank.mood",
 			"koksbord"
 		],
 		"orangeri": [
 			"orangeri",
-			"bordslampa"
+			"bordslampa.night"
 		],
 		"entre": [
 			"hall-entre"
@@ -54,8 +54,8 @@
 		],
 		"kontor": [
 			"kontor",
-			"hylla-hoger",
-			"hylla-vanster"
+			"hylla-hoger.mood",
+			"hylla-vanster.mood"
 		],
 		"garderob-kontor": [
 			"garderob-2-skap",

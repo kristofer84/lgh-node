@@ -73,7 +73,7 @@ client.on('message', function (topic, message) {
 });
 
 function log() {
-	//console.clear();
+	console.clear();
 	console.log(`Received messages (config/values): ${messages} (${configValues}/${values})`);
 	console.log(`Received web requests: ${requests}`);
 }
@@ -204,14 +204,18 @@ function getLights() {
 		let values = config.zones[zone];
 
 		values.forEach(light => {
-			let device =  devices[light];
+			let split = light.split('.');
+			let device = devices[split[0]];
 			let onoff = undefined;
+			let dim = undefined;
 			let hue = undefined;
+			let mood = (split.length > 1 && split[1] === 'mood') ? true : undefined;
+			let night = (split.length > 1 && split[1] === 'night') ? true : undefined;
 			if (device != undefined) {
 				onoff = device['onoff'];
 				dim = device['dim'];
 			}
-			zoneDevices[light] = { onoff: (onoff === 'true'), dim: dim, hue: hue };
+			zoneDevices[split[0]] = { onoff: (onoff === 'true'), mood: mood, night: night, dim: dim, hue: hue };
 		});
 		retObj[zone] = zoneDevices;
 	});
@@ -241,10 +245,28 @@ function toggle(zone, value) {
 		console.log(`Missing zone: ${zone}`);
 		return;
 	}
-	config.zones[zone].forEach(device => publish(device, 'onoff', value));
+
+	if (value === "night") {
+		config.zones[zone].forEach(device => {
+			var split = device.split('.');
+			var toState = (split.length > 1 && split[1] === 'night');
+			publish(split[0], 'onoff', toState);
+		});
+	}
+	else if (value === "mood") {
+		config.zones[zone].forEach(device => {
+			var split = device.split('.');
+			var toState = (split.length > 1); //Night && mood
+			publish(split[0], 'onoff', toState);
+		});
+	}
+	else {
+		config.zones[zone].forEach(device => publish(device.split('.')[0], 'onoff', value));
+	}
 }
 
 function publish(device, property, message) {
+	if (message === undefined) return;
 	var topic = `homie/homey/${device}/${property}/set`;
 	client.publish(topic, message.toString());
 }
