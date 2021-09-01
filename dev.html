@@ -101,6 +101,8 @@
 			var current = element.getAttribute("light");
 			var moodable = element.getAttribute("moodable");
 			var nightable = element.getAttribute("nightable");
+			var allowMax = $("#cb-mood").is(':checked');
+
 			switch (current) {
 				case "on":
 					return "off";
@@ -109,10 +111,10 @@
 					if (moodable) return "mood";
 					return "on";
 				case "mood":
-					return "on";
+					return allowMax ? "on" : "off";
 				case "night":
 					if (moodable) return "mood";
-					return "on";
+					return allowMax ? "on" : "off";
 			}
 		}
 
@@ -141,6 +143,7 @@
 			//setInterval(get, 5000);
 		});
 
+		//Auto refresh
 		var intervalId = 0;
 		function autoRefresh(cb) {
 			if (cb.checked) {
@@ -182,7 +185,7 @@
 		}
 
 		.room {
-			opacity: 0.7;
+			opacity: 0.6;
 		}
 
 /*
@@ -218,9 +221,8 @@
 	</style>
 <script type="text/javascript">
 	$(document).ready(function () {
-		document.getElementById("orangeri-bordslampa").setAttribute("d", describeSector(23, 483, 100, 0, 90));
+		document.getElementById("orangeri-bordslampa").setAttribute("d", describeSector(0, 89, 100, 0, 90));
 		document.getElementById("vardagsrum-skapbelysning").setAttribute("d", describeSector(76, 145, 50, 0, 180));
-//		document.getElementById("vardagsrum-skapbelysning").setAttribute("d", describeSector(76, 145, 40, 65, 245));
 	});
 </script>
 </head>
@@ -231,6 +233,9 @@
 				<div style="position: absolute; left: 40px; top:20px; z-index: 200;">
 					<input id="cb-refresh" onclick='autoRefresh(this);' type="checkbox">
 					<span>Auto refresh</span>
+					<br />
+					<input id="cb-mood" onclick='moodSetting(this);' type="checkbox">
+					<span>Allow max light</span>
 				</div>
 				<div id="image-map-container">
 					<div id="image-map" style="max-width: 100%" class="image-mapper">
@@ -243,6 +248,10 @@
 									<stop offset="100%" style="stop-color:rgb(230,157,14); stop-opacity:0" />
 								</radialGradient>
 								<radialGradient id="point-orangeri" cx="0", cy="1">
+									<stop offset="0%" style="stop-color:rgb(230,157,14); stop-opacity:1" />
+									<stop offset="100%" style="stop-color:rgb(230,157,14); stop-opacity:0" />
+								</radialGradient>
+								<radialGradient id="point-mk" cx="0", cy="1">
 									<stop offset="0%" style="stop-color:rgb(230,157,14); stop-opacity:1" />
 									<stop offset="100%" style="stop-color:rgb(230,157,14); stop-opacity:0" />
 								</radialGradient>
@@ -267,23 +276,34 @@
 							<rect x="179" y="218" width="40" height="38" class="room" id="hall-sovrum" />
 							<rect x="138" y="397" width="90" height="38" class="room" id="hall-tvattstuga" />
 							<rect x="292" y="99" width="44" height="92" class="room" id="balkong" />
-							<g class="room" id="orangeri">
-								<rect x="23" y="394" width="72" height="89" />
+							<g class="room" id="orangeri" transform="translate(23, 394)">
+								<rect width="72" height="89" />
 								<path class="night" id="orangeri-bordslampa" fill="url('#point-orangeri')" />
 							</g>
 							<g class="room" id="kok">
 								<rect x="23" y="254" width="135" height="139" />
 								<circle class="mood" cx="90" cy="320" r="50" fill="url('#circle')" />
 							</g>
-							<rect x="220" y="192" width="110" height="80" class="room" id="sovrum-mk" />
-							<rect x="220" y="273" width="110" height="46" class="room" id="garderob-kontor" />
-							<g class="room" id="kontor">
-								<rect x="230" y="320" width="100" height="117" />
-								<circle class="mood" cx="280" cy="378" r="50" fill="url('#circle')" />
+							<g class="room" id="sovrum-mk" transform="translate(220, 192)">
+								<rect width="110" height="80" />
+								<circle class="mood" cx="50" cy="42" r="40" fill="url('#circle')" />
 							</g>
-							<rect x="160" y="257" width="59" height="77" class="room" id="badrum" />
-							<rect x="172" y="334" width="57" height="61" class="room" id="dusch" />
-							<rect x="160" y="436" width="69" height="47" class="room" id="tvattstuga" />
+							<g class="room" id="garderob-kontor" transform="translate(220, 273)">
+								<rect width="110" height="46" />
+							</g>
+							<g class="room" id="kontor" transform="translate(230, 320)">
+								<rect width="100" height="117" />
+								<circle class="mood" cx="50" cy="58" r="50" fill="url('#circle')" />
+							</g>
+							<g class="room" id="badrum" transform="translate(160, 257)">
+								<rect width="59" height="77" />
+							</g>
+							<g class="room" id="dusch" transform="translate(172, 334)">
+								<rect width="57" height="61" />
+							</g>
+							<g class="room" id="tvattstuga" transform="translate(160, 436)">
+								<rect width="69" height="47" />
+							</g>
 						</svg>
 					</div>
 				</div>

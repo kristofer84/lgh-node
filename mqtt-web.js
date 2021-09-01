@@ -29,7 +29,7 @@ var devices = JSON.parse(json);
 let buffer2 = fs.readFileSync('config.json');
 var config = JSON.parse(buffer2.toString());
 
-var raw = [];
+//var raw = [];
 
 var configValues = 0;
 var values = 0;
@@ -41,11 +41,6 @@ client.on('message', function (topic, message) {
 	messages++;
 	if (split[1] === 'homey') {
 
-		//		let deviceType = split[2];
-		//		let deviceZone = split[3];
-		//		let device = split[4];
-		//		let valueType = split[5];
-
 		let device = split[2];
 		let valueType = split[3];
 
@@ -53,29 +48,28 @@ client.on('message', function (topic, message) {
 
 
 		if (split.length >= 5 || device.startsWith('$') || valueType.startsWith('$')) {
-			configValues++;
+				configValues++;
 		}
 		else {
 			values++;
 			devices[device][valueType] = message.toString();
 		}
-		//devices[device][valueType] = message.toString();
-
-		//if (deviceType != undefined) { devices[device]['$type'] = deviceType; }
-		//if (deviceZone != undefined) { devices[device]['$zone'] = deviceZone; }
 	}
 
 	log();
 
-	raw.push(`${topic}: ${message.toString()}`);
-	if (raw.length >= 100) { raw.shift(); }
+	fs.appendFile('mqtt-raw.log', `${topic}: ${message.toString()}\n`, function(err) {
+		if (err) console.log(err);
+	});;
+	//raw.push(`${topic}: ${message.toString()}`);
+	//if (raw.length >= 100) { raw.shift(); }
 	//console.log(`${topic}: ${message.toString()}`);
 });
 
 function log() {
-	console.clear();
-	console.log(`Received messages (config/values): ${messages} (${configValues}/${values})`);
-	console.log(`Received web requests: ${requests}`);
+	//console.clear();
+	//console.log(`Received messages (config/values): ${messages} (${configValues}/${values})`);
+	//console.log(`Received web requests: ${requests}`);
 }
 
 const server = http.createServer((req, res) => {
@@ -208,14 +202,13 @@ function getLights() {
 			let device = devices[split[0]];
 			let onoff = undefined;
 			let dim = undefined;
-			let hue = undefined;
 			let mood = (split.length > 1 && split[1] === 'mood') ? true : undefined;
 			let night = (split.length > 1 && split[1] === 'night') ? true : undefined;
 			if (device != undefined) {
 				onoff = device['onoff'];
 				dim = device['dim'];
 			}
-			zoneDevices[split[0]] = { onoff: (onoff === 'true'), mood: mood, night: night, dim: dim, hue: hue };
+			zoneDevices[split[0]] = { onoff: (onoff === 'true'), mood: mood, night: night, dim: dim };
 		});
 		retObj[zone] = zoneDevices;
 	});
@@ -228,8 +221,8 @@ function exitHandler(options, exitCode) {
 	//Close MQTT
 	client.end();
 
-	let rawstr = JSON.stringify(options.raw, null, '\t');
-	fs.writeFileSync('mqtt-raw.log', rawstr);
+	//let rawstr = JSON.stringify(options.raw, null, '\t');
+	//fs.writeFileSync('mqtt-raw.log', rawstr);
 
 	let str = JSON.stringify(options.devices, null, '\t');
 	fs.writeFileSync('mqtt.log', str);
@@ -271,8 +264,8 @@ function publish(device, property, message) {
 	client.publish(topic, message.toString());
 }
 
-process.on('exit', exitHandler.bind(null, { devices: devices, raw: raw }));
-process.on('SIGINT', exitHandler.bind(null, { devices: devices, raw: raw, exit: true }));
-process.on('SIGINT1', exitHandler.bind(null, { devices: devices, raw: raw, exit: true }));
-process.on('SIGINT2', exitHandler.bind(null, { devices: devices, raw: raw, exit: true }));
-process.on('uncaughtException', exitHandler.bind(null, { devices: devices, raw: raw, exit: true }));
+process.on('exit', exitHandler.bind(null, { devices: devices }));
+process.on('SIGINT', exitHandler.bind(null, { devices: devices, exit: true }));
+process.on('SIGINT1', exitHandler.bind(null, { devices: devices, exit: true }));
+process.on('SIGINT2', exitHandler.bind(null, { devices: devices, exit: true }));
+process.on('uncaughtException', exitHandler.bind(null, { devices: devices, exit: true }));
