@@ -70,8 +70,10 @@
 	<script type="text/javascript">
 		function updateTemp(data) {
 			Object.keys(data).forEach(name => {
-				$("#" + name + "-t").html(Number(data[name].temperature).toFixed(1) + "&deg;")
-				$("#" + name + "-h").html(Number(data[name].humidity).toFixed(0) + "%")
+				let tDef = $("#" + name + "-t").attr("default") ?? '';
+				$("#" + name + "-t").html(tDef + Number(data[name].temperature).toFixed(1) + "&deg;")
+				let hDef = $("#" + name + "-h").attr("default") ?? '';
+				$("#" + name + "-h").html(hDef + Number(data[name].humidity).toFixed(0) + "%")
 			});
 		}
 
@@ -330,9 +332,13 @@
 									<stop offset="100%" stop-color="var(--sc)" stop-opacity="0" />
 								</radialGradient>
 							</defs>
-							<g transform="translate(200, 0)">
+							<g transform="translate(200, -20)">
 								<text class="temp" hidden="true" id="th-utomhus-t" x="6" y="33" />
 								<text class="temp" hidden="true" id="th-utomhus-h" x="6" y="49" />
+							</g>
+							<g transform="translate(240, 450)">
+								<text class="temp" hidden="true" default="Kylsk&#229;p: " id="th-kylskap-t" x="6" y="33" />
+								<text class="temp" hidden="true" default="Frys: " id="th-frys-t" x="6" y="49" />
 							</g>
 							<g class="room" id="sovrum" transform="translate(179,66)">
 								<rect width="40" height="10" x="35" y="76" fill="white" hidden="true" class="name-blocker" />
@@ -414,13 +420,13 @@
 								<text class="temp" hidden="true" id="th-kontor-t" x="32" y="51" />
 								<text class="temp" hidden="true" id="th-kontor-h" x="32" y="67" />
 							</g>
-							<g class="room" id="badrum" transform="translate(160, 257)">
-								<rect width="22" height="10" x="26" y="24" fill="white" hidden="true" class="name-blocker-unused" />
-								<rect width="59" height="77" class="outline" />
+							<g class="room" id="badrum" transform="translate(159, 257)">
+								<rect width="22" height="10" x="27" y="24" fill="white" hidden="true" class="name-blocker-unused" />
+								<rect width="60" height="77" class="outline" />
 							</g>
-							<g class="room" id="dusch" transform="translate(172, 334)">
-								<rect width="22" height="10" x="17" y="32" fill="white" hidden="true" class="name-blocker-unused" />
-								<rect width="57" height="61" class="outline" />
+							<g class="room" id="dusch" transform="translate(159, 334)">
+								<rect width="22" height="10" x="30" y="32" fill="white" hidden="true" class="name-blocker-unused" />
+								<rect width="70" height="61" class="outline" />
 							</g>
 							<g class="room" id="tvattstuga" transform="translate(160, 436)">
 								<rect width="30" height="10" x="15" y="18" fill="white" hidden="true" class="name-blocker-unused" />

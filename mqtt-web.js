@@ -22,14 +22,20 @@ client.on('connect', function () {
 });
 
 //var devices = {};
-let buffer = fs.readFileSync('mqtt.log');
-let json = buffer.toString();
-var devices = JSON.parse(json);
 
-let buffer2 = fs.readFileSync('config.json');
-var config = JSON.parse(buffer2.toString());
+var devices;
+var config;
 
-//var raw = [];
+function init() {
+	let buffer = fs.readFileSync('mqtt.log');
+	let json = buffer.toString();
+	devices = JSON.parse(json);
+
+	let buffer2 = fs.readFileSync('config.json');
+	config = JSON.parse(buffer2.toString());
+}
+
+init();
 
 var configValues = 0;
 var values = 0;
@@ -56,25 +62,13 @@ client.on('message', function (topic, message) {
 		}
 	}
 
-	log();
-
 	fs.appendFile('mqtt-raw.log', `${topic}: ${message.toString()}\n`, function(err) {
 		if (err) console.log(err);
 	});;
-	//raw.push(`${topic}: ${message.toString()}`);
-	//if (raw.length >= 100) { raw.shift(); }
-	//console.log(`${topic}: ${message.toString()}`);
 });
-
-function log() {
-	//console.clear();
-	//console.log(`Received messages (config/values): ${messages} (${configValues}/${values})`);
-	//console.log(`Received web requests: ${requests}`);
-}
 
 const server = http.createServer((req, res) => {
 	requests++;
-	log();
 
 	let { method, url } = req;
 	if (method === 'OPTIONS') {
@@ -90,7 +84,6 @@ const server = http.createServer((req, res) => {
 		  const data = Buffer.concat(chunks);
 		  var obj = JSON.parse(data.toString());
 		  toggle(obj.name, obj.value);
-//		  publish(obj.name, 'onoff', obj.value);
 		});
 
 		res.statusCode = 204;
@@ -100,8 +93,8 @@ const server = http.createServer((req, res) => {
 
 	res.statusCode = 200;
 
-	if (url.startsWith('/dev')) {
-		let html = fs.readFileSync('./dev.html');
+	if (url.startsWith('/dashboard')) {
+		let html = fs.readFileSync('./dashboard.html');
 		res.end(html.toString());
 		return;
 	}
@@ -114,36 +107,10 @@ const server = http.createServer((req, res) => {
 		return;
 	}
 
-	if (url === '/temp?h=1') {
-		res.setHeader('Content-Type', 'text/html');
-		let temp = getTemperatures();
-		let sorted = Object.keys(temp).sort();
-		var html = `<html><body><table>`;
-
-		Object.values(sorted).forEach(key => {
-			html += `<tr><td>`;
-			html += key;
-			html += `<td><td>`;
-			html += temp[key];
-			html += `</td></tr>`;
-		});
-
-		html += `</table></body></html>`;
-		res.end(html);
-		return;
-	}
-
 	if (url === '/temp') {
 		res.setHeader('Content-Type', 'application/json');
 		let temp = getTemperatures();
 		var json = JSON.stringify(temp, null, '  ');
-		res.end(json);
-		return;
-	}
-
-	if (url === '/raw') {
-		res.setHeader('Content-Type', 'application/json');
-		var json = JSON.stringify(raw, null, '  ');
 		res.end(json);
 		return;
 	}
@@ -163,9 +130,6 @@ const server = http.createServer((req, res) => {
 		return;
 	}
 
-
-	//res.setHeader('Content-Type', 'application/json');
-	//res.end(JSON.stringify(req, null, '\t'));
 	res.setHeader('Content-Type', 'text/plain');
 	res.end(method);
 });
@@ -225,9 +189,6 @@ function getLights() {
 function exitHandler(options, exitCode) {
 	//Close MQTT
 	client.end();
-
-	//let rawstr = JSON.stringify(options.raw, null, '\t');
-	//fs.writeFileSync('mqtt-raw.log', rawstr);
 
 	let str = JSON.stringify(options.devices, null, '\t');
 	fs.writeFileSync('mqtt.log', str);
