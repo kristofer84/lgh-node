@@ -1,4 +1,7 @@
 {
+	"defaults": {
+		"hsv": {"h":0,"s":0,"v":100}
+	},
 	"zones": {
 		"garderob": [
 			"garderob-skap",
@@ -27,7 +30,7 @@
 			"v2.mood",
 			"skapbelysning.night",
 			"vardagsrum-tak",
-			"vardagsrum-vaggar"
+			"vardagsrum-vaggar.mood"
 		],
 		"kok": [
 			"kok-tak",

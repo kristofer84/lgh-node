@@ -182,8 +182,13 @@ function getTemperatures() {
 		var device = devices[key];
 		Object.keys(device).forEach(function (valueKey) {
 			if (valueKey === 'measure-temperature') {
-				let name = device['$name'];
-				retObj[name] = device[valueKey];
+				if (retObj[key] === undefined) retObj[key] = {};
+				retObj[key].temperature = device[valueKey];
+			}
+
+			if (valueKey === 'measure-humidity') {
+				if (retObj[key] === undefined) retObj[key] = {};
+				retObj[key].humidity = device[valueKey];
 			}
 		});
 	});
@@ -259,6 +264,7 @@ function toggle(zone, value) {
 }
 
 function publish(device, property, message) {
+	console.log(`homie/homey/${device}/${property}/set: ${message.toString()}`);
 	if (message === undefined) return;
 	var topic = `homie/homey/${device}/${property}/set`;
 	client.publish(topic, message.toString());
