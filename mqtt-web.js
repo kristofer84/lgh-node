@@ -37,14 +37,9 @@ function init() {
 
 init();
 
-var configValues = 0;
-var values = 0;
-var messages = 0;
-var requests = 0;
-
 client.on('message', function (topic, message) {
 	let split = topic.split('/');
-	messages++;
+
 	if (split[1] === 'homey') {
 
 		let device = split[2];
@@ -52,13 +47,9 @@ client.on('message', function (topic, message) {
 
 		if (devices[device] === undefined) { devices[device] = {}; }
 
-
-		if (split.length >= 5 || device.startsWith('$') || valueType.startsWith('$')) {
-				configValues++;
-		}
-		else {
-			values++;
+		if (split.length == 4 && !device.startsWith('$') && !valueType.startsWith('$')) {
 			devices[device][valueType] = message.toString();
+//			devices[device][valueType] = { 'value': message.toString(), 'timeStamp': Math.floor((new Date()).getTime() / 1000) }
 		}
 	}
 
@@ -68,8 +59,6 @@ client.on('message', function (topic, message) {
 });
 
 const server = http.createServer((req, res) => {
-	requests++;
-
 	let { method, url } = req;
 	if (method === 'OPTIONS') {
 		res.statusCode = 204;
@@ -99,13 +88,21 @@ const server = http.createServer((req, res) => {
 		return;
 	}
 
-	if (url.endsWith('.js')) {
-		let html = fs.readFileSync(`./scripts${url}`);
+	if (url.startsWith('/scripts/') && url.endsWith('.js')) {
+		let html = fs.readFileSync(`.${url}`);
 		res.setHeader('Content-Type', 'application/javascript');
 		res.end(html.toString());
 		return;
 	}
 
+	if (url.startsWith('/styles/') && url.endsWith('.css')) {
+		let html = fs.readFileSync(`.${url}`);
+		res.setHeader('Content-Type', 'text/css');
+		res.end(html.toString());
+		return;
+	}
+
+/*
 	if (url.startsWith('/toggle')) {
 		var params = url.split('/');
 		publish(`homie/homey/${params[2]}/onoff/set`, params[3]);
@@ -113,8 +110,9 @@ const server = http.createServer((req, res) => {
 		res.end('ok');
 		return;
 	}
+*/
 
-	if (url === '/temp') {
+	if (url === '/api/temp') {
 		res.setHeader('Content-Type', 'application/json');
 		let temp = getTemperatures();
 		var json = JSON.stringify(temp, null, '  ');
@@ -122,7 +120,7 @@ const server = http.createServer((req, res) => {
 		return;
 	}
 
-	if (url === '/light') {
+	if (url === '/api/light') {
 		res.setHeader('Content-Type', 'application/json');
 		let lights = getLights();
 		var json = JSON.stringify(lights, null, '  ');
@@ -130,7 +128,7 @@ const server = http.createServer((req, res) => {
 		return;
 	}
 
-	if (url === '/all') {
+	if (url === '/api/all') {
 		res.setHeader('Content-Type', 'application/json');
 		var json = JSON.stringify(devices, null, '  ');
 		res.end(json);
