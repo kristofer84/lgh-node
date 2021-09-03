@@ -32,6 +32,36 @@
 		}
 	</script>
 	<script type="text/javascript">
+	
+	async function test() {
+		
+	}
+
+
+
+
+	</script>
+	<script type="text/javascript">
+		var onlongtouch;
+		var timer;
+		var touchduration = 1000;
+
+		function touchstart() {
+			timer = setTimeout(onlongtouch, touchduration);
+		}
+
+		function touchend() {
+			if (timer) {
+				clearTimeout(timer);
+			}
+		}
+
+		onlongtouch = function(event) { alert(JSON.stringify(event)); }
+
+		window.addEventListener("touchstart", touchstart, false);
+		window.addEventListener("touchend", touchend, false);
+	</script>
+	<script type="text/javascript">
 		function rand() {
 			return Math.random().toString(36).replace(/[^a-z]+/g, '').substr(0, 7);
 		}

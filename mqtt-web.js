@@ -99,6 +99,13 @@ const server = http.createServer((req, res) => {
 		return;
 	}
 
+	if (url.endsWith('.js')) {
+		let html = fs.readFileSync(`./scripts${url}`);
+		res.setHeader('Content-Type', 'application/javascript');
+		res.end(html.toString());
+		return;
+	}
+
 	if (url.startsWith('/toggle')) {
 		var params = url.split('/');
 		publish(`homie/homey/${params[2]}/onoff/set`, params[3]);
