@@ -215,7 +215,6 @@ $(document).ready(function () {
 	});
 
 	$('#cb-nightmode').change(function() {
-		$('#image-border').attr("hidden", this.checked ? "false" : "true");
 		if (this.checked) {
 			$("body").addClass("nightmode");
 		}

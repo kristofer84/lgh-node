@@ -1,10 +1,15 @@
 body {
 	font-family: console;
+	transition: background 0.5s, color 0.5s;
 }
 
 body.nightmode {
 	background: black;
 	color: yellow;
+}
+
+text, rect, polygon, circle, path {
+	transition: fill 0.5s, fill-opacity 0.5s, display 0.5s;
 }
 
 body.nightmode text {
@@ -13,33 +18,55 @@ body.nightmode text {
 
 stop {
 	--sc: #FFCC00;
-//	--sc: #E69D0E;
 }
 
-[hidden="true"] { display: none; }
-.name-blocker[hidden="false"] { opacity: 0.8; }
+[hidden="true"] { 
+	display: none;
+}
 
-.room[light="on"] .outline { 
-//	fill: rgb(230, 157, 14); /* #E69D0E */
+.name-blocker { 
+	fill: white;
+}
+
+.name-blocker[hidden="false"] {
+	fill-opacity: 0.8;
+}
+
+/* Room outline */
+.room[light="on"] .room-outline { 
 	fill: #FFCC00;
 	fill-opacity: 0.6;
 }
 
-.mood, .night { display: none; }
+body.nightmode .room-outline { fill-opacity: 0.6; } 
+
+.room-outline {
+	fill-opacity: 0.2;
+} 
+
+/* End room outline */
+
+.mood, .night {
+	display: none;
+}
 
 [light="night"] .night,
 [light="mood"] .mood,
-[light="mood"] .night,
-[light="on"] .night
+[light="mood"] .night
 {
 	display: inline;
 }
 
+#image-border {
+	fill: black;
+	opacity: 0;
+	transition: opacity 0.5s;
+}
 
-#image-border { fill: black; }
+body.nightmode #image-border { 
+	opacity: 1;
+}
 
-.outline { fill-opacity: 0.2; } 
-body.nightmode .outline { fill-opacity: 0.6; } 
 .mood, .night { fill-opacity: 0.8; } 
 
 /*
@@ -71,8 +98,3 @@ body.nightmode .outline { fill-opacity: 0.6; }
 	height: 100%;
 	width: 100%;
 }
-
-.hl {
-	border: 1px solid black;
-}
-
