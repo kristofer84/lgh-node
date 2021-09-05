@@ -9,7 +9,7 @@ body.nightmode {
 }
 
 text, rect, polygon, circle, path {
-	transition: fill 0.5s, fill-opacity 0.5s, display 0.5s;
+	transition: fill 0.5s, fill-opacity 0.5s, opacity 0.2s;
 }
 
 body.nightmode text {
@@ -21,7 +21,7 @@ stop {
 }
 
 [hidden="true"] { 
-	display: none;
+	opacity: 0;
 }
 
 .name-blocker { 
@@ -43,20 +43,19 @@ body.nightmode .room-outline { fill-opacity: 0.6; }
 .room-outline {
 	fill-opacity: 0.2;
 } 
-
 /* End room outline */
 
 .mood, .night {
-	display: none;
+	opacity: 0;
 }
 
 [light="night"] .night,
 [light="mood"] .mood,
 [light="mood"] .night
 {
-	display: inline;
+	opacity: 1;
 }
-
+/*
 #image-border {
 	fill: black;
 	opacity: 0;
@@ -66,7 +65,7 @@ body.nightmode .room-outline { fill-opacity: 0.6; }
 body.nightmode #image-border { 
 	opacity: 1;
 }
-
+*/
 .mood, .night { fill-opacity: 0.8; } 
 
 /*
@@ -87,6 +86,10 @@ body.nightmode #image-border {
 	padding: 2px;
 	border-radius: 3px;
 	max-width: 100%;
+}
+
+#image-mapper-img  {
+	clip-path: url(#clip);
 }
 
 #image-mapper-svg {
