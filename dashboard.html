@@ -6,23 +6,17 @@
 	<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no" />
 	<script src="https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
 	<script src="./scripts/home.js"></script>
+	<script defer src="./node_modules/@fortawesome/fontawesome-free/js/all.min.js"></script>
 </head>
 <body>
 	<table>
 		<tr>
 			<td>
 				<div style="position: absolute; left: 40px; top:20px; z-index: 200;">
-					<input id="cb-refresh" type="checkbox">
-					<span>Auto refresh</span>
-					<br />
-					<input id="cb-mood" type="checkbox">
-					<span>Allow max light</span>
-					<br />
-					<input id="cb-temp" type="checkbox">
-					<span>Show temp</span>
-					<br />
-					<input id="cb-nightmode" type="checkbox">
-					<span>Night mode</span>
+					<label><input id="cb-refresh" type="checkbox" /><i class="fas fa-sync-alt fa-2x"></i></label>
+					<label><input id="cb-mood" type="checkbox" /><i class="fas fa-sun fa-2x"></i></label>
+					<label><input id="cb-temp" type="checkbox" /><i class="fas fa-thermometer-three-quarters fa-2x"></i></label>
+					<label><input id="cb-nightmode" type="checkbox" /><i class="fas fa-moon fa-2x"></i></label>
 				</div>
 				<div id="image-map-container">
 					<div id="image-mapper" style="max-width: 100%">

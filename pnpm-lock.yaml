@@ -1,14 +1,22 @@
 lockfileVersion: 5.3
 
 specifiers:
+  '@fortawesome/fontawesome-free': ^5.15.4
   concat-stream: ^2.0.0
   mqtt: ^4.2.8
 
 dependencies:
+  '@fortawesome/fontawesome-free': 5.15.4
   concat-stream: 2.0.0
   mqtt: 4.2.8
 
 packages:
+
+  /@fortawesome/fontawesome-free/5.15.4:
+    resolution: {integrity: sha512-eYm8vijH/hpzr/6/1CJ/V/Eb1xQFW2nnUKArb3z+yUWv7HTwj6M7SP957oMjfZjAHU6qpoNc2wQvIxBLWYa/Jg==}
+    engines: {node: '>=6'}
+    requiresBuild: true
+    dev: false
 
   /balanced-match/1.0.2:
     resolution: {integrity: sha512-3oSeUO0TMV67hN1AmbXsK4yaqU7tjiHlbxRDZOpH0KW9+CeX4bRAaX0Anxt0tx2MrpRpWwQaPwIlISEJhYU5Pw==}
@@ -171,7 +179,7 @@ packages:
       readable-stream: 3.6.0
       reinterval: 1.1.0
       split2: 3.2.2
-      ws: 7.5.3
+      ws: 7.5.4
       xtend: 4.0.2
     transitivePeerDependencies:
       - bufferutil
@@ -250,8 +258,8 @@ packages:
     resolution: {integrity: sha1-tSQ9jz7BqjXxNkYFvA0QNuMKtp8=}
     dev: false
 
-  /ws/7.5.3:
-    resolution: {integrity: sha512-kQ/dHIzuLrS6Je9+uv81ueZomEwH0qVYstcAQ4/Z93K8zeko9gtAbttJWzoC5ukqXY1PpoouV3+VSOqEAFt5wg==}
+  /ws/7.5.4:
+    resolution: {integrity: sha512-zP9z6GXm6zC27YtspwH99T3qTG7bBFv2VIkeHstMLrLlDJuzA7tQ5ls3OJ1hOGGCzTQPniNJoHXIAOS0Jljohg==}
     engines: {node: '>=8.3.0'}
     peerDependencies:
       bufferutil: ^4.0.1

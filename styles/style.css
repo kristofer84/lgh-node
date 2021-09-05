@@ -101,3 +101,24 @@ body.nightmode #image-border {
 	height: 100%;
 	width: 100%;
 }
+
+input[type=checkbox] {
+	display: none;
+}
+
+input[type=checkbox]~svg {
+	color: lightgray;
+	transition: color 0.3s;
+}
+
+body.nightmode input[type=checkbox]~svg {
+	color: lightgray;
+}
+
+input[type=checkbox]:checked~svg {
+	color: black;
+}
+
+body.nightmode input[type=checkbox]:checked~svg {
+	color: lawngreen;
+}

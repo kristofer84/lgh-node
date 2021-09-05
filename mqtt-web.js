@@ -88,14 +88,16 @@ const server = http.createServer((req, res) => {
 		return;
 	}
 
-	if (url.startsWith('/scripts/') && url.endsWith('.js')) {
+/*	if (url.startsWith('/scripts/') && url.endsWith('.js')) { */
+	if (url.endsWith('.js')) {
 		let html = fs.readFileSync(`.${url}`);
 		res.setHeader('Content-Type', 'application/javascript');
 		res.end(html.toString());
 		return;
 	}
 
-	if (url.startsWith('/styles/') && url.endsWith('.css')) {
+/*	if (url.startsWith('/styles/') && url.endsWith('.css')) { */
+	if (url.endsWith('.css')) {
 		let html = fs.readFileSync(`.${url}`);
 		res.setHeader('Content-Type', 'text/css');
 		res.end(html.toString());
