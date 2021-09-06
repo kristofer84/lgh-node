@@ -215,11 +215,11 @@ $(document).ready(function () {
 	$('#cb-settings').change(function() {
 		if (this.checked) {
 			$("#cb-settings").addClass("rotate");
-			$("#settings").addClass("slide-right");
+			$("#settings").addClass("slide");
 	}
 		else {
 			$("#cb-settings").removeClass("rotate");
-			$("#settings").removeClass("slide-right");
+			$("#settings").removeClass("slide");
 		}
 	});
 
@@ -272,6 +272,27 @@ $(document).ready(function () {
 		d.setTime(d.getTime() + (7*24*60*60*1000)); //seconds
 		let cookie = `${cb.id}=${cb.checked}; expires=${d.toGMTString()};path=/`;
 		document.cookie = cookie;
+		if (cb.id === 'cb-refresh' || cb.id === 'cb-mood') {
+			popup(cb);
+		}
 	});
 	//Cookies end
+
+	//Message on click
+	var popupTimer;
+	var popupTimerInner;
+	function popup(cb) {
+		let name = cb.getAttribute('name');
+		let message = `${name}: ${cb.checked ? 'on' : 'off'}`;
+		$('#popup').text(message);
+		$('#popup').removeClass('removed');
+		$('#popup').addClass('popup');
+
+		clearTimeout(popupTimer);
+		clearTimeout(popupTimerInner);
+		popupTimer = setTimeout(function() {
+			$('#popup').removeClass('popup');
+			popupTimerInner = setTimeout(function() { $('#popup').addClass('removed'); }, 1200);
+		}, 300);
+	}
 });

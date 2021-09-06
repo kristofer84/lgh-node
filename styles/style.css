@@ -16,6 +16,10 @@ body.nightmode text {
 	fill: yellow;
 }
 
+.removed {
+	display: none;
+}
+
 /* Menu start */
 #cb-settings~svg {
 	transition: transform 1s ease, color 1s ease !important;
@@ -51,7 +55,7 @@ body.nightmode input[type=checkbox]:checked~svg {
 	width: 255px;
 }
 
-#settings.slide-right {
+#settings.slide {
 	width: 255px;
 }
 
@@ -61,15 +65,40 @@ body.nightmode input[type=checkbox]:checked~svg {
 	opacity: 0;
 	transition: top 1s ease, opacity 0.8s ease;
 	position: absolute;
-	width: 170px;
+	width: 200px;
 	top: -60px;
-	right: 50px;
+	right: 2px;
 }
 
-#settings.slide-right #menu {
+#settings.slide #menu {
 	opacity: 1;
 	top: 0px;
 }
+
+#popup {
+	background: gray;
+	border: 1px solid black;
+	padding: 10px;
+	transition: opacity 1.2s ease-out;
+	position: fixed;
+	width: 180px;
+	height: 20px;
+	margin-left: -100px;
+	margin-top: -10px;
+	text-align: center;
+	left: 50%;
+	top: 50%;
+	font-weight: bold;
+	z-index: 500;
+	opacity: 0;
+}
+
+#popup.popup {
+	display: inline;
+	transition: none;
+	opacity: 1;
+}
+
 /* Menu end */
 
 stop {
