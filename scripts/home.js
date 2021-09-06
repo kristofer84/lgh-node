@@ -181,12 +181,12 @@ function updateArea(element, value) {
 
 $(document).ready(function () {
 	$(".room").click(e => {
-		skipRefresh = 2;
+		//Skip refresh for 3 seconds after click
+		skipRefresh = 3;
 		let ar = e.currentTarget;
 		var name = ar.id;
 
 		let nextState = getNextState(ar);
-		//alert(nextState);
 		var item = {
 			name: name,
 			value: nextState
@@ -197,8 +197,6 @@ $(document).ready(function () {
 	});
 
 	get();
-
-	//setInterval(get, 5000);
 });
 
 $(document).ready(function () {
@@ -214,6 +212,17 @@ $(document).ready(function () {
 		}
 	});
 
+	$('#cb-settings').change(function() {
+		if (this.checked) {
+			$("#cb-settings").addClass("rotate");
+			$("#settings").addClass("slide-right");
+	}
+		else {
+			$("#cb-settings").removeClass("rotate");
+			$("#settings").removeClass("slide-right");
+		}
+	});
+
 	$('#cb-nightmode').change(function() {
 		if (this.checked) {
 			$("body").addClass("nightmode");
@@ -224,12 +233,25 @@ $(document).ready(function () {
 	});
 
 	$('#cb-temp').change(function() {
-		$('.temp').attr("hidden", this.checked ? "false" : "true");
-		$('.name-blocker').attr("hidden", this.checked ? "false" : "true");
+		if (this.checked) {
+			$('.temp').removeClass("hidden");
+			$('.name-blocker').removeClass("hidden");
+		}
+		else {
+			$('.temp').addClass("hidden");
+			$('.name-blocker').addClass("hidden");
+		}
 	});
 });
 
 $(document).ready(function () {
+	var els = document.getElementsByClassName("lampa-horn");
+	Array.prototype.forEach.call(els, function(el) { el.setAttribute("d", describeSector(0, 0, 100, 0, 90))});
+
+	var els2 = document.getElementsByClassName("lampa-vagg");
+	Array.prototype.forEach.call(els2, function(el) { el.setAttribute("d", describeSector(0, 0, 50, 0, 180))});
+
+	//Cookies start
 	//Set checkboxes from cookie
 	let cookieData = decodeURIComponent(document.cookie).split(';');
 	cookieData.forEach(data => {
@@ -243,12 +265,6 @@ $(document).ready(function () {
 		}
 	});
 
-	var els = document.getElementsByClassName("lampa-horn");
-	Array.prototype.forEach.call(els, function(el) { el.setAttribute("d", describeSector(0, 0, 100, 0, 90))});
-
-	var els2 = document.getElementsByClassName("lampa-vagg");
-	Array.prototype.forEach.call(els2, function(el) { el.setAttribute("d", describeSector(0, 0, 50, 0, 180))});
-
 	//Monitor checkboxes
 	let checkboxes = $('input[type=checkbox]').click(e => {
 		let cb = e.currentTarget;
@@ -257,4 +273,5 @@ $(document).ready(function () {
 		let cookie = `${cb.id}=${cb.checked}; expires=${d.toGMTString()};path=/`;
 		document.cookie = cookie;
 	});
+	//Cookies end
 });

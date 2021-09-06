@@ -9,18 +9,74 @@ body.nightmode {
 }
 
 text, rect, polygon, circle, path {
-	transition: fill 0.5s, fill-opacity 0.5s, opacity 0.2s;
+	transition: fill 0.5s, fill-opacity 0.5s, opacity 0.3s;
 }
 
 body.nightmode text {
 	fill: yellow;
 }
 
+/* Menu start */
+#cb-settings~svg {
+	transition: transform 1s ease, color 1s ease !important;
+}
+
+#cb-settings.rotate~svg {
+	transform: rotate(355deg);
+	color: red;
+}
+
+input[type=checkbox] {
+	display: none;
+}
+
+input[type=checkbox]~svg {
+	color: lightgray;
+	transition: color 0.3s;
+}
+
+body.nightmode input[type=checkbox]~svg {
+	color: #555;
+}
+
+input[type=checkbox]:checked~svg {
+	color: black;
+}
+
+body.nightmode input[type=checkbox]:checked~svg {
+	color: lawngreen;
+}
+
+#settings {
+	width: 255px;
+}
+
+#settings.slide-right {
+	width: 255px;
+}
+
+#menu {
+	display: flex;
+	justify-content: space-evenly;
+	opacity: 0;
+	transition: top 1s ease, opacity 0.8s ease;
+	position: absolute;
+	width: 170px;
+	top: -60px;
+	right: 50px;
+}
+
+#settings.slide-right #menu {
+	opacity: 1;
+	top: 0px;
+}
+/* Menu end */
+
 stop {
 	--sc: #FFCC00;
 }
 
-[hidden="true"] { 
+.hidden { 
 	opacity: 0;
 }
 
@@ -28,7 +84,7 @@ stop {
 	fill: white;
 }
 
-.name-blocker[hidden="false"] {
+.name-blocker {
 	fill-opacity: 0.8;
 }
 
@@ -55,17 +111,7 @@ body.nightmode .room-outline { fill-opacity: 0.6; }
 {
 	opacity: 1;
 }
-/*
-#image-border {
-	fill: black;
-	opacity: 0;
-	transition: opacity 0.5s;
-}
 
-body.nightmode #image-border { 
-	opacity: 1;
-}
-*/
 .mood, .night { fill-opacity: 0.8; } 
 
 /*
@@ -100,25 +146,4 @@ body.nightmode #image-border {
 	left: 0;
 	height: 100%;
 	width: 100%;
-}
-
-input[type=checkbox] {
-	display: none;
-}
-
-input[type=checkbox]~svg {
-	color: lightgray;
-	transition: color 0.3s;
-}
-
-body.nightmode input[type=checkbox]~svg {
-	color: lightgray;
-}
-
-input[type=checkbox]:checked~svg {
-	color: black;
-}
-
-body.nightmode input[type=checkbox]:checked~svg {
-	color: lawngreen;
 }

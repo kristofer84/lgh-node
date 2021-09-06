@@ -12,11 +12,14 @@
 	<table>
 		<tr>
 			<td>
-				<div style="position: absolute; left: 40px; top:20px; z-index: 200;">
-					<label><input id="cb-refresh" type="checkbox" /><i class="fas fa-sync-alt fa-2x"></i></label>
-					<label><input id="cb-mood" type="checkbox" /><i class="fas fa-sun fa-2x"></i></label>
-					<label><input id="cb-temp" type="checkbox" /><i class="fas fa-thermometer-three-quarters fa-2x"></i></label>
-					<label><input id="cb-nightmode" type="checkbox" /><i class="fas fa-moon fa-2x"></i></label>
+				<div id="settings" style="position: absolute; left: 20px; top: 20px; z-index: 200;">
+					<label><input id="cb-settings" type="checkbox" /><i class="fas fa-cog fa-2x"></i></label>
+					<div id="menu">
+						<label><input id="cb-refresh" type="checkbox" /><i class="fas fa-sync-alt fa-2x"></i></label>
+						<label><input id="cb-mood" type="checkbox" /><i class="fas fa-sun fa-2x"></i></label>
+						<label><input id="cb-temp" type="checkbox" /><i class="fas fa-thermometer-three-quarters fa-2x"></i></label>
+						<label><input id="cb-nightmode" type="checkbox" /><i class="fas fa-moon fa-2x"></i></label>
+					</div>
 				</div>
 				<div id="image-map-container">
 					<div id="image-mapper" style="max-width: 100%">
@@ -41,16 +44,16 @@
 								</radialGradient>
 							</defs>
 						<!--	<path id="image-border" fill-rule="evenodd" d="M 0 0 h 350 v 560 H 0 Z M 23 162 L 330 16 v 83 h 6 v 92 h -6 v 250 h -97 v 46 h -84 v 49 h -57 v -49 h -69 Z" /> -->
-							<g transform="translate(200, -20)">
-								<text class="temp" hidden="true" id="th-utomhus-t" x="6" y="33" />
-								<text class="temp" hidden="true" id="th-utomhus-h" x="6" y="49" />
+							<g transform="translate(220, -20)">
+								<text class="temp hidden" id="th-utomhus-t" x="6" y="33" />
+								<text class="temp hidden" id="th-utomhus-h" x="6" y="49" />
 							</g>
 							<g transform="translate(240, 450)">
-								<text class="temp" hidden="true" default="Kylsk&#229;p: " id="th-kylskap-t" x="6" y="33" />
-								<text class="temp" hidden="true" default="Frys: " id="th-frys-t" x="6" y="49" />
+								<text class="temp hidden" default="Kylsk&#229;p: " id="th-kylskap-t" x="6" y="33" />
+								<text class="temp hidden" default="Frys: " id="th-frys-t" x="6" y="49" />
 							</g>
 							<g class="room" id="sovrum" transform="translate(179,66)">
-								<rect width="40" height="10" x="35" y="76" hidden="true" class="name-blocker" />
+								<rect width="40" height="10" x="35" y="76" class="name-blocker hidden" />
 								<polygon class="room-outline" points="0,23,45,0,45,32,112,32,112,125,40,125,40,151,0,151" />
 								<g transform="translate(105, 124) rotate(270) scale(0.7)">
 									<path class="mood lampa-horn" fill="url(#p-horn)" />
@@ -58,23 +61,23 @@
 								<g transform="translate(2, 80) scale(1.5, 1)">
 									<path class="mood lampa-vagg" fill="url(#p-vagg)" />
 								</g>
-								<text class="temp" hidden="true" id="th-sovrum-t" x="40" y="78" />
-								<text class="temp" hidden="true" id="th-sovrum-h" x="40" y="94" />
+								<text class="temp hidden" id="th-sovrum-t" x="40" y="78" />
+								<text class="temp hidden" id="th-sovrum-h" x="40" y="94" />
 							</g>
 							<g class="room" id="garderob" transform="translate(226, 16)">
-								<rect width="58" height="10" x="20" y="55" hidden="true" class="name-blocker-unused" />
+								<rect width="58" height="10" x="20" y="55" class="name-blocker-unused hidden" />
 								<polygon points="0,49,104,0,104,82,0,82" class="room-outline" />
 							</g>
 							<g class="room" id="vardagsrum" transform="translate(23, 90)">
-								<rect width="70" height="10" x="55" y="107" hidden="true" class="name-blocker-unused" />
+								<rect width="70" height="10" x="55" y="107" class="name-blocker-unused hidden" />
 								<polygon class="room-outline" points="0,72,155,0,155,163,0,163" />
 								<circle class="mood" cx="98" cy="100" r="50" fill="url(#pf)" />
 								<g transform="translate(53, 55) rotate(65)">
 									<path class="night lampa-vagg" fill="url(#p-vagg)" />
 								</g>
 							</g>
-							<g class="room" id="entre" transform="translate(96, 394)">
-								<rect width="25" height="10" x="13" y="105" hidden="true" class="name-blocker-unused" />
+							<g class="room" id="entre" transform="translate(96, 395)">
+								<rect width="25" height="10" x="13" y="104" class="name-blocker-unused hidden" />
 								<polygon points="0,0,41,0,41,42,63,42,63,89,49,89,49,138,0,138" class="room-outline" />
 							</g>
 							<g class="room" id="hall-sovrum" transform="translate(179, 218)">
@@ -82,64 +85,63 @@
 							</g>
 							<g class="room" id="hall-tvattstuga" transform="translate(138, 397)">
 								<rect width="90" height="38" class="room-outline" />
-								<text class="temp" hidden="true" id="th-hall-t" x="30" y="17" />
-								<text class="temp" hidden="true" id="th-hall-h" x="30" y="33" />
+								<text class="temp hidden" id="th-hall-t" x="30" y="17" />
+								<text class="temp hidden" id="th-hall-h" x="30" y="33" />
 							</g>
 							<g class="room" id="balkong" transform="translate(292, 99)">
-								<rect width="30" height="10" x="10" y="53" hidden="true" class="name-blocker-unused" />
+								<rect width="30" height="10" x="10" y="53" class="name-blocker-unused hidden" />
 								<rect width="44" height="92" class="room-outline" />
 							</g>
-							<g class="room" id="orangeri" transform="translate(23, 394)">
-								<rect width="40" height="10" x="16" y="34" hidden="true" class="name-blocker" />
-								<rect width="72" height="89" class="room-outline" />
-								<!-- <path class="night" id="orangeri-bordslampa" fill="url('#pfo')" /> -->
-								<g transform="translate(0, 86)">
+							<g class="room" id="orangeri" transform="translate(23, 395)">
+								<rect width="40" height="10" x="16" y="33" class="name-blocker hidden" />
+								<rect width="72" height="88" class="room-outline" />
+								<g transform="translate(0, 85)">
 									<path class="night lampa-horn" fill="url(#p-horn)" />
 								</g>
-								<text class="temp" hidden="true" id="th-orangeri-t" x="21" y="37" />
-								<text class="temp" hidden="true" id="th-orangeri-h" x="21" y="53" />
+								<text class="temp hidden" id="th-orangeri-t" x="21" y="36" />
+								<text class="temp hidden" id="th-orangeri-h" x="21" y="52" />
 							</g>
 							<g class="room" id="kok" transform="translate(23, 254)">
-								<rect width="45" height="22" x="38" y="75" hidden="true" class="name-blocker-unused" />
-								<rect width="135" height="139" class="room-outline" />
+								<rect width="45" height="22" x="38" y="75" class="name-blocker-unused hidden" />
+								<rect width="135" height="140" class="room-outline" />
 									<circle class="mood" cx="60" cy="95" r="50" fill="url(#pf)" />
 									<g transform="translate(132, 70) rotate(180) scale(2.5, 1.5)">
 									<path class="mood lampa-vagg" fill="url(#p-vagg)" />
 								</g>
 							</g>
 							<g class="room" id="sovrum-mk" transform="translate(220, 192)">
-								<rect width="40" height="10" x="32" y="40" hidden="true" class="name-blocker" />
+								<rect width="40" height="10" x="32" y="40" class="name-blocker hidden" />
 								<rect width="110" height="80" class="room-outline" />
 								<g transform="translate(0, 0) rotate(90) scale(0.7)">
 									<path class="night lampa-horn" fill="url(#p-horn)" />
 								</g>
-								<text class="temp" hidden="true" id="th-barnens-rum-t" x="37" y="38" />
-								<text class="temp" hidden="true" id="th-barnens-rum-h" x="37" y="54" />
+								<text class="temp hidden" id="th-barnens-rum-t" x="37" y="38" />
+								<text class="temp hidden" id="th-barnens-rum-h" x="37" y="54" />
 							<!--	<use xlink:href="#circle" x="50" y="42" /> -->
 							</g>
 							<g class="room" id="garderob-kontor" transform="translate(220, 273)">
-								<rect width="70" height="10" x="14" y="18" hidden="true" class="name-blocker-unused" />
+								<rect width="70" height="10" x="14" y="18" class="name-blocker-unused hidden" />
 								<rect width="110" height="46" class="room-outline" />
 							</g>
 							<g class="room" id="kontor" transform="translate(230, 320)">
-								<rect width="40" height="10" x="32" y="50" hidden="true" class="name-blocker" />
+								<rect width="40" height="10" x="32" y="50" class="name-blocker hidden" />
 								<rect width="100" height="117" class="room-outline" />
 								<g transform="translate(2, 59) scale(2, 1.2)">
 									<path class="mood lampa-vagg" fill="url(#p-vagg)" />
 								</g>
-								<text class="temp" hidden="true" id="th-kontor-t" x="32" y="51" />
-								<text class="temp" hidden="true" id="th-kontor-h" x="32" y="67" />
+								<text class="temp hidden" id="th-kontor-t" x="32" y="51" />
+								<text class="temp hidden" id="th-kontor-h" x="32" y="67" />
 							</g>
 							<g class="room" id="badrum" transform="translate(159, 257)">
-								<rect width="22" height="10" x="27" y="24" hidden="true" class="name-blocker-unused" />
+								<rect width="22" height="10" x="27" y="24" class="name-blocker-unused hidden" />
 								<rect width="60" height="77" class="room-outline" />
 							</g>
 							<g class="room" id="dusch" transform="translate(159, 334)">
-								<rect width="22" height="10" x="30" y="32" hidden="true" class="name-blocker-unused" />
+								<rect width="22" height="10" x="30" y="32" class="name-blocker-unused hidden" />
 								<rect width="70" height="61" class="room-outline" />
 							</g>
 							<g class="room" id="tvattstuga" transform="translate(160, 436)">
-								<rect width="30" height="10" x="15" y="18" hidden="true" class="name-blocker-unused" />
+								<rect width="30" height="10" x="15" y="18" class="name-blocker-unused hidden" />
 								<rect width="69" height="47" class="room-outline" />
 							</g>
 						</svg>
