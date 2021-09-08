@@ -4,65 +4,76 @@
 	},
 	"zones": {
 		"garderob": [
-			"garderob-skap",
-			"garderob-tak"
+			"garderob-skap.light",
+			"garderob-tak.light"
 		],
 		"sovrum": [
-			"sang-hoger.mood",
-			"sang-vanster.mood",
-			"sovrum.mood",
-			"sovrum-tak"
+			"sang-hoger.light.mood",
+			"sang-vanster.light.mood",
+			"sovrum.light.mood",
+			"sovrum-tak.light",
+			"th-sovrum.th"
 		],
 		"sovrum-mk": [
-			"sovrum-mk",
-			"lampa-byra.mood"
+			"sovrum-mk.light",
+			"lampa-byra.light.mood",
+			"th-barnens-rum.th"
 		],
 		"hall-sovrum": [
-			"hall-sovrum"
+			"hall-sovrum.light"
 		],
 		"badrum": [
-			"badrum-spegel",
-			"badrum-tak"
+			"badrum-spegel.light",
+			"badrum-tak.light"
 		],
 		"vardagsrum": [
-			"golvlampa.mood",
-			"v1.mood",
-			"v2.mood",
-			"skapbelysning.night",
-			"vardagsrum-tak",
-			"vardagsrum-vaggar.mood"
+			"golvlampa.light.mood",
+			"v1.light.mood",
+			"v2.light.mood",
+			"skapbelysning.light.night",
+			"vardagsrum-tak.light",
+			"vardagsrum-vaggar.light.mood"
 		],
 		"kok": [
-			"kok-tak",
-			"koksbank.mood",
-			"koksbord.mood"
+			"kok-tak.light",
+			"koksbank.light.mood",
+			"koksbord.light.mood",
+			"th-kylskap.th",
+			"th-frys.th"
 		],
 		"orangeri": [
-			"orangeri",
-			"bordslampa.night"
+			"orangeri.light",
+			"bordslampa.light.night",
+			"th-orangeri.th"
 		],
 		"entre": [
-			"hall-entre"
+			"hall-entre.light",
+			"multisensor-6.th"
 		],
 		"dusch": [
-			"dusch-tak",
-			"dusch-spegel"
+			"dusch-tak.light",
+			"dusch-spegel.light"
 		],
 		"hall-tvattstuga": [
-			"hall-tvattstuga"
+			"hall-tvattstuga.light",
+			"th-hall.th"
 		],
 		"tvattstuga": [
-			"tvattstuga",
-			"tvattstuga-bank"
+			"tvattstuga.light",
+			"tvattstuga-bank.light"
 		],
 		"kontor": [
-			"kontor",
-			"hylla-hoger.mood",
-			"hylla-vanster.mood"
+			"kontor.light",
+			"hylla-hoger.light.mood",
+			"hylla-vanster.light.mood",
+			"th-kontor.th"
 		],
 		"garderob-kontor": [
-			"garderob-2-skap",
-			"garderob-2-tak"
+			"garderob-2-skap.light",
+			"garderob-2-tak.light"
+		],
+		"utomhus": [
+			"th-utomhus.th"
 		]
 	}
 }

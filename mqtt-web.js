@@ -4,7 +4,6 @@ const fs = require('fs');
 const http = require('http');
 const concat = require('concat-stream');
 const qs = require('querystring');
-
 const hostname = 'localhost';
 const port = 8080;
 
@@ -13,15 +12,13 @@ process.stdin.resume();
 client.on('connect', function () {
 	client.subscribe('#', function (err) {
 		if (!err) {
-			console.log('connected');
+			log('MQTT connected');
 		}
 		else {
-			console.log(err);
+			log(err);
 		}
 	});
 });
-
-//var devices = {};
 
 var devices;
 var config;
@@ -33,6 +30,18 @@ function init() {
 
 	let buffer2 = fs.readFileSync('config.json');
 	config = JSON.parse(buffer2.toString());
+
+	//Save zone for each light for faster processing
+	/*
+	Object.keys(config.zones).forEach(zone => {
+		let values = config.zones[zone];
+
+		values.forEach(light => {
+			let split = light.split('.');
+			deviceZones[split[0]] = zone;
+		});
+	});
+	*/
 }
 
 init();
@@ -49,14 +58,23 @@ client.on('message', function (topic, message) {
 
 		if (split.length == 4 && !device.startsWith('$') && !valueType.startsWith('$')) {
 			devices[device][valueType] = message.toString();
-//			devices[device][valueType] = { 'value': message.toString(), 'timeStamp': Math.floor((new Date()).getTime() / 1000) }
+
+			let dev = getDevice(device);
+			if (Object.keys(dev).length > 0) {
+				filterQueue(dev);
+			}
 		}
 	}
 
 	fs.appendFile('mqtt-raw.log', `${topic}: ${message.toString()}\n`, function(err) {
-		if (err) console.log(err);
-	});;
+		if (err) log(err);
+	});
 });
+
+function filterQueue(msg) {
+	let json = JSON.stringify(msg);
+	io.emit('device', json);
+}
 
 const server = http.createServer((req, res) => {
 	let { method, url } = req;
@@ -124,7 +142,7 @@ const server = http.createServer((req, res) => {
 
 	if (url === '/api/light') {
 		res.setHeader('Content-Type', 'application/json');
-		let lights = getLights();
+		let lights = getDevice(null);
 		var json = JSON.stringify(lights, null, '  ');
 		res.end(json);
 		return;
@@ -141,10 +159,36 @@ const server = http.createServer((req, res) => {
 	res.end(method);
 });
 
+function log(str) {
+	let date = new Date().toISOString();
+	console.log(`${date} - ${str}`);
+}
+
+// START socket.io
+const io = require('socket.io')(server);
+io.on('connection', client => {
+	log(`${client.id} connected, sending data`);
+
+	let lights = getDevice(null);
+	var json = JSON.stringify(lights, null, '  ');
+	var cson = JSON.stringify(config, null, '  ');
+	client.emit('device.all', json);
+//	client.emit('config', cson);
+
+	client.on('toggle', data => {
+		  var obj = JSON.parse(data.toString());
+		  toggle(obj.name, obj.value);
+	});
+
+	//client.on('event', data => { log(`data: ${JSON.stringify(data)}`); });
+	client.on('disconnect', () => { log(`${client.id} disconnected`); });
+});
+// END socket.io
+
 // server.listen(port, hostname, () => {
-// console.log(`Server running at http://${hostname}:${port}/`);
+// log(`Server running at http://${hostname}:${port}/`);
 server.listen(port, () => {
-	console.log(`Server running at port ${port}`);
+	log(`Server running at port ${port}`);
 });
 
 function getTemperatures() {
@@ -166,7 +210,7 @@ function getTemperatures() {
 	return retObj;
 }
 
-function getLights() {
+function getDevice(dev) {
 	let retObj = {}
 
 	Object.keys(config.zones).forEach(zone => {
@@ -175,18 +219,34 @@ function getLights() {
 
 		values.forEach(light => {
 			let split = light.split('.');
+
+			if (dev && dev !== split[0]) return;
+
+			let ret = {};
+			let type = split[1];
 			let device = devices[split[0]];
-			let onoff = undefined;
-			let dim = undefined;
-			let mood = (split.length > 1 && split[1] === 'mood') ? true : undefined;
-			let night = (split.length > 1 && split[1] === 'night') ? true : undefined;
-			if (device != undefined) {
-				onoff = device['onoff'];
-				dim = device['dim'];
+			if (type === 'light') {
+				ret.mood = (split.length > 2 && split[2] === 'mood') ? true : undefined;
+				ret.night = (split.length > 2 && split[2] === 'night') ? true : undefined;
 			}
-			zoneDevices[split[0]] = { onoff: (onoff === 'true'), mood: mood, night: night, dim: dim };
+
+			if (device != undefined) {
+				if (type === 'light') {
+					ret.onoff = device['onoff'] === 'true';
+					ret.dim = device['dim'];
+				}
+				else {
+					ret.temperature = device['measure-temperature'];
+					ret.humidity = device['measure-humidity'];
+				}
+			}
+
+			zoneDevices[split[0]] = ret;
 		});
-		retObj[zone] = zoneDevices;
+
+		if (Object.keys(zoneDevices).length > 0) {
+			retObj[zone] = zoneDevices;
+		}
 	});
 
 	return retObj;
@@ -201,38 +261,49 @@ function exitHandler(options, exitCode) {
 	fs.writeFileSync('mqtt.log', str);
 
 	if (options.exit) {
-		console.log(`Exiting: ${exitCode}`);
+		log(`Exiting: ${exitCode}`);
 		process.exit();
 	}
 }
 
 function toggle(zone, value) {
 	if (config.zones[zone] === undefined) {
-		console.log(`Missing zone: ${zone}`);
+		log(`Missing zone: ${zone}`);
+		return;
+	}
+
+	if (value === undefined) {
+		log(`Missing value`);
 		return;
 	}
 
 	if (value === "night") {
 		config.zones[zone].forEach(device => {
 			var split = device.split('.');
-			var toState = (split.length > 1 && split[1] === 'night');
+			if (split[1] !== 'light') return;
+			var toState = (split.length > 2 && split[2] === 'night');
 			publish(split[0], 'onoff', toState);
 		});
 	}
 	else if (value === "mood") {
 		config.zones[zone].forEach(device => {
 			var split = device.split('.');
-			var toState = (split.length > 1); //Night && mood
+			if (split[1] !== 'light') return;
+			var toState = (split.length > 2); //Night && mood
 			publish(split[0], 'onoff', toState);
 		});
 	}
 	else {
-		config.zones[zone].forEach(device => publish(device.split('.')[0], 'onoff', value));
+		config.zones[zone].forEach(device => {
+			var split = device.split('.');
+			if (split[1] !== 'light') return;
+			publish(split[0], 'onoff', value)
+		});
 	}
 }
 
 function publish(device, property, message) {
-	console.log(`homie/homey/${device}/${property}/set: ${message.toString()}`);
+	log(`homie/homey/${device}/${property}/set: ${message.toString()}`);
 	if (message === undefined) return;
 	var topic = `homie/homey/${device}/${property}/set`;
 	client.publish(topic, message.toString());

@@ -1,3 +1,63 @@
+// START socket.io
+var socket;
+var reconnect = false;
+var raw = [];
+
+function connect() {
+	socket = io();
+	appendLog('connected');
+	socket.on('device.all', function(msg) {
+		let obj = JSON.parse(msg);
+		updateMap(obj);
+		appendLog('complete state received');
+	});
+
+	socket.on('device', function(msg) {
+		let obj = JSON.parse(msg);
+		updateMap(obj);
+		appendLog(msg);
+	});
+}
+
+function appendLog(msg) {
+	if (raw.length >= 40) { raw.shift(); }
+	raw.push(`${getTime()} ${msg}`);
+	$('#raw').html(raw.join("<br />"));
+}
+
+function disconnect() {
+	socket.disconnect();
+	socket = null;
+	appendLog('disconnected');
+}
+
+$(window).focus(function() {
+	if (reconnect) connect();
+});
+
+$(window).blur(function() {
+	if (socket) disconnect();
+});
+
+// END socket.io
+
+// START Generic helpers
+Number.prototype.pad = function(size) {
+    var s = String(this);
+    while (s.length < (size || 2)) {s = "0" + s;}
+    return s;
+}
+
+function getTime() {
+	let now = new Date();
+	return `${now.getHours().pad()}:${now.getMinutes().pad()}:${now.getSeconds().pad()}`;
+}
+function rand() {
+	return Math.random().toString(36).replace(/[^a-z]+/g, '').substr(0, 7);
+}
+// END Generic helpers
+
+// START SVG helpers
 function polarToCartesian(centerX, centerY, radius, angleInDegrees) {
 	var angleInRadians = (angleInDegrees - 90) * Math.PI / 180.0;
 
@@ -24,6 +84,16 @@ function describeSector(x, y, radius, startAngle, endAngle) {
 	return d;
 }
 
+$(document).ready(function () {
+	var els = document.getElementsByClassName("lampa-horn");
+	Array.prototype.forEach.call(els, function(el) { el.setAttribute("d", describeSector(0, 0, 100, 0, 90))});
+
+	var els2 = document.getElementsByClassName("lampa-vagg");
+	Array.prototype.forEach.call(els2, function(el) { el.setAttribute("d", describeSector(0, 0, 50, 0, 180))});
+});
+// END SVG helpers
+
+/*
 var onlongtouch;
 var timer;
 var touchduration = 1000;
@@ -42,41 +112,51 @@ onlongtouch = function(event) { alert(JSON.stringify(event)); }
 
 window.addEventListener("touchstart", touchstart, false);
 window.addEventListener("touchend", touchend, false);
+*/
 
-function rand() {
-	return Math.random().toString(36).replace(/[^a-z]+/g, '').substr(0, 7);
-}
-
+// START Sending updates
 var toSend = {};
 
+//Queues multiple event for the same zone and sends the last one
 function queue(item) {
+	//Only wait if max is checked
+	if (!$('#cb-mood').is(':checked')) {
+		send(item);
+		return;
+	}
+
 	//Set a new key for every click
 	let key = rand();
 	toSend[item.name] = { "value": item.value, "lastKey": key };
 
-	//Only wait if max is checked
-	let interval = $("#cb-mood").is(':checked') ? 500 : 0;
-
-	//alert(JSON.stringify(item));
 	setTimeout(function() {
-		//Only send if the latest update (click)
+		//Only send if the latest event (click)
 		if (key === toSend[item.name].lastKey) send(item);
-	}, interval);
+	}, 500);
 }
+
+var updateViewFlagKey;
+var updateViewFlag = true;
 
 function send(item) {
-	//$('#target').html('sending..');
+	//If auto-refresh, disable view updates for a few seconds
+	if ($('#cb-refresh').is(':checked')) {
+		//To avoid overlapping updates, set a key
+		let key = rand();
+		updateViewFlagKey = key;
 
-	$.ajax({
-		url: "/toggle",
-		type: "post",
-		dataType: "json",
-		contentType: "application/json",
-		success: function (data) { },
-		data: JSON.stringify(item)
-	});
+		//Toggle skipView and schdule a reset
+		updateViewFlag = false;
+		setTimeout(function() {
+			if (updateViewFlagKey == key) updateViewFlag = true;
+		}, 2000);
+	}
+
+	socket.emit('toggle', JSON.stringify(item));
 }
+// END Sending updates
 
+// START Update model and view
 function updateTemp(data) {
 	Object.keys(data).forEach(name => {
 		let tDef = $("#" + name + "-t").attr("default") ?? '';
@@ -86,60 +166,63 @@ function updateTemp(data) {
 	});
 }
 
+var model = {};
+
+//Update model
 function updateMap(data) {
-	//alert(JSON.stringify(data));
+	//model = { ...model, ...data };
 	Object.keys(data).forEach(zone => {
-		let moodable = Object.keys(data[zone]).some(light => data[zone][light].mood);
-		let nightable = Object.keys(data[zone]).some(light => data[zone][light].night);
+		if (model[zone] === undefined) { model[zone] = {}; }
+
+		let keys = Object.keys(data[zone]);
+		keys.forEach(device => {
+			if (model[zone][device] === undefined) { model[zone][device] = {}; }
+			Object.keys(data[zone][device]).forEach(valueKey => {
+				model[zone][device][valueKey] = data[zone][device][valueKey];
+			});
+		});
+	});
+
+ 	if (updateViewFlag) updateView();
+}
+
+//Update view from model
+function updateView() {
+	Object.keys(model).forEach(zone => {
+		let lights = Object.keys(model[zone]).filter(light => model[zone][light].hasOwnProperty('onoff'));
+		let moodable = lights.some(light => model[zone][light].mood);
+		let nightable = lights.some(light => model[zone][light].night);
 
 		let ar = document.getElementById(zone);
 		if (moodable && !ar.hasAttribute("moodable")) ar.setAttribute("moodable", "moodable");
 		if (nightable && !ar.hasAttribute("nightable")) ar.setAttribute("nightable", "nightable");
 
-		let keys = Object.keys(data[zone]);
-
 		let value = "on";
-		if (keys.every(light => !data[zone][light].onoff)) {
+		if (lights.every(light => !model[zone][light].onoff)) {
 			value = "off";
 		}
-		else if (keys.every(light => data[zone][light].onoff)) {
+		else if (lights.every(light => model[zone][light].onoff)) {
 			value = "on";
 		}
-		else if (moodable && keys.some(light => data[zone][light].onoff && data[zone][light].mood)) {
+		else if (moodable && lights.some(light => model[zone][light].onoff && model[zone][light].mood)) {
 			value = "mood";
 		}
-		else if (nightable && keys.some(light => data[zone][light].onoff && data[zone][light].night)) {
+		else if (nightable && lights.some(light => model[zone][light].onoff && model[zone][light].night)) {
 			value = "night";
 		}
 
-		//Object.keys(data[zone]).forEach(light => alert(`${data[zone][light].mood}`));
-
-		//alert(`${zone}: ${value}`);
-
 		updateArea(ar, value);
+
+		let th = Object.keys(model[zone]).filter(th => !model[zone][th].hasOwnProperty('onoff'));
+		let temp = {};
+		th.forEach(name => temp[name] = model[zone][name]);
+
+		updateTemp(temp);
 	});
 }
-var skipRefresh = 0;
 
+/*
 function get() {
-	if (skipRefresh > 0) {
-		skipRefresh--;
-		return;
-	}
-
-	$.ajax({
-		url: "/api/light",
-		type: "get",
-		dataType: "json",
-		contentType: "application/json",
-		success: function (data) {
-			updateMap(data);
-		},
-		error: function(data) {
-		//	$('#target').html('err');
-		}
-	});
-
 	$.ajax({
 		url: "/api/temp",
 		type: "get",
@@ -152,7 +235,7 @@ function get() {
 		//	$('#target').html('err');
 		}
 	});
-}
+}*/
 
 function getNextState(element) {
 	var current = element.getAttribute("light");
@@ -176,13 +259,14 @@ function getNextState(element) {
 }
 
 function updateArea(element, value) {
-	element.setAttribute("light", value);
+	if (element) element.setAttribute("light", value);
 }
 
+// END Update model and view
+
+// START Buttons
 $(document).ready(function () {
 	$(".room").click(e => {
-		//Skip refresh for 3 seconds after click
-		skipRefresh = 3;
 		let ar = e.currentTarget;
 		var name = ar.id;
 
@@ -196,7 +280,7 @@ $(document).ready(function () {
 		queue(item);
 	});
 
-	get();
+//	get();
 });
 
 $(document).ready(function () {
@@ -205,10 +289,12 @@ $(document).ready(function () {
 
 	$('#cb-refresh').change(function() {
 	if (this.checked) {
-			intervalId = setInterval(get, 1000);
+			connect();
+			reconnect = true;
 		}
 		else {
-			clearInterval(intervalId);
+			disconnect();
+			reconnect = false;
 		}
 	});
 
@@ -242,16 +328,22 @@ $(document).ready(function () {
 			$('.name-blocker').addClass("hidden");
 		}
 	});
+
+	$('#cb-raw').change(function() {
+		if (this.checked) {
+			$('#raw').removeClass('removed');
+			$('#raw').addClass('raw');
+		}
+		else {
+			$('#raw').removeClass('raw');
+			$('#raw').addClass('removed');
+		}
+	});
 });
+// END Buttons
 
+//START Cookies
 $(document).ready(function () {
-	var els = document.getElementsByClassName("lampa-horn");
-	Array.prototype.forEach.call(els, function(el) { el.setAttribute("d", describeSector(0, 0, 100, 0, 90))});
-
-	var els2 = document.getElementsByClassName("lampa-vagg");
-	Array.prototype.forEach.call(els2, function(el) { el.setAttribute("d", describeSector(0, 0, 50, 0, 180))});
-
-	//Cookies start
 	//Set checkboxes from cookie
 	let cookieData = decodeURIComponent(document.cookie).split(';');
 	cookieData.forEach(data => {
@@ -276,23 +368,24 @@ $(document).ready(function () {
 			popup(cb);
 		}
 	});
-	//Cookies end
-
-	//Message on click
-	var popupTimer;
-	var popupTimerInner;
-	function popup(cb) {
-		let name = cb.getAttribute('name');
-		let message = `${name}: ${cb.checked ? 'on' : 'off'}`;
-		$('#popup').text(message);
-		$('#popup').removeClass('removed');
-		$('#popup').addClass('popup');
-
-		clearTimeout(popupTimer);
-		clearTimeout(popupTimerInner);
-		popupTimer = setTimeout(function() {
-			$('#popup').removeClass('popup');
-			popupTimerInner = setTimeout(function() { $('#popup').addClass('removed'); }, 1200);
-		}, 300);
-	}
 });
+
+// END Cookies
+
+//Message on click
+var popupTimer;
+var popupTimerInner;
+function popup(cb) {
+	let name = cb.getAttribute('name');
+	let message = `${name}: ${cb.checked ? 'on' : 'off'}`;
+	$('#popup').text(message);
+	$('#popup').removeClass('removed');
+	$('#popup').addClass('popup');
+
+	clearTimeout(popupTimer);
+	clearTimeout(popupTimerInner);
+	popupTimer = setTimeout(function() {
+		$('#popup').removeClass('popup');
+		popupTimerInner = setTimeout(function() { $('#popup').addClass('removed'); }, 1200);
+	}, 300);
+}

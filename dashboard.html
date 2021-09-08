@@ -7,9 +7,11 @@
 	<script src="https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
 	<script src="./scripts/home.js"></script>
 	<script defer src="./node_modules/@fortawesome/fontawesome-free/js/all.min.js"></script>
+	<script src="/socket.io/socket.io.js"></script>
 </head>
 <body>
-	<div id="popup"></div>
+	<div class="removed" id="popup"></div>
+	<div class="removed" id="raw"></div>
 	<div id="settings" style="position: absolute; left: 20px; top: 20px; z-index: 200;">
 		<label><input id="cb-settings" type="checkbox" /><i class="fas fa-cog fa-2x"></i></label>
 		<div id="menu">
@@ -17,6 +19,7 @@
 			<label><input id="cb-mood" name="Max brightness" type="checkbox" /><i class="fas fa-sun fa-2x"></i></label>
 			<label><input id="cb-temp" name="Show temperatures" type="checkbox" /><i class="fas fa-thermometer-three-quarters fa-2x"></i></label>
 			<label><input id="cb-energy" name="Show power usage" type="checkbox" /><i class="fas fa-bolt fa-2x"></i></label>
+			<label><input id="cb-raw" name="Raw messages" type="checkbox" /><i class="fas fa-stream fa-2x"></i></label>
 			<label><input id="cb-nightmode" name="Nightmode" type="checkbox" /><i class="fas fa-moon fa-2x"></i></label>
 		</div>
 	</div>
