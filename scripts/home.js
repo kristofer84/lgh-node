@@ -52,6 +52,7 @@ function getTime() {
 	let now = new Date();
 	return `${now.getHours().pad()}:${now.getMinutes().pad()}:${now.getSeconds().pad()}`;
 }
+
 function rand() {
 	return Math.random().toString(36).replace(/[^a-z]+/g, '').substr(0, 7);
 }

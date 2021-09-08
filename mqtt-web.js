@@ -59,22 +59,75 @@ client.on('message', function (topic, message) {
 		if (split.length == 4 && !device.startsWith('$') && !valueType.startsWith('$')) {
 			devices[device][valueType] = message.toString();
 
-			let dev = getDevice(device);
-			if (Object.keys(dev).length > 0) {
-				filterQueue(dev);
+			//Implicit change of known values (onoff and dim)
+			if (valueType === 'onoff' && message.toString() === 'false' && devices[device].hasOwnProperty('dim')) {
+				let prev = devices[device]['dim'];
+				if (prev !== '0') {
+					//log(`Implicit change of dim for ${device} from ${prev} to 0`);
+					devices[device]['dim'] = '0';
+				}
 			}
+
+			if (valueType === 'dim') {
+				let prev = devices[device]['onoff'];
+				let val = parseInt(message.toString()) > 0 ? 'true' : 'false';
+				if (prev !== val) {
+					//log(`Implicit change of onoff for ${device} from ${prev} to ${val}`);
+					devices[device]['onoff'] = val;
+				}
+			}
+
+			queueSend(device);
 		}
 	}
 
-	fs.appendFile('mqtt-raw.log', `${topic}: ${message.toString()}\n`, function(err) {
+	let date = new Date();
+	fs.appendFile('mqtt-raw.log', `${date.toISOString()}-${topic}: ${message.toString()}\n`, function(err) {
 		if (err) log(err);
 	});
 });
 
-function filterQueue(msg) {
-	let json = JSON.stringify(msg);
-	io.emit('device', json);
+var toSend = {};
+
+function queueSend(device) {
+	let dev = getDevice(device);
+	if (Object.keys(dev).length > 0) {
+		let json = JSON.stringify(dev);
+
+		if (toSend[device] !== json) {
+			io.emit('device', json);
+			toSend[device] = json;
+		}
+		else {
+			//log(`Skipping duplicate for ${device}`);
+		}
+	}
 }
+
+/*
+function rand() {
+    return Math.random().toString(36).replace(/[^a-z]+/g, '').substr(0, 7);
+}
+*/
+
+/*
+function queueSend(device) {
+	let key = rand();
+	toSend[device] = key;
+
+	//Wait a very short while to avoid repeated sends
+	setTimeout(function() {
+		//Only send if last update
+		if (toSend[device] === key) {
+			let dev = getDevice(device);
+			if (Object.keys(dev).length > 0) {
+				let json = JSON.stringify(dev);
+				io.emit('device', json);
+			}
+		} else { log(`${device}: ${toSend[device]} !== ${key}`); }
+	}, 200);
+}
+*/
 
 const server = http.createServer((req, res) => {
 	let { method, url } = req;
