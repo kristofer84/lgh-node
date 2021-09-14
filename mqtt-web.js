@@ -1,6 +1,7 @@
 const mqtt = require('mqtt');
 const client = mqtt.connect('mqtt://192.168.0.116');
-const fs = require('fs');
+const fs = require('fs').promises;
+const fssync = require('fs');
 const http = require('http');
 const concat = require('concat-stream');
 const qs = require('querystring');
@@ -23,25 +24,37 @@ client.on('connect', function () {
 var devices;
 var config;
 
-function init() {
-	let buffer = fs.readFileSync('mqtt.log');
+async function init() {
+	let buffer = await fs.readFile('mqtt.log');
 	let json = buffer.toString();
 	devices = JSON.parse(json);
 
-	let buffer2 = fs.readFileSync('config.json');
+	let buffer2 = await fs.readFile('config.json');
 	config = JSON.parse(buffer2.toString());
 
+
 	//Save zone for each light for faster processing
-	/*
 	Object.keys(config.zones).forEach(zone => {
 		let values = config.zones[zone];
 
 		values.forEach(light => {
 			let split = light.split('.');
-			deviceZones[split[0]] = zone;
+			let device = split[0];
+			devices[device].type = split[1];
+
+			if (split.length === 3) {
+				if (split[2] === 'mood') {
+					devices[device].mood = true;
+				}
+
+				if (split[2] === 'night') {
+					devices[device].night = true;
+				}
+			}
+			if (!devices.hasOwnProperty(device)) devices[device] = {};
+			devices[device].zone = zone;
 		});
 	});
-	*/
 }
 
 init();
@@ -54,31 +67,37 @@ client.on('message', function (topic, message) {
 		let device = split[2];
 		let valueType = split[3];
 
-		if (devices[device] === undefined) { devices[device] = {}; }
+		let values = split.slice(2);
 
-		if (split.length == 4 && !device.startsWith('$') && !valueType.startsWith('$')) {
-			devices[device][valueType] = message.toString();
+		//Convert '/'-separated string to object properties
+		const reducer = (prev, curr, count) => prev[curr] = count === values.length - 1 ? message.toString() : prev.hasOwnProperty(curr) ? prev[curr] : {};
+		values.reduce(reducer, devices);
 
-			//Implicit change of known values (onoff and dim)
-			if (valueType === 'onoff' && message.toString() === 'false' && devices[device].hasOwnProperty('dim')) {
-				let prev = devices[device]['dim'];
-				if (prev !== '0') {
-					//log(`Implicit change of dim for ${device} from ${prev} to 0`);
-					devices[device]['dim'] = '0';
-				}
+		//if (devices[device] === undefined) { devices[device] = {}; }
+
+		//if (split.length == 4 && !device.startsWith('$') && !valueType.startsWith('$')) {
+		//	devices[device][valueType] = message.toString();
+
+		//Implicit change of known values (onoff and dim)
+		if (valueType === 'onoff' && message.toString() === 'false' && devices[device].hasOwnProperty('dim')) {
+			let prev = devices[device]['dim'];
+			if (prev !== '0') {
+				//log(`Implicit change of dim for ${device} from ${prev} to 0`);
+				devices[device]['dim'] = '0';
 			}
-
-			if (valueType === 'dim') {
-				let prev = devices[device]['onoff'];
-				let val = parseInt(message.toString()) > 0 ? 'true' : 'false';
-				if (prev !== val) {
-					//log(`Implicit change of onoff for ${device} from ${prev} to ${val}`);
-					devices[device]['onoff'] = val;
-				}
-			}
-
-			queueSend(device);
 		}
+
+		if (valueType === 'dim') {
+			let prev = devices[device]['onoff'];
+			let val = parseInt(message.toString()) > 0 ? 'true' : 'false';
+			if (prev !== val) {
+				//log(`Implicit change of onoff for ${device} from ${prev} to ${val}`);
+				devices[device]['onoff'] = val;
+			}
+		}
+
+		queueSend(device);
+		//}
 	}
 
 	let date = new Date();
@@ -94,6 +113,7 @@ function queueSend(device) {
 	if (Object.keys(dev).length > 0) {
 		let json = JSON.stringify(dev);
 
+		//Don't send if same as last emitted message
 		if (toSend[device] !== json) {
 			io.emit('device', json);
 			toSend[device] = json;
@@ -104,112 +124,117 @@ function queueSend(device) {
 	}
 }
 
-/*
-function rand() {
-    return Math.random().toString(36).replace(/[^a-z]+/g, '').substr(0, 7);
+const keys = {};
+
+async function validateUser(pwd) {
+	var users = (await fs.readFile('users.conf', 'binary')).toString().split('\n');
+	let user = users.find(s => s.split(';')[1] === pwd);
+	if (user !== undefined) return user.split(';')[0];
+	return undefined;
 }
-*/
 
-/*
-function queueSend(device) {
-	let key = rand();
-	toSend[device] = key;
+async function returnFile(res, file) {
+	data = await fs.readFile(file, 'binary');
 
-	//Wait a very short while to avoid repeated sends
-	setTimeout(function() {
-		//Only send if last update
-		if (toSend[device] === key) {
-			let dev = getDevice(device);
-			if (Object.keys(dev).length > 0) {
-				let json = JSON.stringify(dev);
-				io.emit('device', json);
-			}
-		} else { log(`${device}: ${toSend[device]} !== ${key}`); }
-	}, 200);
+	let ct = undefined;
+	if (file.endsWith('.html')) ct = 'text/html'
+	if (file.endsWith('.json')) ct = 'application/json'
+	if (file.endsWith('.js')) ct = 'application/javascript'
+	if (file.endsWith('.css')) ct = 'text/css'
+	res.statusCode = 200;
+	if (ct !== undefined) res.setHeader('Content-Type', ct);
+	res.end(data.toString());
 }
-*/
 
-const server = http.createServer((req, res) => {
-	let { method, url } = req;
+function returnContent(res, json) {
+	let ct = 'application/json'
+	res.setHeader('Content-Type', 'application/json');
+	res.end(json);
+}
+
+const server = http.createServer();
+
+server.on('request', async (req, res) => {
+	let { headers, method, url } = req;
 	if (method === 'OPTIONS') {
 		res.statusCode = 204;
 		res.end();
 		return;
 	}
 
-	if (method === 'POST') {
-		const chunks = [];
-		req.on('data', chunk => chunks.push(chunk));
-		req.on('end', () => {
-		  const data = Buffer.concat(chunks);
-		  var obj = JSON.parse(data.toString());
-		  toggle(obj.name, obj.value);
-		});
-
-		res.statusCode = 204;
-		res.end();
-		return;
+	//Verify user
+	let loggedIn = false;
+	let user = 'kristofer';
+	if (headers.cookie !== undefined) {
+		let split = headers.cookie.split(';');
+		var kaka = split.find(s => s.trim().split('=')[0] === 'minkaka');
+		if (kaka !== undefined && kaka.split('=')[1] === 'kaka') {
+			loggedIn = true;
+		}
 	}
 
-	res.statusCode = 200;
+	if (!loggedIn || url.startsWith('/login')) {
+		if (method === 'POST') {
+			const chunks = [];
+			req.on('data', chunk => chunks.push(chunk));
+			req.on('end', async () => {
+				const data = Buffer.concat(chunks);
+				let split = data.toString().split('=');
+				if (split[0] === 'password') {
+					let user = await validateUser(split[1]);
+
+					if (!user) {
+						res.statusCode = 403;
+						res.setHeader('Content-Type', 'text/plain');
+						res.end();
+						return;
+					}
+
+					let date = new Date((new Date()).valueOf() + 1000 * 60 * 60 * 24 * 7 * 2);
+					res.writeHead(302, {
+						location: './dashboard',
+						'Set-Cookie': `minkaka=kaka; Expires=${date.toUTCString()}`
+					});
+					console.log(`${user} logged in`);
+					res.end();
+				}
+				else {
+					res.statusCode = 400;
+					res.end();
+				}
+			});
+
+			return;
+		}
+		else {
+			returnFile(res, './login.html');
+			return;
+		}
+	}
+
+	let token = 'ancioewowefiwe';
+	keys[user] = token;
+	res.setHeader('token', token);
 
 	if (url.startsWith('/dashboard')) {
-		let html = fs.readFileSync('./dashboard.html');
-		res.end(html.toString());
+		returnFile(res, './dashboard.html');
 		return;
 	}
 
-/*	if (url.startsWith('/scripts/') && url.endsWith('.js')) { */
-	if (url.endsWith('.js')) {
-		let html = fs.readFileSync(`.${url}`);
-		res.setHeader('Content-Type', 'application/javascript');
-		res.end(html.toString());
-		return;
-	}
-
-/*	if (url.startsWith('/styles/') && url.endsWith('.css')) { */
-	if (url.endsWith('.css')) {
-		let html = fs.readFileSync(`.${url}`);
-		res.setHeader('Content-Type', 'text/css');
-		res.end(html.toString());
-		return;
-	}
-
-/*
-	if (url.startsWith('/toggle')) {
-		var params = url.split('/');
-		publish(`homie/homey/${params[2]}/onoff/set`, params[3]);
-		res.setHeader('Content-Type', 'text/html');
-		res.end('ok');
-		return;
-	}
-*/
-
-	if (url === '/api/temp') {
-		res.setHeader('Content-Type', 'application/json');
-		let temp = getTemperatures();
-		var json = JSON.stringify(temp, null, '  ');
-		res.end(json);
-		return;
-	}
-
-	if (url === '/api/light') {
-		res.setHeader('Content-Type', 'application/json');
-		let lights = getDevice(null);
-		var json = JSON.stringify(lights, null, '  ');
-		res.end(json);
+	if (url.endsWith('.js') || url.endsWith('.css')) {
+		returnFile(res, `./${url}`);
 		return;
 	}
 
 	if (url === '/api/all') {
-		res.setHeader('Content-Type', 'application/json');
 		var json = JSON.stringify(devices, null, '  ');
-		res.end(json);
+		returnContent(res, json);
 		return;
 	}
 
+	res.statusCode = 403;
 	res.setHeader('Content-Type', 'text/plain');
-	res.end(method);
+	res.end();
 });
 
 function log(str) {
@@ -233,13 +258,10 @@ io.on('connection', client => {
 		  toggle(obj.name, obj.value);
 	});
 
-	//client.on('event', data => { log(`data: ${JSON.stringify(data)}`); });
 	client.on('disconnect', () => { log(`${client.id} disconnected`); });
 });
 // END socket.io
 
-// server.listen(port, hostname, () => {
-// log(`Server running at http://${hostname}:${port}/`);
 server.listen(port, () => {
 	log(`Server running at port ${port}`);
 });
@@ -265,6 +287,54 @@ function getTemperatures() {
 
 function getDevice(dev) {
 	let retObj = {}
+
+	if (dev) {
+		let d = devices[dev];
+		let r = {};
+
+		let zone = d.zone === undefined ? 'nozone' : d.zone;
+		r[zone] = {};
+
+		if (d.type === 'light') {
+			let dim = d.hasOwnProperty('dim') ? d['dim'] : undefined;
+			let mood = d.mood;
+			let night = d.night;
+			r[zone][dev] = {
+				onoff: d['onoff'] === 'true',
+				dim: dim,
+				night: night,
+				mood: mood
+			};
+
+		}
+
+		else if (d.type === 'th') {
+			r[zone][dev] = {
+				temperature: d['measure-temperature'],
+				humidity: d['measure-humidity']
+			}
+		}
+		else if (d.hasOwnProperty('onoff')) {
+			r[zone][dev] = {
+				onoff: d['onoff'] === 'true'
+			}
+		}
+		else if (d.hasOwnProperty('alarm-contact')) {
+			r[zone][dev] = {
+				onoff: d['alarm-contact'] === 'true'
+			}
+		}
+		else if (d.hasOwnProperty('alarm-motion')) {
+			r[zone][dev] = {
+				onoff: d['alarm-motion'] === 'true'
+			}
+		}
+		else {
+			return {};
+		}
+
+		return r;
+	}
 
 	Object.keys(config.zones).forEach(zone => {
 		zoneDevices = {};
@@ -310,8 +380,8 @@ function exitHandler(options, exitCode) {
 	//Close MQTT
 	client.end();
 
-	let str = JSON.stringify(options.devices, null, '\t');
-	fs.writeFileSync('mqtt.log', str);
+	let str = JSON.stringify(devices, null, '\t');
+	fssync.writeFileSync('mqtt.log', str);
 
 	if (options.exit) {
 		log(`Exiting: ${exitCode}`);
