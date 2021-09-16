@@ -1,37 +1,28 @@
 const mqtt = require('mqtt');
-const client = mqtt.connect('mqtt://192.168.0.116');
 const fs = require('fs').promises;
 const fssync = require('fs');
 const http = require('http');
+const https = require('https');
 const concat = require('concat-stream');
 const qs = require('querystring');
-const hostname = 'localhost';
-const port = 8080;
 
+
+
+const lg = require('./log.js');
+const us = require('./user.js');
 process.stdin.resume();
 
-client.on('connect', function () {
-	client.subscribe('#', function (err) {
-		if (!err) {
-			log('MQTT connected');
-		}
-		else {
-			log(err);
-		}
-	});
-});
-
+// START Init
 var devices;
 var config;
 
-async function init() {
-	let buffer = await fs.readFile('mqtt.log');
+function init() {
+	let buffer = fssync.readFileSync('./log/mqtt.log');
 	let json = buffer.toString();
 	devices = JSON.parse(json);
 
-	let buffer2 = await fs.readFile('config.json');
+	let buffer2 = fssync.readFileSync('./db/config.json');
 	config = JSON.parse(buffer2.toString());
-
 
 	//Save zone for each light for faster processing
 	Object.keys(config.zones).forEach(zone => {
@@ -58,6 +49,44 @@ async function init() {
 }
 
 init();
+const client = mqtt.connect(config.config.mqttAddress);
+const certFolder = config.config.certFolder;
+// END Init
+
+// START Http config
+async function webLog(req, port) {
+	let { headers, method, url } = req;
+	let date = new Date();
+	fs.appendFile('./log/web-raw.log', `${date.toISOString()}-${port}-${method}-(${req.connection.remoteAddress}:${req.connection.remotePort}-${url})\n`, function(err) {
+		if (err) lg.log(err);
+	});
+}
+
+http.createServer(function(req, res) {
+		webLog(req, 8080);
+        res.writeHead(302, {"location": "https://" + req.headers['host'] + req.url});
+        res.end();
+}).listen(8080);
+
+const server = https.createServer({ 
+        key: fssync.readFileSync(certFolder + 'privkey.pem'),
+        cert: fssync.readFileSync(certFolder + 'fullchain.pem'),
+        ca: fssync.readFileSync(certFolder + 'chain.pem')
+}, (res, req) => {
+}).listen(8443);
+// END Http config
+
+// MQTT Start
+client.on('connect', function () {
+	client.subscribe('#', function (err) {
+		if (!err) {
+			lg.log('MQTT connected');
+		}
+		else {
+			lg.log(err);
+		}
+	});
+});
 
 client.on('message', function (topic, message) {
 	let split = topic.split('/');
@@ -73,16 +102,10 @@ client.on('message', function (topic, message) {
 		const reducer = (prev, curr, count) => prev[curr] = count === values.length - 1 ? message.toString() : prev.hasOwnProperty(curr) ? prev[curr] : {};
 		values.reduce(reducer, devices);
 
-		//if (devices[device] === undefined) { devices[device] = {}; }
-
-		//if (split.length == 4 && !device.startsWith('$') && !valueType.startsWith('$')) {
-		//	devices[device][valueType] = message.toString();
-
 		//Implicit change of known values (onoff and dim)
 		if (valueType === 'onoff' && message.toString() === 'false' && devices[device].hasOwnProperty('dim')) {
 			let prev = devices[device]['dim'];
 			if (prev !== '0') {
-				//log(`Implicit change of dim for ${device} from ${prev} to 0`);
 				devices[device]['dim'] = '0';
 			}
 		}
@@ -91,18 +114,16 @@ client.on('message', function (topic, message) {
 			let prev = devices[device]['onoff'];
 			let val = parseInt(message.toString()) > 0 ? 'true' : 'false';
 			if (prev !== val) {
-				//log(`Implicit change of onoff for ${device} from ${prev} to ${val}`);
 				devices[device]['onoff'] = val;
 			}
 		}
 
 		queueSend(device);
-		//}
 	}
 
 	let date = new Date();
-	fs.appendFile('mqtt-raw.log', `${date.toISOString()}-${topic}: ${message.toString()}\n`, function(err) {
-		if (err) log(err);
+	fs.appendFile('./log/mqtt-raw.log', `${date.toISOString()}-${topic}: ${message.toString()}\n`, function(err) {
+		if (err) lg.log(err);
 	});
 });
 
@@ -119,22 +140,34 @@ function queueSend(device) {
 			toSend[device] = json;
 		}
 		else {
-			//log(`Skipping duplicate for ${device}`);
+			//lg.log(`Skipping duplicate for ${device}`);
 		}
 	}
 }
+// MQTT End
 
-const keys = {};
-
-async function validateUser(pwd) {
-	var users = (await fs.readFile('users.conf', 'binary')).toString().split('\n');
-	let user = users.find(s => s.split(';')[1] === pwd);
-	if (user !== undefined) return user.split(';')[0];
-	return undefined;
+// START HTTP Server functions Start
+function rand() {
+	return Math.random().toString(36).replace(/[^a-z]+/g, '').substr(0, 7);
 }
+const fileCache = {};
 
 async function returnFile(res, file) {
-	data = await fs.readFile(file, 'binary');
+	let cf = fileCache[file];
+	let mtime = (await fs.stat(file)).mtime.toISOString();
+	let data;
+	let etag;
+
+	if (cf === undefined || mtime !== cf.mtime) {
+		data = await fs.readFile(`${file}`, 'binary');
+		etag = rand();
+		fileCache[file] = { data: data, mtime: mtime, etag: etag };
+	}
+	else {
+		data = cf.data;
+		etag = cf.etag;
+		lg.debug(`Read ${file} from cache`);
+	}
 
 	let ct = undefined;
 	if (file.endsWith('.html')) ct = 'text/html'
@@ -143,6 +176,8 @@ async function returnFile(res, file) {
 	if (file.endsWith('.css')) ct = 'text/css'
 	res.statusCode = 200;
 	if (ct !== undefined) res.setHeader('Content-Type', ct);
+	res.setHeader('Cache-Control', 'max-age=600');
+	res.setHeader('etag', etag);
 	res.end(data.toString());
 }
 
@@ -152,77 +187,113 @@ function returnContent(res, json) {
 	res.end(json);
 }
 
-const server = http.createServer();
+async function verifyUser(headers) {
+	if (headers.cookie !== undefined) {
+		let split = headers.cookie.split(';');
+		var ac = split.find(s => s.trim().split('=')[0] === 'socketKey');
+		if (ac !== undefined) {
+			let key = ac.trim().split('=')[1];
+			let user = await us.validateKey(key);
+			if (user !== undefined) return true;
+		}
+	}
+	return false;
+}
+
+async function verifyLogin(req, res) {
+	const chunks = [];
+
+	req.on('data', chunk => chunks.push(chunk));
+	return await req.on('end', async () => {
+		const data = Buffer.concat(chunks);
+		let strings = data.toString().split('&');
+
+		let userVar = strings.find(s => s.split('=')[0] === 'username');
+		let passVar = strings.find(s => s.split('=')[0] === 'password');
+		let username = userVar ? userVar.split('=')[1] : undefined;
+		let password = passVar ? passVar.split('=')[1] : undefined;
+
+		if (username && password) {
+			let socketKey = await us.validate(username, password);
+			if (socketKey) {
+				let date = new Date((new Date()).valueOf() + 1000 * 60 * 60 * 24 * 7 * 2);
+				res.writeHead(302, {
+					location: './dashboard',
+					'Set-Cookie': `socketKey=${socketKey}; Expires=${date.toUTCString()}`
+				});
+
+				lg.log(`${username} logged in`);
+				res.end();
+				return;
+			}
+			else {
+				lg.log(`Failed login attempt ${username}:${password} (${req.connection.remoteAddress})`);
+			}
+		}
+
+		returnFile(res, './web/login.html');
+		return;
+	});
+}
 
 server.on('request', async (req, res) => {
+	webLog(req, 8443);
 	let { headers, method, url } = req;
 	if (method === 'OPTIONS') {
 		res.statusCode = 204;
+		res.setHeader('Cache-Control', 'max-age=600');
+		res.setHeader('etag', 'favicon-none');
+		res.end();
+		return;
+	}
+
+	if (url === '/favicon.ico') {
+		res.statusCode = 204;
+		res.setHeader('Cache-Control', 'max-age=600');
+		res.setHeader('etag', 'favicon-none');
 		res.end();
 		return;
 	}
 
 	//Verify user
-	let loggedIn = false;
-	let user = 'kristofer';
-	if (headers.cookie !== undefined) {
-		let split = headers.cookie.split(';');
-		var kaka = split.find(s => s.trim().split('=')[0] === 'minkaka');
-		if (kaka !== undefined && kaka.split('=')[1] === 'kaka') {
-			loggedIn = true;
-		}
-	}
+	let loggedIn = await verifyUser(headers);
 
-	if (!loggedIn || url.startsWith('/login')) {
-		if (method === 'POST') {
-			const chunks = [];
-			req.on('data', chunk => chunks.push(chunk));
-			req.on('end', async () => {
-				const data = Buffer.concat(chunks);
-				let split = data.toString().split('=');
-				if (split[0] === 'password') {
-					let user = await validateUser(split[1]);
+ 	let logInUrl = url.startsWith('/login4321');
 
-					if (!user) {
-						res.statusCode = 403;
-						res.setHeader('Content-Type', 'text/plain');
-						res.end();
-						return;
-					}
-
-					let date = new Date((new Date()).valueOf() + 1000 * 60 * 60 * 24 * 7 * 2);
-					res.writeHead(302, {
-						location: './dashboard',
-						'Set-Cookie': `minkaka=kaka; Expires=${date.toUTCString()}`
-					});
-					console.log(`${user} logged in`);
-					res.end();
-				}
-				else {
-					res.statusCode = 400;
-					res.end();
-				}
-			});
-
-			return;
-		}
-		else {
-			returnFile(res, './login.html');
-			return;
-		}
-	}
-
-	let token = 'ancioewowefiwe';
-	keys[user] = token;
-	res.setHeader('token', token);
-
-	if (url.startsWith('/dashboard')) {
-		returnFile(res, './dashboard.html');
+	if (!loggedIn && !logInUrl) {
+		res.statusCode = 403;
+		res.end();
 		return;
 	}
 
-	if (url.endsWith('.js') || url.endsWith('.css')) {
-		returnFile(res, `./${url}`);
+	if (!loggedIn || logInUrl) {
+		if (method === 'POST') {
+			await verifyLogin(req, res);
+			return;
+		}
+		else {
+			returnFile(res, './web/login.html');
+			return;
+		}
+	}
+
+	if (url === '/dashboard') {
+		returnFile(res, './web/dashboard.html');
+		return;
+	}
+
+	if (url === '/styles/style.css') {
+		returnFile(res, './web/styles/style.css');
+		return;
+	}
+
+	if (url === '/scripts/home.js') {
+		returnFile(res, './web/scripts/home.js');
+		return;
+	}
+
+	if (url.startsWith('/node_modules/')) {
+		returnFile(res, `.${url}`);
 		return;
 	}
 
@@ -233,38 +304,44 @@ server.on('request', async (req, res) => {
 	}
 
 	res.statusCode = 403;
-	res.setHeader('Content-Type', 'text/plain');
+//	res.setHeader('Content-Type', 'text/plain');
 	res.end();
 });
 
-function log(str) {
-	let date = new Date().toISOString();
-	console.log(`${date} - ${str}`);
-}
+// END HTTP Server functions
 
 // START socket.io
 const io = require('socket.io')(server);
-io.on('connection', client => {
-	log(`${client.id} connected, sending data`);
+
+io.on('connection', async client => {
+	client.emit('auth', async (answer) => {
+		let a = JSON.stringify(answer);
+		let user = await us.validateKey(answer.socketKey);
+		if (user === undefined) {
+			lg.log(`Wrong socket key, closing connection`);
+			client.disconnect();
+		} else {
+			clientConnected(user, client);
+		}
+	});
+});
+
+function clientConnected(user, client) {
+ 	lg.log(`${client.id} (${user}) connected, sending data`);
 
 	let lights = getDevice(null);
 	var json = JSON.stringify(lights, null, '  ');
 	var cson = JSON.stringify(config, null, '  ');
 	client.emit('device.all', json);
-//	client.emit('config', cson);
 
 	client.on('toggle', data => {
 		  var obj = JSON.parse(data.toString());
 		  toggle(obj.name, obj.value);
 	});
 
-	client.on('disconnect', () => { log(`${client.id} disconnected`); });
-});
+	client.on('disconnect', () => { lg.log(`${client.id} disconnected`); });
+}
 // END socket.io
-
-server.listen(port, () => {
-	log(`Server running at port ${port}`);
-});
 
 function getTemperatures() {
 	let retObj = {}
@@ -381,22 +458,24 @@ function exitHandler(options, exitCode) {
 	client.end();
 
 	let str = JSON.stringify(devices, null, '\t');
-	fssync.writeFileSync('mqtt.log', str);
+	if (str) {
+		fssync.writeFileSync('./log/mqtt.log', str);
+	}
 
 	if (options.exit) {
-		log(`Exiting: ${exitCode}`);
+		lg.log(`Exiting: ${exitCode}`);
 		process.exit();
 	}
 }
 
 function toggle(zone, value) {
 	if (config.zones[zone] === undefined) {
-		log(`Missing zone: ${zone}`);
+		lg.log(`Missing zone: ${zone}`);
 		return;
 	}
 
 	if (value === undefined) {
-		log(`Missing value`);
+		lg.log(`Missing value`);
 		return;
 	}
 
@@ -426,7 +505,7 @@ function toggle(zone, value) {
 }
 
 function publish(device, property, message) {
-	log(`homie/homey/${device}/${property}/set: ${message.toString()}`);
+	lg.log(`homie/homey/${device}/${property}/set: ${message.toString()}`);
 	if (message === undefined) return;
 	var topic = `homie/homey/${device}/${property}/set`;
 	client.publish(topic, message.toString());
