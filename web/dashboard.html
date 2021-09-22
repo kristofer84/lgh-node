@@ -59,10 +59,6 @@
 						<stop offset="0%" stop-color="var(--sc)" stop-opacity="1" />
 						<stop offset="100%" stop-color="var(--sc)" stop-opacity="0" />
 					</radialGradient>
-					<radialGradient id="p-horn" cx="0.2", cy="0.8">
-						<stop offset="0%" stop-color="var(--sc)" stop-opacity="1" />
-						<stop offset="100%" stop-color="var(--sc)" stop-opacity="0" />
-					</radialGradient>
 					<radialGradient id="p-vagg" cx="0" cy="0.5">
 						<stop offset="0%" stop-color="var(--sc)" stop-opacity="1" />
 						<stop offset="100%" stop-color="var(--sc)" stop-opacity="0" />
@@ -80,7 +76,7 @@
 					<text class="temp hidden" default="Frys: " id="th-frys-t" x="6" y="49" />
 				</g>
 				<g class="room" id="vardagsrum" transform="translate(19, 84)" clip-path="url(#vardagsrum-clip)">
-					<rect width="70" height="10" x="55" y="107" class="name-blocker-unused hidden" />
+					<rect width="70" height="10" x="55" y="110" class="name-blocker-unused hidden" />
 					<polygon id="vardagsrum-outline" class="room-outline" points="0,74,158,0,158,170,0,170" />
 					<circle class="mood" cx="65" cy="54" r="40" fill="url(#pf)" />
 					<circle class="mood" cx="140" cy="40" r="40" fill="url(#pf)" />
@@ -90,24 +86,16 @@
 					</g>
 				</g>
 				<g class="room" id="sovrum" transform="translate(177,62)" clip-path="url(#sovrum-clip)">
-					<rect width="40" height="10" x="35" y="76" class="name-blocker hidden" />
+					<rect width="40" height="10" x="35" y="78" class="name-blocker hidden" />
 					<polygon id="sovrum-outline" class="room-outline" points="0,22,47,0,47,33,112,33,112,128,40,128,40,154,0,154" />
-					<g transform="translate(105, 124) rotate(270) scale(0.7)">
-						<path class="mood lampa-horn" fill="url(#p-horn)" />
-					</g>
-
-						<circle class="mood" cx="60" cy="95" r="50" fill="url(#pf)" />
-						<circle class="mood" cx="60" cy="95" r="50" fill="url(#pf)" />
-
-					<g transform="translate(2, 80) scale(1.5, 1)">
-						<path class="mood lampa-vagg" fill="url(#p-vagg)" />
-					</g>
-
+					<circle class="mood" cx="95" cy="115" r="40" fill="url(#pf)" />
+					<circle class="mood" cx="2" cy="60" r="30" fill="url(#pf)" />
+					<circle class="mood" cx="2" cy="100" r="30" fill="url(#pf)" />
 					<text class="temp hidden" id="th-sovrum-t" x="40" y="78" />
 					<text class="temp hidden" id="th-sovrum-h" x="40" y="94" />
 				</g>
 				<g class="room" id="garderob" transform="translate(224, 10)" clip-path="url(#garderob-clip)">
-					<rect width="58" height="10" x="20" y="55" class="name-blocker-unused hidden" />
+					<rect width="58" height="10" x="20" y="58" class="name-blocker-unused hidden" />
 					<polygon id="garderob-outline" points="0,52,107,1,107,85,0,85" class="room-outline" />
 				</g>
 				<g class="room" id="entre" transform="translate(93, 395)" clip-path="url(#entre-clip)">
@@ -123,15 +111,13 @@
 					<text class="temp hidden" id="th-hall-h" x="30" y="33" />
 				</g>
 				<g class="room" id="balkong" transform="translate(289, 95)" clip-path="url(#balkong-clip)">
-					<rect width="30" height="10" x="10" y="53" class="name-blocker-unused hidden" />
+					<rect width="30" height="10" x="10" y="55" class="name-blocker-unused hidden" />
 					<rect id="balkong-outline" width="44" height="95" class="room-outline" />
 				</g>
 				<g class="room" id="orangeri" transform="translate(19, 395)" clip-path="url(#orangeri-clip)">
-					<rect width="40" height="10" x="16" y="33" class="name-blocker hidden" />
+					<rect width="40" height="10" x="16" y="31" class="name-blocker hidden" />
 					<rect id="orangeri-outline" width="74" height="88" class="room-outline" />
-					<g transform="translate(0, 85)">
-						<path class="night lampa-horn" fill="url(#p-horn)" />
-					</g>
+					<circle class="night" cx="15" cy="70" r="40" fill="url(#pf)" />
 					<text class="temp hidden" id="th-orangeri-t" x="21" y="36" />
 					<text class="temp hidden" id="th-orangeri-h" x="21" y="52" />
 				</g>
@@ -146,40 +132,37 @@
 				<g class="room" id="sovrum-mk" transform="translate(217, 190)" clip-path="url(#sovrum-mk-clip)">
 					<rect width="40" height="10" x="32" y="40" class="name-blocker hidden" />
 					<rect id="sovrum-mk-outline" width="114" height="80" class="room-outline" />
-					<g transform="translate(0, 0) rotate(90) scale(0.7)">
-						<path class="night lampa-horn" fill="url(#p-horn)" />
-					</g>
+					<circle class="mood" cx="10" cy="10" r="40" fill="url(#pf)" />
 					<text class="temp hidden" id="th-barnens-rum-t" x="37" y="38" />
 					<text class="temp hidden" id="th-barnens-rum-h" x="37" y="54" />
 				</g>
 				<g class="room" id="garderob-kontor" transform="translate(217, 270)" clip-path="url(#garderob-kontor-clip)">
-					<rect width="70" height="10" x="14" y="18" class="name-blocker-unused hidden" />
+					<rect width="70" height="10" x="14" y="19" class="name-blocker-unused hidden" />
 					<rect id="garderob-kontor-outline" width="114" height="49" class="room-outline" />
 				</g>
 				<g class="room" id="kontor" transform="translate(228, 319)" clip-path="url(#kontor-clip)">
-					<rect width="40" height="10" x="32" y="50" class="name-blocker hidden" />
+					<rect width="40" height="10" x="32" y="48" class="name-blocker hidden" />
 					<rect id="kontor-outline" width="103" height="117" class="room-outline" />
-					<g transform="translate(2, 59) scale(2, 1.2)">
-						<path class="mood lampa-vagg" fill="url(#p-vagg)" />
-					</g>
+					<circle class="night" cx="10" cy="35" r="40" fill="url(#pf)" />
+					<circle class="night" cx="10" cy="75" r="40" fill="url(#pf)" />
 					<text class="temp hidden" id="th-kontor-t" x="32" y="51" />
 					<text class="temp hidden" id="th-kontor-h" x="32" y="67" />
 				</g>
 				<g class="room" id="badrum" transform="translate(156, 254)" clip-path="url(#badrum-clip)">
 					<rect width="22" height="10" x="27" y="24" class="name-blocker-unused hidden" />
 					<rect id="badrum-outline" width="61" height="77" class="room-outline" />
-					<circle class="mood" cx="25" cy="24" r="17" fill="url(#pf)" />
-					<circle class="mood" cx="25" cy="53" r="17" fill="url(#pf)" />
-					<circle class="mood" cx="45" cy="24" r="17" fill="url(#pf)" />
-					<circle class="mood" cx="45" cy="53" r="17" fill="url(#pf)" />
+					<circle class="mood" cx="25" cy="24" r="25" fill="url(#pf)" />
+					<circle class="mood" cx="25" cy="53" r="25" fill="url(#pf)" />
+					<circle class="mood" cx="45" cy="24" r="25" fill="url(#pf)" />
+					<circle class="mood" cx="45" cy="53" r="25" fill="url(#pf)" />
 				</g>
 				<g class="room" id="dusch" transform="translate(156, 331)" clip-path="url(#dusch-clip)">
 					<rect width="22" height="10" x="30" y="32" class="name-blocker-unused hidden" />
 					<rect id="dusch-outline" width="72" height="64" class="room-outline" />
-					<circle class="mood" cx="35" cy="20" r="17" fill="url(#pf)" />
-					<circle class="mood" cx="35" cy="50" r="17" fill="url(#pf)" />
-					<circle class="mood" cx="55" cy="20" r="17" fill="url(#pf)" />
-					<circle class="mood" cx="55" cy="50" r="17" fill="url(#pf)" />
+					<circle class="mood" cx="35" cy="20" r="25" fill="url(#pf)" />
+					<circle class="mood" cx="35" cy="50" r="25" fill="url(#pf)" />
+					<circle class="mood" cx="55" cy="20" r="25" fill="url(#pf)" />
+					<circle class="mood" cx="55" cy="50" r="25" fill="url(#pf)" />
 				</g>
 				<g class="room" id="tvattstuga" transform="translate(158, 434)" clip-path="url(#tvattstuga-clip)">
 					<rect width="30" height="10" x="15" y="18" class="name-blocker-unused hidden" />
