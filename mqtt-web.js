@@ -6,10 +6,9 @@ const https = require('https');
 const concat = require('concat-stream');
 const qs = require('querystring');
 
-
-
 const lg = require('./log.js');
 const us = require('./user.js');
+
 process.stdin.resume();
 
 // START Init
@@ -54,21 +53,25 @@ const certFolder = config.config.certFolder;
 // END Init
 
 // START Http config
-async function webLog(req, port) {
+async function webLog(req, data, port) {
 	let { headers, method, url } = req;
 	let date = new Date();
-	fs.appendFile('./log/web-raw.log', `${date.toISOString()}-${port}-${method}-(${req.connection.remoteAddress}:${req.connection.remotePort}-${url})\n`, function(err) {
+	if (data !== undefined && data.length > 0) {
+		data = '_POST-data: ' + data;
+	}
+
+	fs.appendFile('./log/web-raw.log', `${date.toISOString()}_${port}_${method}_(${req.connection.remoteAddress}:${req.connection.remotePort})_${url}${data}\n`, function(err) {
 		if (err) lg.log(err);
 	});
 }
 
 http.createServer(function(req, res) {
-		webLog(req, 8080);
+		webLog(req, undefined, 8080);
         res.writeHead(302, {"location": "https://" + req.headers['host'] + req.url});
         res.end();
 }).listen(8080);
 
-const server = https.createServer({ 
+const server = https.createServer({
         key: fssync.readFileSync(certFolder + 'privkey.pem'),
         cert: fssync.readFileSync(certFolder + 'fullchain.pem'),
         ca: fssync.readFileSync(certFolder + 'chain.pem')
@@ -154,7 +157,11 @@ const fileCache = {};
 
 async function returnFile(res, file) {
 	let cf = fileCache[file];
-	let mtime = (await fs.stat(file)).mtime.toISOString();
+	let mtimeStat = await fs.stat(file, function(err, stat) {
+		if (err == null) return stat;
+		else lg.log(err);
+	});
+	let mtime = mtimeStat.mtime.toISOString();
 	let data;
 	let etag;
 
@@ -174,9 +181,10 @@ async function returnFile(res, file) {
 	if (file.endsWith('.json')) ct = 'application/json'
 	if (file.endsWith('.js')) ct = 'application/javascript'
 	if (file.endsWith('.css')) ct = 'text/css'
+	if (file.endsWith('.svg')) ct = 'image/svg+xml'
 	res.statusCode = 200;
 	if (ct !== undefined) res.setHeader('Content-Type', ct);
-	res.setHeader('Cache-Control', 'max-age=600');
+//	res.setHeader('Cache-Control', 'max-age=600');
 	res.setHeader('etag', etag);
 	res.end(data.toString());
 }
@@ -200,13 +208,13 @@ async function verifyUser(headers) {
 	return false;
 }
 
-async function verifyLogin(req, res) {
-	const chunks = [];
+async function verifyLogin(req, res, data) {
+//	const chunks = [];
 
-	req.on('data', chunk => chunks.push(chunk));
-	return await req.on('end', async () => {
-		const data = Buffer.concat(chunks);
-		let strings = data.toString().split('&');
+//	req.on('data', chunk => chunks.push(chunk));
+//	return await req.on('end', async () => {
+//		const data = Buffer.concat(chunks);
+		let strings = data.split('&');
 
 		let userVar = strings.find(s => s.split('=')[0] === 'username');
 		let passVar = strings.find(s => s.split('=')[0] === 'password');
@@ -233,23 +241,46 @@ async function verifyLogin(req, res) {
 
 		returnFile(res, './web/login.html');
 		return;
-	});
+//	});
 }
 
+/*
+process.on('uncaughtException', (err, origin) => {
+	lg.log(origin);
+  fs.writeSync(
+    process.stderr.fd,
+    `Caught exception: ${err}\n` +
+    `Exception origin: ${origin}`
+  );
+});
+
+*/
+
 server.on('request', async (req, res) => {
-	webLog(req, 8443);
+	const chunks = [];
+	var data = '';
+	req.on('data', chunk => chunks.push(chunk));
+	await req.on('end', async () => {
+
+		if (chunks.length > 0) { data = Buffer.concat(chunks).toString(); }
+
+		webLog(req, data, 8443);
+		await handleRequest(req, res, data);
+	});
+});
+
+async function handleRequest(req, res, data) {
 	let { headers, method, url } = req;
 	if (method === 'OPTIONS') {
 		res.statusCode = 204;
-		res.setHeader('Cache-Control', 'max-age=600');
-		res.setHeader('etag', 'favicon-none');
+//		res.setHeader('Cache-Control', 'max-age=600');
 		res.end();
 		return;
 	}
 
 	if (url === '/favicon.ico') {
 		res.statusCode = 204;
-		res.setHeader('Cache-Control', 'max-age=600');
+//		res.setHeader('Cache-Control', 'max-age=600');
 		res.setHeader('etag', 'favicon-none');
 		res.end();
 		return;
@@ -268,7 +299,7 @@ server.on('request', async (req, res) => {
 
 	if (!loggedIn || logInUrl) {
 		if (method === 'POST') {
-			await verifyLogin(req, res);
+			await verifyLogin(req, res, data);
 			return;
 		}
 		else {
@@ -292,6 +323,11 @@ server.on('request', async (req, res) => {
 		return;
 	}
 
+	if (url.startsWith('/images/')) {
+		returnFile(res, `./web${url}`);
+		return;
+	}
+
 	if (url.startsWith('/node_modules/')) {
 		returnFile(res, `.${url}`);
 		return;
@@ -306,7 +342,7 @@ server.on('request', async (req, res) => {
 	res.statusCode = 403;
 //	res.setHeader('Content-Type', 'text/plain');
 	res.end();
-});
+}
 
 // END HTTP Server functions
 

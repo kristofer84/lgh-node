@@ -8,6 +8,20 @@ body.nightmode {
 	color: yellow;
 }
 
+.icon {
+	mask: url(./images/bolt-solid.svg);
+	-webkit-mask: url(./images/bolt-solid.svg);
+	width: 30px;
+}
+
+.icon svg path {
+	fill: #FFCC00;
+}
+
+.icon object svg {
+	fill: #FFCC00;
+}
+
 text, rect, polygon, circle, path {
 	transition: fill 0.5s, fill-opacity 0.5s, opacity 0.3s;
 }
@@ -181,7 +195,6 @@ body.nightmode .room-outline { fill-opacity: 0.6; }
 	top: 15px;
 	left: -7px;
 	display: inline-block;
-	padding: 2px;
 	border-radius: 3px;
 	max-width: 100%;
 }
