@@ -93,6 +93,7 @@ function describeSector(x, y, radius, startAngle, endAngle) {
 	return d;
 }
 
+
 $(document).ready(function () {
 	var els = document.getElementsByClassName("lampa-horn");
 	Array.prototype.forEach.call(els, function(el) { el.setAttribute("d", describeSector(0, 0, 100, 0, 90))});

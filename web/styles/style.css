@@ -23,7 +23,7 @@ body.nightmode {
 }
 
 text, rect, polygon, circle, path {
-	transition: fill 0.5s, fill-opacity 0.5s, opacity 0.3s;
+	transition: fill 0.5s, fill-opacity 0.5s, stroke-opacity 0.5s, opacity 0.3s;
 }
 
 body.nightmode text {
@@ -160,10 +160,29 @@ stop {
 	fill-opacity: 0.6;
 }
 
-body.nightmode .room-outline { fill-opacity: 0.6; } 
+body.nightmode .room-outline { 
+	fill-opacity: 0.6;
+	stroke-opacity: 0.1;
+} 
+
+
+
+body.nightmode #rooms-outline {
+	stroke-opacity: 0.4;
+}
+
+#rooms-outline {
+	fill-opacity: 0;
+	stroke-opacity: 0;
+	stroke-width: 8px;
+	stroke: #000;
+}
 
 .room-outline {
 	fill-opacity: 0.2;
+	stroke-opacity: 0.04;
+	stroke-width: 1px;
+	stroke: #000;
 } 
 /* End room outline */
 
