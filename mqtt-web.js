@@ -182,11 +182,18 @@ async function returnFile(res, file) {
 	if (file.endsWith('.js')) ct = 'application/javascript'
 	if (file.endsWith('.css')) ct = 'text/css'
 	if (file.endsWith('.svg')) ct = 'image/svg+xml'
+	if (file.endsWith('.jpeg')) ct = 'image/jpeg'
 	res.statusCode = 200;
 	if (ct !== undefined) res.setHeader('Content-Type', ct);
 //	res.setHeader('Cache-Control', 'max-age=600');
 	res.setHeader('etag', etag);
-	res.end(data.toString());
+
+	if (ct === 'image/jpeg') {
+		res.end(data, 'binary');
+	}
+	else {
+		res.end(data.toString());
+	}
 }
 
 function returnContent(res, json) {
