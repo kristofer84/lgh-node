@@ -10,7 +10,7 @@ body.nightmode {
 }
 
 text, rect, polygon, circle, path {
-	transition: fill 0.5s, fill-opacity 0.5s, stroke-opacity 0.5s, opacity 0.3s;
+	transition: fill 0.5s, fill-opacity 0.5s, stroke-opacity 0.5s, opacity 0.5s;
 }
 
 body.nightmode text {
@@ -27,6 +27,10 @@ body.nightmode text {
 
 .hidden { 
 	opacity: 0;
+}
+
+text {
+	opacity: 1;
 }
 
 /* Menu start */
