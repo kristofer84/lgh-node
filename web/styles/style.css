@@ -29,10 +29,6 @@ body.nightmode text {
 	opacity: 0;
 }
 
-text {
-	opacity: 1;
-}
-
 /* Menu start */
 #cb-settings~svg {
 	transition: transform 1s ease, color 1s ease !important;
