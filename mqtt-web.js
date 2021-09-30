@@ -66,7 +66,7 @@ async function webLog(req, data, port) {
 }
 
 http.createServer(function(req, res) {
-		webLog(req, undefined, 8080);
+		webLog(req, '', 8080);
         res.writeHead(302, {"location": "https://" + req.headers['host'] + req.url});
         res.end();
 }).listen(8080);

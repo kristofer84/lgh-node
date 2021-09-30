@@ -10,11 +10,6 @@
 	<script src="/socket.io/socket.io.js"></script>
 </head>
 <body>
-	<div class="icon">
-	<!--
-	<svg aria-hidden="true" data-prefix="fas" data-icon="bolt" role="img" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512" class="svg-inline--fa fa-bolt fa-w-10 fa-7x"><path fill="currentColor" d="M295.973 160H180.572L215.19 30.184C219.25 14.956 207.756 0 192 0H56C43.971 0 33.8 8.905 32.211 20.828l-31.996 240C-1.704 275.217 9.504 288 24.004 288h118.701L96.646 482.466C93.05 497.649 104.659 512 119.992 512c8.35 0 16.376-4.374 20.778-11.978l175.973-303.997c9.244-15.967-2.288-36.025-20.77-36.025z" class=""></path></svg>
-	-->
-	</div>
 	<div class="removed" id="popup"></div>
 	<div class="removed" id="raw"></div>
 	<div id="settings" style="position: absolute; left: 20px; top: 20px; z-index: 200;">
@@ -23,7 +18,7 @@
 			<label><input id="cb-refresh" name="Auto refresh" type="checkbox" /><i class="fas fa-sync-alt fa-2x"></i></label>
 			<label><input id="cb-mood" name="Max brightness" type="checkbox" /><i class="fas fa-sun fa-2x"></i></label>
 			<label><input id="cb-temp" name="Show temperatures" type="checkbox" /><i class="fas fa-thermometer-three-quarters fa-2x"></i></label>
-			<label><input id="cb-energy" name="Show power usage" type="checkbox" /><i class="fas fa-bolt fa-2x"></i></label>
+<!--			<label><input id="cb-energy" name="Show power usage" type="checkbox" /><i class="fas fa-bolt fa-2x"></i></label> -->
 			<label><input id="cb-raw" name="Raw messages" type="checkbox" /><i class="fas fa-stream fa-2x"></i></label>
 			<label><input id="cb-nightmode" name="Nightmode" type="checkbox" /><i class="fas fa-moon fa-2x"></i></label>
 		</div>
@@ -31,14 +26,13 @@
 	<div id="image-mapper">
 		<svg id="image-mapper-svg" viewBox="0 0 342 557">
 			<defs>
-				<clipPath id="vardagsrum-clip"><use xlink:href="#vardagsrum-outline" /></clipPath>
+				<clipPath id="vardagsrum-kok-clip"><use xlink:href="#vardagsrum-kok-outline" /></clipPath>
 				<clipPath id="sovrum-clip"><use xlink:href="#sovrum-outline" /></clipPath>
 				<clipPath id="garderob-clip"><use xlink:href="#garderob-outline" /></clipPath>
 				<clipPath id="balkong-clip"><use xlink:href="#balkong-outline" /></clipPath>
 				<clipPath id="sovrum-mk-clip"><use xlink:href="#sovrum-mk-outline" /></clipPath>
 				<clipPath id="hall-sovrum-clip"><use xlink:href="#hall-sovrum-outline" /></clipPath>
 				<clipPath id="badrum-clip"><use xlink:href="#badrum-outline" /></clipPath>
-				<clipPath id="kok-clip"><use xlink:href="#kok-outline" /></clipPath>
 				<clipPath id="orangeri-clip"><use xlink:href="#orangeri-outline" /></clipPath>
 				<clipPath id="entre-clip"><use xlink:href="#entre-outline" /></clipPath>
 				<clipPath id="hall-tvattstuga-clip"><use xlink:href="#hall-tvattstuga-outline" /></clipPath>
@@ -71,14 +65,27 @@
 				<text class="temp hidden" default="Kylsk&#229;p: " id="th-kylskap-t" x="6" y="33" />
 				<text class="temp hidden" default="Frys: " id="th-frys-t" x="6" y="49" />
 			</g>
-			<g class="room" id="vardagsrum" transform="translate(19, 84)" clip-path="url(#vardagsrum-clip)">
-				<rect width="70" height="10" x="55" y="110" class="name-blocker-unused hidden" />
-				<polygon id="vardagsrum-outline" class="room-outline" points="0,74,158,0,158,170,0,170" />
+			<g class="room" id="vardagsrum-kok" transform="translate(19, 84)" clip-path="url(#vardagsrum-kok-clip)">
+				<rect width="70" height="10" x="55" y="110" class="name-blocker hidden" />
+				<polygon id="vardagsrum-kok-outline" class="room-outline" points="0,74,158,0,158,170,137,170,137,311,0,311" />
+				<text class="temp hidden" id="th-vardagsrum-t" x="75" y="110" />
+				<text class="temp hidden" id="th-vardagsrum-h" x="75" y="126" />
 				<circle class="mood" cx="65" cy="54" r="40" fill="url(#pf)" />
 				<circle class="mood" cx="140" cy="40" r="40" fill="url(#pf)" />
-				<circle class="mood" cx="10" cy="130" r="40" fill="url(#pf)" />
+				<circle class="mood" cx="15" cy="180" r="40" fill="url(#pf)" />
 				<g transform="translate(53, 55) rotate(65)">
 					<path class="night lampa-vagg" fill="url(#p-vagg)" />
+				</g>
+				<rect width="45" height="22" x="38" y="245" class="name-blocker-unused hidden" />
+				<circle class="mood" cx="60" cy="265" r="50" fill="url(#pf)" />
+				<g opacity="0.6">
+					<circle class="mood" cx="127" cy="180" r="30" fill="url(#pf)" />
+					<circle class="mood" cx="127" cy="200" r="30" fill="url(#pf)" />
+					<circle class="mood" cx="127" cy="220" r="30" fill="url(#pf)" />
+					<circle class="mood" cx="127" cy="240" r="30" fill="url(#pf)" />
+					<circle class="mood" cx="127" cy="260" r="30" fill="url(#pf)" />
+					<circle class="mood" cx="127" cy="280" r="30" fill="url(#pf)" />
+					<circle class="mood" cx="127" cy="300" r="30" fill="url(#pf)" />
 				</g>
 			</g>
 			<g class="room" id="sovrum" transform="translate(177,62)" clip-path="url(#sovrum-clip)">
@@ -91,8 +98,10 @@
 				<text class="temp hidden" id="th-sovrum-h" x="40" y="94" />
 			</g>
 			<g class="room" id="garderob" transform="translate(224, 10)" clip-path="url(#garderob-clip)">
-				<rect width="58" height="10" x="20" y="58" class="name-blocker-unused hidden" />
+				<rect width="58" height="10" x="20" y="58" class="name-blocker hidden" />
 				<polygon id="garderob-outline" points="0,52,107,1,107,85,0,85" class="room-outline" />
+				<text class="temp hidden" id="th-garderob-t" x="45" y="58" />
+				<text class="temp hidden" id="th-garderob-h" x="45" y="74" />
 			</g>
 			<g class="room" id="entre" transform="translate(93, 395)" clip-path="url(#entre-clip)">
 				<rect width="25" height="10" x="13" y="104" class="name-blocker-unused hidden" />
@@ -116,14 +125,6 @@
 				<circle class="night" cx="15" cy="70" r="40" fill="url(#pf)" />
 				<text class="temp hidden" id="th-orangeri-t" x="21" y="36" />
 				<text class="temp hidden" id="th-orangeri-h" x="21" y="52" />
-			</g>
-			<g class="room" id="kok" transform="translate(19, 254)" clip-path="url(#kok-clip)">
-				<rect width="45" height="22" x="38" y="75" class="name-blocker-unused hidden" />
-				<rect id="kok-outline" width="137" height="141" class="room-outline" />
-				<circle class="mood" cx="60" cy="95" r="50" fill="url(#pf)" />
-				<g transform="translate(135, 70) rotate(180) scale(2.5, 1.5)">
-					<path class="mood lampa-vagg" fill="url(#p-vagg)" />
-				</g>
 			</g>
 			<g class="room" id="sovrum-mk" transform="translate(217, 190)" clip-path="url(#sovrum-mk-clip)">
 				<rect width="40" height="10" x="32" y="40" class="name-blocker hidden" />
