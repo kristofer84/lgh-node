@@ -289,8 +289,6 @@ $(document).ready(function () {
 		updateArea(ar, nextState);
 		queue(item);
 	});
-
-//	get();
 });
 
 
@@ -344,14 +342,22 @@ function ensureState(cb) {
 			break;
 
 		case 'cb-raw':
-			hasClass = $('#raw').hasClass('raw');
+			hasClass = $('#raw').hasClass('display');
 			if (state && !hasClass) {
 				$('#raw').removeClass('removed');
-				$('#raw').addClass('raw');
+				$('#raw-bg').removeClass('removed');
+				setTimeout(function() {
+					$('#raw').addClass('display');
+					$('#raw-bg').addClass('display');
+				}, 20);
 			}
 			else if (!state && hasClass) {
-				$('#raw').removeClass('raw');
-				$('#raw').addClass('removed');
+				$('#raw').removeClass('display');
+				$('#raw-bg').removeClass('display');
+				setTimeout(function() {
+					$('#raw').addClass('removed');
+					$('#raw-bg').addClass('removed');
+				}, 500);
 			}
 			break;
 	}
@@ -359,11 +365,18 @@ function ensureState(cb) {
 
 
 $(document).ready(function () {
-	let checkboxes = $('input[type=checkbox]').change(e => {
+	$('input[type=checkbox]').change(e => {
 		let cb = $('#' + e.currentTarget.id);
 		ensureState(cb);
 	});
+
+	$('#raw-bg').click(e => {
+		let cb = $('#cb-raw');
+		cb.click();
+	});
 });
+
+
 // END Buttons
 
 //START Cookies
@@ -408,12 +421,12 @@ function popup(cb) {
 	let message = `${name}: ${cb.checked ? 'on' : 'off'}`;
 	$('#popup').text(message);
 	$('#popup').removeClass('removed');
-	$('#popup').addClass('popup');
+	$('#popup').addClass('display');
 
 	clearTimeout(popupTimer);
 	clearTimeout(popupTimerInner);
 	popupTimer = setTimeout(function() {
-		$('#popup').removeClass('popup');
+		$('#popup').removeClass('display');
 		popupTimerInner = setTimeout(function() { $('#popup').addClass('removed'); }, 1200);
 	}, 300);
 }

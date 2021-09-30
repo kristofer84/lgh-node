@@ -9,20 +9,6 @@ body.nightmode {
 	color: yellow;
 }
 
-.icon {
-	mask: url(./images/bolt-solid.svg);
-	-webkit-mask: url(./images/bolt-solid.svg);
-	width: 30px;
-}
-
-.icon svg path {
-	fill: #FFCC00;
-}
-
-.icon object svg {
-	fill: #FFCC00;
-}
-
 text, rect, polygon, circle, path {
 	transition: fill 0.5s, fill-opacity 0.5s, stroke-opacity 0.5s, opacity 0.3s;
 }
@@ -33,6 +19,14 @@ body.nightmode text {
 
 .removed {
 	display: none;
+}
+
+.display {
+	display: inline;
+}
+
+.hidden { 
+	opacity: 0;
 }
 
 /* Menu start */
@@ -104,8 +98,7 @@ body.nightmode input[type=checkbox]:checked~svg {
 	opacity: 0;
 }
 
-#popup.popup {
-	display: inline;
+#popup.display {
 	transition: none;
 	opacity: 1;
 }
@@ -114,12 +107,29 @@ body.nightmode input[type=checkbox]:checked~svg {
 
 /* Raw start */
 
+.raw-common {
+	position: fixed;
+	transition: opacity 0.3s ease-out;
+	opacity: 0;
+}
+
+#raw-bg {
+	left: 0;
+	right: 0;
+	top: 0;
+	bottom: 0;
+	z-index: 590;
+	background: black;
+}
+
+#raw-bg.display {
+	opacity: 0.8;
+}
+
 #raw {
 	background: gray;
 	border: 1px solid black;
 	padding: 10px;
-	transition: opacity 1.2s ease-out;
-	position: fixed;
 	width: 300px;
 	height: 400px;
 	margin-left: -160px;
@@ -127,13 +137,10 @@ body.nightmode input[type=checkbox]:checked~svg {
 	left: 50%;
 	top: 50%;
 	font-size: 8px;
-	z-index: 500;
-	opacity: 0;
+	z-index: 600;
 }
 
-#raw.raw {
-	display: inline;
-	transition: none;
+#raw.display {
 	opacity: 1;
 }
 
@@ -141,10 +148,6 @@ body.nightmode input[type=checkbox]:checked~svg {
 
 stop {
 	--sc: #FFCC00;
-}
-
-.hidden { 
-	opacity: 0;
 }
 
 .name-blocker {
@@ -182,8 +185,10 @@ body.nightmode #rooms-outline {
 }
 /* End room outline */
 
-.mood, .night {
+.mood,
+.night {
 	opacity: 0;
+	fill-opacity: 0.8;
 }
 
 [light="night"] .night,
@@ -192,8 +197,6 @@ body.nightmode #rooms-outline {
 {
 	opacity: 1;
 }
-
-.mood, .night { fill-opacity: 0.8; } 
 
 /*
 .room:hover {
