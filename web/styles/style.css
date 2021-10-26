@@ -183,7 +183,17 @@ body.nightmode #rooms-outline {
 	fill: #FFCC00;
 	fill-opacity: 0.6;
 }
+
+body.nightmode .room[light="on"] .room-outline { 
+	fill: #FFCC00;
+	fill-opacity: 0.5;
+}
 /* End room outline */
+
+.room[light="on"] text {
+	fill: black;
+}
+
 
 .mood,
 .night {
