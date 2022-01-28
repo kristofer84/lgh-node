@@ -16,6 +16,7 @@ function connect() {
 	socket.on('device.all', function(msg) {
 		let obj = JSON.parse(msg);
 		updateMap(obj);
+
 		appendLog('authenticated, complete state received');
 	});
 
@@ -169,10 +170,15 @@ function send(item) {
 // START Update model and view
 function updateTemp(data) {
 	Object.keys(data).forEach(name => {
-		let tDef = $("#" + name + "-t").attr("default") ?? '';
-		$("#" + name + "-t").html(tDef + Number(data[name].temperature).toFixed(1) + "&deg;")
-		let hDef = $("#" + name + "-h").attr("default") ?? '';
-		$("#" + name + "-h").html(hDef + Number(data[name].humidity).toFixed(0) + "%")
+		//if (!data[dev].hasOwnProperty('state')) return;
+		if (name.endsWith('temperature')) {
+			let tDef = $("#th-" + name).attr("default") ?? '';
+			$("#th-" + name).html(tDef + Number(data[name].state).toFixed(1) + "&deg;")
+		}
+		else {
+			let hDef = $("#th-" + name).attr("default") ?? '';
+			$("#th-" + name).html(hDef + Number(data[name].state).toFixed(0) + "%")
+		}
 	});
 }
 

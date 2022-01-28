@@ -5,7 +5,7 @@ const http = require('http');
 const https = require('https');
 const concat = require('concat-stream');
 const qs = require('querystring');
-
+const url = require('url');
 const lg = require('./log.js');
 const us = require('./user.js');
 
@@ -30,6 +30,9 @@ function init() {
 		values.forEach(light => {
 			let split = light.split('.');
 			let device = split[0];
+
+			if (!devices.hasOwnProperty(device)) devices[device] = {};
+			devices[device].zone = zone;
 			devices[device].type = split[1];
 
 			if (split.length === 3) {
@@ -41,8 +44,6 @@ function init() {
 					devices[device].night = true;
 				}
 			}
-			if (!devices.hasOwnProperty(device)) devices[device] = {};
-			devices[device].zone = zone;
 		});
 	});
 }
@@ -65,6 +66,11 @@ async function webLog(req, data, port) {
 	});
 }
 
+const server = http.createServer({
+}, (res, req) => {
+}).listen(8080);
+
+/*
 http.createServer(function(req, res) {
 		webLog(req, '', 8080);
         res.writeHead(302, {"location": "https://" + req.headers['host'] + req.url});
@@ -77,6 +83,7 @@ const server = https.createServer({
         ca: fssync.readFileSync(certFolder + 'chain.pem')
 }, (res, req) => {
 }).listen(8443);
+*/
 // END Http config
 
 // MQTT Start
@@ -94,9 +101,10 @@ client.on('connect', function () {
 client.on('message', function (topic, message) {
 	let split = topic.split('/');
 
-	if (split[1] === 'homey') {
-
+    //homeassistant/light/entre/state: on
+	if (split[0] === 'homeassistant') {
 		let device = split[2];
+		let deviceType = split[1];
 		let valueType = split[3];
 
 		let values = split.slice(2);
@@ -106,22 +114,33 @@ client.on('message', function (topic, message) {
 		values.reduce(reducer, devices);
 
 		//Implicit change of known values (onoff and dim)
-		if (valueType === 'onoff' && message.toString() === 'false' && devices[device].hasOwnProperty('dim')) {
-			let prev = devices[device]['dim'];
-			if (prev !== '0') {
-				devices[device]['dim'] = '0';
+//		if (valueType === 'state' && message.toString() === 'off' && devices[device].hasOwnProperty('dim')) {
+//			let prev = devices[device]['dim'];
+//			if (prev !== '0') {
+//				devices[device]['dim'] = '0';
+//			}
+//		}
+
+		if (devices[device].hasOwnProperty('zone')) {
+			if (valueType === 'state') {
+				if (deviceType === 'light' || deviceType === 'switch') {
+					let prev = devices[device]['onoff'];
+					let val = message.toString() === 'on' ? 'true' : 'false';
+					if (prev !== val) {
+						devices[device]['onoff'] = val;
+					}
+				}
+				else {
+					let prev = devices[device]['state'];
+					let val = message.toString();
+					if (prev !== val) {
+						devices[device]['state'] = val;
+					}
+				}
+
+				queueSend(device);
 			}
 		}
-
-		if (valueType === 'dim') {
-			let prev = devices[device]['onoff'];
-			let val = parseInt(message.toString()) > 0 ? 'true' : 'false';
-			if (prev !== val) {
-				devices[device]['onoff'] = val;
-			}
-		}
-
-		queueSend(device);
 	}
 
 	let date = new Date();
@@ -136,7 +155,7 @@ function queueSend(device) {
 	let dev = getDevice(device);
 	if (Object.keys(dev).length > 0) {
 		let json = JSON.stringify(dev);
-
+		//console.log(`json: ${json}`);
 		//Don't send if same as last emitted message
 		if (toSend[device] !== json) {
 			io.emit('device', json);
@@ -298,13 +317,13 @@ async function handleRequest(req, res, data) {
 
  	let logInUrl = url.startsWith('/login4321');
 
-	if (!loggedIn && !logInUrl) {
+	if (!loggedIn && !logInUrl && url !== '/dashboard') {
 		res.statusCode = 403;
 		res.end();
 		return;
 	}
 
-	if (!loggedIn || logInUrl) {
+	if (!loggedIn && (logInUrl || url === '/dashboard')) {
 		if (method === 'POST') {
 			await verifyLogin(req, res, data);
 			return;
@@ -386,24 +405,24 @@ function clientConnected(user, client) {
 }
 // END socket.io
 
-function getTemperatures() {
-	let retObj = {}
-	Object.keys(devices).forEach(function (key) {
-		var device = devices[key];
-		Object.keys(device).forEach(function (valueKey) {
-			if (valueKey === 'measure-temperature') {
-				if (retObj[key] === undefined) retObj[key] = {};
-				retObj[key].temperature = device[valueKey];
-			}
-
-			if (valueKey === 'measure-humidity') {
-				if (retObj[key] === undefined) retObj[key] = {};
-				retObj[key].humidity = device[valueKey];
-			}
-		});
-	});
-	return retObj;
-}
+//function getTemperatures() {
+//	let retObj = {}
+//	Object.keys(devices).forEach(function (key) {
+//		var device = devices[key];
+//		Object.keys(device).forEach(function (valueKey) {
+//			if (valueKey === 'measure-temperature') {
+//				if (retObj[key] === undefined) retObj[key] = {};
+//				retObj[key].temperature = device[valueKey];
+//			}
+//
+//			if (valueKey === 'measure-humidity') {
+//				if (retObj[key] === undefined) retObj[key] = {};
+//				retObj[key].humidity = device[valueKey];
+//			}
+//		});
+//	});
+//	return retObj;
+//}
 
 function getDevice(dev) {
 	let retObj = {}
@@ -428,10 +447,9 @@ function getDevice(dev) {
 
 		}
 
-		else if (d.type === 'th') {
+		else if (d.type === 'sensor') {
 			r[zone][dev] = {
-				temperature: d['measure-temperature'],
-				humidity: d['measure-humidity']
+				state: d['state']
 			}
 		}
 		else if (d.hasOwnProperty('onoff')) {
@@ -468,19 +486,18 @@ function getDevice(dev) {
 			let ret = {};
 			let type = split[1];
 			let device = devices[split[0]];
-			if (type === 'light') {
+			if (type === 'light' || type === 'switch') {
 				ret.mood = (split.length > 2 && split[2] === 'mood') ? true : undefined;
 				ret.night = (split.length > 2 && split[2] === 'night') ? true : undefined;
 			}
 
 			if (device != undefined) {
-				if (type === 'light') {
+				if (type === 'light' || type === 'switch') {
 					ret.onoff = device['onoff'] === 'true';
 					ret.dim = device['dim'];
 				}
 				else {
-					ret.temperature = device['measure-temperature'];
-					ret.humidity = device['measure-humidity'];
+					ret.state = device['state'];
 				}
 			}
 
@@ -525,32 +542,32 @@ function toggle(zone, value) {
 	if (value === "night") {
 		config.zones[zone].forEach(device => {
 			var split = device.split('.');
-			if (split[1] !== 'light') return;
-			var toState = (split.length > 2 && split[2] === 'night');
-			publish(split[0], 'onoff', toState);
+			if (split[1] !== 'light' && split[1] !== 'switch') return;
+			var toState = split.length > 2 && split[2] === 'night' ? 'on' : 'off';
+			publish(split[1] + '.' + split[0], 'state', toState);
 		});
 	}
 	else if (value === "mood") {
 		config.zones[zone].forEach(device => {
 			var split = device.split('.');
-			if (split[1] !== 'light') return;
-			var toState = (split.length > 2); //Night && mood
-			publish(split[0], 'onoff', toState);
+			if (split[1] !== 'light' && split[1] !== 'switch') return;
+			var toState = split.length > 2 ? 'on' : 'off'; //Night && mood
+			publish(split[1] + '.' + split[0], 'state', toState);
 		});
 	}
 	else {
 		config.zones[zone].forEach(device => {
 			var split = device.split('.');
-			if (split[1] !== 'light') return;
-			publish(split[0], 'onoff', value)
+			if (split[1] !== 'light' && split[1] !== 'switch') return;
+			publish(split[1] + '.' + split[0], 'state', value)
 		});
 	}
 }
 
 function publish(device, property, message) {
-	lg.log(`homie/homey/${device}/${property}/set: ${message.toString()}`);
+	lg.log(`homeassistant/light/${device}/${property}/set: ${message.toString()}`);
 	if (message === undefined) return;
-	var topic = `homie/homey/${device}/${property}/set`;
+	var topic = `home/switch/${device}/${property}/set`;
 	client.publish(topic, message.toString());
 }
 
