@@ -99,6 +99,7 @@ client.on('connect', function () {
 });
 
 client.on('message', function (topic, message) {
+	try {
 	let split = topic.split('/');
 
     //homeassistant/light/entre/state: on
@@ -147,6 +148,10 @@ client.on('message', function (topic, message) {
 	fs.appendFile('./log/mqtt-raw.log', `${date.toISOString()}-${topic}: ${message.toString()}\n`, function(err) {
 		if (err) lg.log(err);
 	});
+	}
+	catch(e) {
+		console.log(e);
+	}
 });
 
 var toSend = {};
@@ -175,43 +180,48 @@ function rand() {
 const fileCache = {};
 
 async function returnFile(res, file) {
-	let cf = fileCache[file];
-	let mtimeStat = await fs.stat(file, function(err, stat) {
-		if (err == null) return stat;
-		else lg.log(err);
-	});
-	let mtime = mtimeStat.mtime.toISOString();
-	let data;
-	let etag;
+	try {
+		let cf = fileCache[file];
+		let mtimeStat = await fs.stat(file, function(err, stat) {
+			if (err == null) return stat;
+			else lg.log(err);
+		});
+		let mtime = mtimeStat.mtime.toISOString();
+		let data;
+		let etag;
 
-	if (cf === undefined || mtime !== cf.mtime) {
-		data = await fs.readFile(`${file}`, 'binary');
-		etag = rand();
-		fileCache[file] = { data: data, mtime: mtime, etag: etag };
-	}
-	else {
-		data = cf.data;
-		etag = cf.etag;
-		lg.debug(`Read ${file} from cache`);
-	}
+		if (cf === undefined || mtime !== cf.mtime) {
+			data = await fs.readFile(`${file}`, 'binary');
+			etag = rand();
+			fileCache[file] = { data: data, mtime: mtime, etag: etag };
+		}
+		else {
+			data = cf.data;
+			etag = cf.etag;
+			lg.debug(`Read ${file} from cache`);
+		}
 
-	let ct = undefined;
-	if (file.endsWith('.html')) ct = 'text/html'
-	if (file.endsWith('.json')) ct = 'application/json'
-	if (file.endsWith('.js')) ct = 'application/javascript'
-	if (file.endsWith('.css')) ct = 'text/css'
-	if (file.endsWith('.svg')) ct = 'image/svg+xml'
-	if (file.endsWith('.jpeg')) ct = 'image/jpeg'
-	res.statusCode = 200;
-	if (ct !== undefined) res.setHeader('Content-Type', ct);
-//	res.setHeader('Cache-Control', 'max-age=600');
-	res.setHeader('etag', etag);
+		let ct = undefined;
+		if (file.endsWith('.html')) ct = 'text/html'
+		if (file.endsWith('.json')) ct = 'application/json'
+		if (file.endsWith('.js')) ct = 'application/javascript'
+		if (file.endsWith('.css')) ct = 'text/css'
+		if (file.endsWith('.svg')) ct = 'image/svg+xml'
+		if (file.endsWith('.jpeg')) ct = 'image/jpeg'
+		res.statusCode = 200;
+		if (ct !== undefined) res.setHeader('Content-Type', ct);
+	//	res.setHeader('Cache-Control', 'max-age=600');
+		res.setHeader('etag', etag);
 
-	if (ct === 'image/jpeg') {
-		res.end(data, 'binary');
+		if (ct === 'image/jpeg') {
+			res.end(data, 'binary');
+		}
+		else {
+			res.end(data.toString());
+		}
 	}
-	else {
-		res.end(data.toString());
+	catch(e) {
+		console.log(e);
 	}
 }
 

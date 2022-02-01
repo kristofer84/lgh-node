@@ -26,6 +26,8 @@ function connect() {
 		appendLog(msg);
 	});
 
+	socket.on("connect_error", (err) => appendLog(err));
+
 	socket.on('disconnect', () => appendLog('disconnected'));
 }
 
@@ -329,9 +331,13 @@ function ensureState(cb) {
 			hasClass = $('body').hasClass('nightmode');
 			if (state && !hasClass) {
 				$("body").addClass("nightmode");
+			    var metaThemeColor = document.querySelector("meta[name=theme-color]");
+    			metaThemeColor.setAttribute("content", "#222");
 			}
 			else if (!state && hasClass) {
 				$("body").removeClass("nightmode");
+			    var metaThemeColor = document.querySelector("meta[name=theme-color]");
+    			metaThemeColor.setAttribute("content", "#eee");
 			}
 			break;
 
