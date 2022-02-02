@@ -232,3 +232,23 @@ body.nightmode .room[light="on"] .room-outline {
 	max-height:85vh;
 	width: 100%;
 }
+
+.device {
+	fill-opacity: 0;
+}
+
+.active-outline {
+	fill-opacity: 0.2;
+	fill: red;
+	stroke: red !important;
+	stroke-opacity: 1;
+	stroke-width: 1;
+    animation: border-pulse ease-in-out 1s infinite;
+}
+
+@keyframes border-pulse {
+    50% {
+		stroke-opacity: 0.1
+    }
+}
+

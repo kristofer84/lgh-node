@@ -170,16 +170,35 @@ function send(item) {
 // END Sending updates
 
 // START Update model and view
-function updateTemp(data) {
+function updateEntity(data) {
 	Object.keys(data).forEach(name => {
 		//if (!data[dev].hasOwnProperty('state')) return;
 		if (name.endsWith('temperature')) {
+//			console.log(`temp: ${name}`);
 			let tDef = $("#th-" + name).attr("default") ?? '';
 			$("#th-" + name).html(tDef + Number(data[name].state).toFixed(1) + "&deg;")
 		}
-		else {
+		else if (name.endsWith('humidity')) {
+//			console.log(`humi: ${name}`);
 			let hDef = $("#th-" + name).attr("default") ?? '';
 			$("#th-" + name).html(hDef + Number(data[name].state).toFixed(0) + "%")
+		}
+		else if (name.endsWith('_w')) {
+			console.log(`${name}: ${data[name].state}`);
+			let en = name.split('_')[0];
+			let ent = $("#" + en);
+			console.log(ent.hasClass('active-outline'));
+			if (data[name].state === true && !ent.hasClass('active-outline')) {
+				ent.addClass('active-outline');
+			}
+			else if (data[name].state !== true && ent.hasClass('active-outline')) {
+				ent.removeClass('active-outline');
+			}
+
+			console.log(ent.hasClass('active-outline'));
+		}
+		else {
+//			console.log(`wunknow: ${name}`);
 		}
 	});
 }
@@ -232,10 +251,10 @@ function updateView() {
 		updateArea(ar, value);
 
 		let th = Object.keys(model[zone]).filter(th => !model[zone][th].hasOwnProperty('onoff'));
-		let temp = {};
-		th.forEach(name => temp[name] = model[zone][name]);
+		let entities = {};
+		th.forEach(name => entities[name] = model[zone][name]);
 
-		updateTemp(temp);
+		updateEntity(entities);
 	});
 }
 

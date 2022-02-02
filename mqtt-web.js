@@ -133,7 +133,10 @@ client.on('message', function (topic, message) {
 				}
 				else {
 					let prev = devices[device]['state'];
-					let val = message.toString();
+					let val = devices[device].zone === 'devices'
+						? parseFloat(message.toString()) > 0.00001
+						: message.toString();
+
 					if (prev !== val) {
 						devices[device]['state'] = val;
 					}
