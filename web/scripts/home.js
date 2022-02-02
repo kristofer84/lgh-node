@@ -184,10 +184,10 @@ function updateEntity(data) {
 			$("#th-" + name).html(hDef + Number(data[name].state).toFixed(0) + "%")
 		}
 		else if (name.endsWith('_w')) {
-			console.log(`${name}: ${data[name].state}`);
+//			console.log(`${name}: ${data[name].state}`);
 			let en = name.split('_')[0];
 			let ent = $("#" + en);
-			console.log(ent.hasClass('active-outline'));
+//			console.log(ent.hasClass('active-outline'));
 			if (data[name].state === true && !ent.hasClass('active-outline')) {
 				ent.addClass('active-outline');
 			}
@@ -195,7 +195,7 @@ function updateEntity(data) {
 				ent.removeClass('active-outline');
 			}
 
-			console.log(ent.hasClass('active-outline'));
+//			console.log(ent.hasClass('active-outline'));
 		}
 		else {
 //			console.log(`wunknow: ${name}`);
