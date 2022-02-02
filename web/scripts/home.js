@@ -391,6 +391,16 @@ function ensureState(cb) {
 				}, 500);
 			}
 			break;
+
+		case 'cb-devi':
+			hasClass = $('.device').hasClass('hidden');
+			if (state && hasClass) {
+				$('.device').removeClass("hidden");
+			}
+			else if (!state && !hasClass) {
+				$('.device').addClass("hidden");
+			}
+			break;
 	}
 }
 

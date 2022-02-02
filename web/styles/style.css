@@ -61,7 +61,7 @@ body.nightmode input[type=checkbox]:checked~svg {
 }
 
 #settings {
-	width: 270px;
+	width: 300px;
 }
 
 #menu {
@@ -70,7 +70,7 @@ body.nightmode input[type=checkbox]:checked~svg {
 	opacity: 0;
 	transition: top 1s ease, opacity 0.8s ease;
 	position: absolute;
-	width: 210px;
+	width: 230px;
 	top: -60px;
 	right: 25px;
 }
