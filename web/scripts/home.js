@@ -5,6 +5,7 @@ var raw = [];
 var socketKey;
 
 function connect() {
+	if (socket) return;
 	socket = io();
 	appendLog('connected');
 
@@ -61,7 +62,11 @@ Number.prototype.pad = function(size) {
 
 function getTime() {
 	let now = new Date();
-	return `${now.getHours().pad()}:${now.getMinutes().pad()}:${now.getSeconds().pad()}`;
+    return formatDate(now);
+}
+
+function formatDate(date) {
+	return `${date.getHours().pad()}:${date.getMinutes().pad()}:${date.getSeconds().pad()}`;
 }
 
 function rand() {
@@ -177,6 +182,11 @@ function updateEntity(data) {
 //			console.log(`temp: ${name}`);
 			let tDef = $("#th-" + name).attr("default") ?? '';
 			$("#th-" + name).html(tDef + Number(data[name].state).toFixed(1) + "&deg;")
+		}
+		else if (name === 'sensorer_alla') {
+			let def = $("#info-senaste_aktivitet").attr("default") ?? '';
+			let d = formatDate(new Date(data[name].lastChange))
+			$("#info-senaste_aktivitet").html(def + d)
 		}
 		else if (name.endsWith('humidity')) {
 //			console.log(`humi: ${name}`);

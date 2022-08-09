@@ -42,7 +42,7 @@ exports.validateKey = async function validateKey(key) {
 
 function rand() {
 	return crypto.randomUUID();
-//    return Math.random().toString(36).replace(/[^a-z]+/g, '').substr(0, 7);
+	//    return Math.random().toString(36).replace(/[^a-z]+/g, '').substr(0, 7);
 }
 
 async function loadDb() {

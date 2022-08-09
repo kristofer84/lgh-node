@@ -61,7 +61,7 @@ async function webLog(req, data, port) {
 		data = '_POST-data: ' + data;
 	}
 
-	fs.appendFile('./log/web-raw.log', `${date.toISOString()}_${port}_${method}_(${req.connection.remoteAddress}:${req.connection.remotePort})_${url}${data}\n`, function(err) {
+	fs.appendFile('./log/web-raw.log', `${date.toISOString()}_${port}_${method}_(${req.connection.remoteAddress}:${req.connection.remotePort})_${url}${data}\n`, function (err) {
 		if (err) lg.log(err);
 	});
 }
@@ -73,14 +73,14 @@ const server = http.createServer({
 /*
 http.createServer(function(req, res) {
 		webLog(req, '', 8080);
-        res.writeHead(302, {"location": "https://" + req.headers['host'] + req.url});
-        res.end();
+		res.writeHead(302, {"location": "https://" + req.headers['host'] + req.url});
+		res.end();
 }).listen(8080);
 
 const server = https.createServer({
-        key: fssync.readFileSync(certFolder + 'privkey.pem'),
-        cert: fssync.readFileSync(certFolder + 'fullchain.pem'),
-        ca: fssync.readFileSync(certFolder + 'chain.pem')
+		key: fssync.readFileSync(certFolder + 'privkey.pem'),
+		cert: fssync.readFileSync(certFolder + 'fullchain.pem'),
+		ca: fssync.readFileSync(certFolder + 'chain.pem')
 }, (res, req) => {
 }).listen(8443);
 */
@@ -100,59 +100,62 @@ client.on('connect', function () {
 
 client.on('message', function (topic, message) {
 	try {
-	let split = topic.split('/');
+		let split = topic.split('/');
 
-    //homeassistant/light/entre/state: on
-	if (split[0] === 'homeassistant') {
-		let device = split[2];
-		let deviceType = split[1];
-		let valueType = split[3];
+		//homeassistant/light/entre/state: on
+		if (split[0] === 'homeassistant') {
+			let device = split[2];
+			let deviceType = split[1];
+			let valueType = split[3];
 
-		let values = split.slice(2);
+			let values = split.slice(2);
 
-		//Convert '/'-separated string to object properties
-		const reducer = (prev, curr, count) => prev[curr] = count === values.length - 1 ? message.toString() : prev.hasOwnProperty(curr) ? prev[curr] : {};
-		values.reduce(reducer, devices);
+			//Convert '/'-separated string to object properties
+			const reducer = (prev, curr, count) => prev[curr] = count === values.length - 1 ? message.toString() : prev.hasOwnProperty(curr) ? prev[curr] : {};
+			values.reduce(reducer, devices);
 
-		//Implicit change of known values (onoff and dim)
-//		if (valueType === 'state' && message.toString() === 'off' && devices[device].hasOwnProperty('dim')) {
-//			let prev = devices[device]['dim'];
-//			if (prev !== '0') {
-//				devices[device]['dim'] = '0';
-//			}
-//		}
+			//Implicit change of known values (onoff and dim)
+			//		if (valueType === 'state' && message.toString() === 'off' && devices[device].hasOwnProperty('dim')) {
+			//			let prev = devices[device]['dim'];
+			//			if (prev !== '0') {
+			//				devices[device]['dim'] = '0';
+			//			}
+			//		}
 
-		if (devices[device].hasOwnProperty('zone')) {
-			if (valueType === 'state') {
-				if (deviceType === 'light' || deviceType === 'switch') {
-					let prev = devices[device]['onoff'];
-					let val = message.toString() === 'on' ? 'true' : 'false';
-					if (prev !== val) {
-						devices[device]['onoff'] = val;
+			if (devices.hasOwnProperty(device) && devices[device].hasOwnProperty('zone')) {
+				if (valueType === 'state') {
+					if (deviceType === 'light' || deviceType === 'switch') {
+						let prev = devices[device]['onoff'];
+						let val = message.toString() === 'on' ? 'true' : 'false';
+						if (prev !== val) {
+							devices[device]['onoff'] = val;
+						}
 					}
-				}
-				else {
-					let prev = devices[device]['state'];
-					let val = devices[device].zone === 'devices'
-						? parseFloat(message.toString()) > 0.00001
-						: message.toString();
+                    else if (deviceType === 'group') {
+                        devices[device]['lastChange'] = Date.now();
+                    }
+					else {
+						let prev = devices[device]['state'];
+						let val = devices[device].zone === 'devices'
+							? parseFloat(message.toString()) > 2.5
+							: message.toString();
 
-					if (prev !== val) {
-						devices[device]['state'] = val;
+						if (prev !== val) {
+							devices[device]['state'] = val;
+						}
 					}
-				}
 
-				queueSend(device);
+					queueSend(device);
+				}
 			}
 		}
-	}
 
-	let date = new Date();
-	fs.appendFile('./log/mqtt-raw.log', `${date.toISOString()}-${topic}: ${message.toString()}\n`, function(err) {
-		if (err) lg.log(err);
-	});
+		let date = new Date();
+		fs.appendFile('./log/mqtt-raw.log', `${date.toISOString()}-${topic}: ${message.toString()}\n`, function (err) {
+			if (err) lg.log(err);
+		});
 	}
-	catch(e) {
+	catch (e) {
 		console.log(e);
 	}
 });
@@ -185,7 +188,7 @@ const fileCache = {};
 async function returnFile(res, file) {
 	try {
 		let cf = fileCache[file];
-		let mtimeStat = await fs.stat(file, function(err, stat) {
+		let mtimeStat = await fs.stat(file, function (err, stat) {
 			if (err == null) return stat;
 			else lg.log(err);
 		});
@@ -210,20 +213,21 @@ async function returnFile(res, file) {
 		if (file.endsWith('.js')) ct = 'application/javascript'
 		if (file.endsWith('.css')) ct = 'text/css'
 		if (file.endsWith('.svg')) ct = 'image/svg+xml'
+		if (file.endsWith('.png')) ct = 'image/png'
 		if (file.endsWith('.jpeg')) ct = 'image/jpeg'
 		res.statusCode = 200;
 		if (ct !== undefined) res.setHeader('Content-Type', ct);
-	//	res.setHeader('Cache-Control', 'max-age=600');
+		//	res.setHeader('Cache-Control', 'max-age=600');
 		res.setHeader('etag', etag);
 
-		if (ct === 'image/jpeg') {
+		if (ct === 'image/jpeg' || ct === 'image/png') {
 			res.end(data, 'binary');
 		}
 		else {
 			res.end(data.toString());
 		}
 	}
-	catch(e) {
+	catch (e) {
 		console.log(e);
 	}
 }
@@ -248,48 +252,48 @@ async function verifyUser(headers) {
 }
 
 async function verifyLogin(req, res, data) {
-//	const chunks = [];
+	//	const chunks = [];
 
-//	req.on('data', chunk => chunks.push(chunk));
-//	return await req.on('end', async () => {
-//		const data = Buffer.concat(chunks);
-		let strings = data.split('&');
+	//	req.on('data', chunk => chunks.push(chunk));
+	//	return await req.on('end', async () => {
+	//		const data = Buffer.concat(chunks);
+	let strings = data.split('&');
 
-		let userVar = strings.find(s => s.split('=')[0] === 'username');
-		let passVar = strings.find(s => s.split('=')[0] === 'password');
-		let username = userVar ? userVar.split('=')[1] : undefined;
-		let password = passVar ? passVar.split('=')[1] : undefined;
+	let userVar = strings.find(s => s.split('=')[0] === 'username');
+	let passVar = strings.find(s => s.split('=')[0] === 'password');
+	let username = userVar ? userVar.split('=')[1] : undefined;
+	let password = passVar ? passVar.split('=')[1] : undefined;
 
-		if (username && password) {
-			let socketKey = await us.validate(username, password);
-			if (socketKey) {
-				let date = new Date((new Date()).valueOf() + 1000 * 60 * 60 * 24 * 7 * 2);
-				res.writeHead(302, {
-					location: './dashboard',
-					'Set-Cookie': `socketKey=${socketKey}; Expires=${date.toUTCString()}`
-				});
+	if (username && password) {
+		let socketKey = await us.validate(username, password);
+		if (socketKey) {
+			let date = new Date((new Date()).valueOf() + 1000 * 60 * 60 * 24 * 7 * 2);
+			res.writeHead(302, {
+				location: './dashboard',
+				'Set-Cookie': `socketKey=${socketKey}; Expires=${date.toUTCString()}`
+			});
 
-				lg.log(`${username} logged in`);
-				res.end();
-				return;
-			}
-			else {
-				lg.log(`Failed login attempt ${username}:${password} (${req.connection.remoteAddress})`);
-			}
+			lg.log(`${username} logged in`);
+			res.end();
+			return;
 		}
+		else {
+			lg.log(`Failed login attempt ${username}:${password} (${req.connection.remoteAddress})`);
+		}
+	}
 
-		returnFile(res, './web/login.html');
-		return;
-//	});
+	returnFile(res, './web/login.html');
+	return;
+	//	});
 }
 
 /*
 process.on('uncaughtException', (err, origin) => {
 	lg.log(origin);
   fs.writeSync(
-    process.stderr.fd,
-    `Caught exception: ${err}\n` +
-    `Exception origin: ${origin}`
+	process.stderr.fd,
+	`Caught exception: ${err}\n` +
+	`Exception origin: ${origin}`
   );
 });
 
@@ -312,14 +316,14 @@ async function handleRequest(req, res, data) {
 	let { headers, method, url } = req;
 	if (method === 'OPTIONS') {
 		res.statusCode = 204;
-//		res.setHeader('Cache-Control', 'max-age=600');
+		//		res.setHeader('Cache-Control', 'max-age=600');
 		res.end();
 		return;
 	}
 
 	if (url === '/favicon.ico') {
 		res.statusCode = 204;
-//		res.setHeader('Cache-Control', 'max-age=600');
+		//		res.setHeader('Cache-Control', 'max-age=600');
 		res.setHeader('etag', 'favicon-none');
 		res.end();
 		return;
@@ -328,7 +332,13 @@ async function handleRequest(req, res, data) {
 	//Verify user
 	let loggedIn = await verifyUser(headers);
 
- 	let logInUrl = url.startsWith('/login4321');
+	let logInUrl = url.startsWith('/login4321');
+
+	//	if (!loggedIn && url == '/secret_hass') {
+	//		const temp_login = 'username=hemma&password=jfdskljflwiefjelkwjfkweljflkew';
+	//		await verifyLogin(req, res, temp_login);
+	//		return;
+	//	}
 
 	if (!loggedIn && !logInUrl && url !== '/dashboard') {
 		res.statusCode = 403;
@@ -345,6 +355,11 @@ async function handleRequest(req, res, data) {
 			returnFile(res, './web/login.html');
 			return;
 		}
+	}
+
+	if (url === '/favicon-192.png') {
+		returnFile(res, './web/favicon-192.png');
+		return;
 	}
 
 	if (url === '/dashboard') {
@@ -379,7 +394,7 @@ async function handleRequest(req, res, data) {
 	}
 
 	res.statusCode = 403;
-//	res.setHeader('Content-Type', 'text/plain');
+	//	res.setHeader('Content-Type', 'text/plain');
 	res.end();
 }
 
@@ -402,7 +417,7 @@ io.on('connection', async client => {
 });
 
 function clientConnected(user, client) {
- 	lg.log(`${client.id} (${user}) connected, sending data`);
+	lg.log(`${client.id} (${user}) connected, sending data`);
 
 	let lights = getDevice(null);
 	var json = JSON.stringify(lights, null, '  ');
@@ -410,8 +425,8 @@ function clientConnected(user, client) {
 	client.emit('device.all', json);
 
 	client.on('toggle', data => {
-		  var obj = JSON.parse(data.toString());
-		  toggle(obj.name, obj.value);
+		var obj = JSON.parse(data.toString());
+		toggle(obj.name, obj.value);
 	});
 
 	client.on('disconnect', () => { lg.log(`${client.id} disconnected`); });
@@ -459,7 +474,11 @@ function getDevice(dev) {
 			};
 
 		}
-
+        else if (d.type === 'occupancy') {
+  			r[zone][dev] = {
+				lastChange: d['lastChange']
+			}
+        }
 		else if (d.type === 'sensor') {
 			r[zone][dev] = {
 				state: d['state']
@@ -509,6 +528,9 @@ function getDevice(dev) {
 					ret.onoff = device['onoff'] === 'true';
 					ret.dim = device['dim'];
 				}
+                else if (type === 'occupancy') {
+					ret.lastChange = device['lastChange'];
+                }
 				else {
 					ret.state = device['state'];
 				}
@@ -578,9 +600,10 @@ function toggle(zone, value) {
 }
 
 function publish(device, property, message) {
-	lg.log(`homeassistant/light/${device}/${property}/set: ${message.toString()}`);
+	// lg.log(`homeassistant/light/${device}/${property}/set: ${message.toString()}`);
 	if (message === undefined) return;
-	var topic = `home/switch/${device}/${property}/set`;
+	var topic = `webapp/switch/${device}/${property}/set`;
+	lg.log(`${topic}: ${message.toString()}`);
 	client.publish(topic, message.toString());
 }
 
