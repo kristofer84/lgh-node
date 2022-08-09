@@ -377,6 +377,16 @@ async function handleRequest(req, res, data) {
 		return;
 	}
 
+	if (url === '/scripts/auth.js') {
+		returnFile(res, './web/scripts/auth.js');
+		return;
+	}
+
+	if (url === '/config.json') {
+		returnFile(res, './web/config.json');
+		return;
+	}
+
 	if (url.startsWith('/images/')) {
 		returnFile(res, `./web${url}`);
 		return;
