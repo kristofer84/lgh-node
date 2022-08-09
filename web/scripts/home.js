@@ -1,8 +1,17 @@
+import Auth from './auth.js';
+
 // START socket.io
 var socket;
 var reconnect = false;
 var raw = [];
 var socketKey;
+
+async function init() {
+	const auth = new Auth();
+	await auth.login();
+}
+
+init();
 
 function connect() {
 	if (socket) return;
@@ -11,17 +20,17 @@ function connect() {
 
 	socket.on('auth', (callback) => {
 		appendLog('authenticating');
-		callback({socketKey: socketKey});
+		callback({ socketKey: socketKey });
 	});
 
-	socket.on('device.all', function(msg) {
+	socket.on('device.all', function (msg) {
 		let obj = JSON.parse(msg);
 		updateMap(obj);
 
 		appendLog('authenticated, complete state received');
 	});
 
-	socket.on('device', function(msg) {
+	socket.on('device', function (msg) {
 		let obj = JSON.parse(msg);
 		updateMap(obj);
 		appendLog(msg);
@@ -43,26 +52,26 @@ function disconnect() {
 	socket = null;
 }
 
-$(window).focus(function() {
+$(window).focus(function () {
 	if (reconnect) connect();
 });
 
-$(window).blur(function() {
+$(window).blur(function () {
 	if (socket) disconnect();
 });
 
 // END socket.io
 
 // START Generic helpers
-Number.prototype.pad = function(size) {
-    var s = String(this);
-    while (s.length < (size || 2)) {s = "0" + s;}
-    return s;
+Number.prototype.pad = function (size) {
+	var s = String(this);
+	while (s.length < (size || 2)) { s = "0" + s; }
+	return s;
 }
 
 function getTime() {
 	let now = new Date();
-    return formatDate(now);
+	return formatDate(now);
 }
 
 function formatDate(date) {
@@ -104,10 +113,10 @@ function describeSector(x, y, radius, startAngle, endAngle) {
 
 $(document).ready(function () {
 	var els = document.getElementsByClassName("lampa-horn");
-	Array.prototype.forEach.call(els, function(el) { el.setAttribute("d", describeSector(0, 0, 100, 0, 90))});
+	Array.prototype.forEach.call(els, function (el) { el.setAttribute("d", describeSector(0, 0, 100, 0, 90)) });
 
 	var els2 = document.getElementsByClassName("lampa-vagg");
-	Array.prototype.forEach.call(els2, function(el) { el.setAttribute("d", describeSector(0, 0, 50, 0, 180))});
+	Array.prototype.forEach.call(els2, function (el) { el.setAttribute("d", describeSector(0, 0, 50, 0, 180)) });
 });
 // END SVG helpers
 
@@ -147,7 +156,7 @@ function queue(item) {
 	let key = rand();
 	toSend[item.name] = { "value": item.value, "lastKey": key };
 
-	setTimeout(function() {
+	setTimeout(function () {
 		//Only send if the latest event (click)
 		if (key === toSend[item.name].lastKey) send(item);
 	}, 500);
@@ -165,7 +174,7 @@ function send(item) {
 
 		//Toggle skipView and schdule a reset
 		updateViewFlag = false;
-		setTimeout(function() {
+		setTimeout(function () {
 			if (updateViewFlagKey == key) updateViewFlag = true;
 		}, 2000);
 	}
@@ -179,7 +188,7 @@ function updateEntity(data) {
 	Object.keys(data).forEach(name => {
 		//if (!data[dev].hasOwnProperty('state')) return;
 		if (name.endsWith('temperature')) {
-//			console.log(`temp: ${name}`);
+			//			console.log(`temp: ${name}`);
 			let tDef = $("#th-" + name).attr("default") ?? '';
 			$("#th-" + name).html(tDef + Number(data[name].state).toFixed(1) + "&deg;")
 		}
@@ -189,15 +198,15 @@ function updateEntity(data) {
 			$("#info-senaste_aktivitet").html(def + d)
 		}
 		else if (name.endsWith('humidity')) {
-//			console.log(`humi: ${name}`);
+			//			console.log(`humi: ${name}`);
 			let hDef = $("#th-" + name).attr("default") ?? '';
 			$("#th-" + name).html(hDef + Number(data[name].state).toFixed(0) + "%")
 		}
 		else if (name.endsWith('_w')) {
-//			console.log(`${name}: ${data[name].state}`);
+			//			console.log(`${name}: ${data[name].state}`);
 			let en = name.split('_')[0];
 			let ent = $("#" + en);
-//			console.log(ent.hasClass('active-outline'));
+			//			console.log(ent.hasClass('active-outline'));
 			if (data[name].state === true && !ent.hasClass('active-outline')) {
 				ent.addClass('active-outline');
 			}
@@ -205,10 +214,10 @@ function updateEntity(data) {
 				ent.removeClass('active-outline');
 			}
 
-//			console.log(ent.hasClass('active-outline'));
+			//			console.log(ent.hasClass('active-outline'));
 		}
 		else {
-//			console.log(`wunknow: ${name}`);
+			//			console.log(`wunknow: ${name}`);
 		}
 	});
 }
@@ -230,7 +239,7 @@ function updateMap(data) {
 		});
 	});
 
- 	if (updateViewFlag) updateView();
+	if (updateViewFlag) updateView();
 }
 
 //Update view from model
@@ -360,13 +369,13 @@ function ensureState(cb) {
 			hasClass = $('body').hasClass('nightmode');
 			if (state && !hasClass) {
 				$("body").addClass("nightmode");
-			    var metaThemeColor = document.querySelector("meta[name=theme-color]");
-    			metaThemeColor.setAttribute("content", "#222");
+				var metaThemeColor = document.querySelector("meta[name=theme-color]");
+				metaThemeColor.setAttribute("content", "#222");
 			}
 			else if (!state && hasClass) {
 				$("body").removeClass("nightmode");
-			    var metaThemeColor = document.querySelector("meta[name=theme-color]");
-    			metaThemeColor.setAttribute("content", "#eee");
+				var metaThemeColor = document.querySelector("meta[name=theme-color]");
+				metaThemeColor.setAttribute("content", "#eee");
 			}
 			break;
 
@@ -387,7 +396,7 @@ function ensureState(cb) {
 			if (state && !hasClass) {
 				$('#raw').removeClass('removed');
 				$('#raw-bg').removeClass('removed');
-				setTimeout(function() {
+				setTimeout(function () {
 					$('#raw').addClass('display');
 					$('#raw-bg').addClass('display');
 				}, 20);
@@ -395,7 +404,7 @@ function ensureState(cb) {
 			else if (!state && hasClass) {
 				$('#raw').removeClass('display');
 				$('#raw-bg').removeClass('display');
-				setTimeout(function() {
+				setTimeout(function () {
 					$('#raw').addClass('removed');
 					$('#raw-bg').addClass('removed');
 				}, 500);
@@ -453,7 +462,7 @@ $(document).ready(function () {
 	let checkboxes = $('input[type=checkbox]').click(e => {
 		let cb = e.currentTarget;
 		let d = new Date();
-		d.setTime(d.getTime() + (7*24*60*60*1000)); //seconds
+		d.setTime(d.getTime() + (7 * 24 * 60 * 60 * 1000)); //seconds
 		let cookie = `${cb.id}=${cb.checked}; expires=${d.toGMTString()};path=/`;
 		document.cookie = cookie;
 		if (cb.id === 'cb-refresh' || cb.id === 'cb-mood') {
@@ -476,8 +485,8 @@ function popup(cb) {
 
 	clearTimeout(popupTimer);
 	clearTimeout(popupTimerInner);
-	popupTimer = setTimeout(function() {
+	popupTimer = setTimeout(function () {
 		$('#popup').removeClass('display');
-		popupTimerInner = setTimeout(function() { $('#popup').addClass('removed'); }, 1200);
+		popupTimerInner = setTimeout(function () { $('#popup').addClass('removed'); }, 1200);
 	}, 300);
 }
