@@ -3,7 +3,7 @@
       "auth": {
         "clientId": "bcb616b9-0f38-47ee-aeed-68dcffa68d67",
         "authority": "https://login.microsoftonline.com/common",
-        "redirectUri": "https://home.xcds.net",
+        "redirectUri": "https://home.xcds.net/dashboard",
         "navigateToLoginRequestUrl": true
       },
       "cache": {
