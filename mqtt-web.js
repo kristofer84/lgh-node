@@ -89,6 +89,10 @@ app.get('/favicon.ico', (req, res) => {
     res.end();
 });
 
+app.get('/dashboard', function(req, res){
+    res.redirect('/dashboard.html');
+});
+
 app.use(express.static('./web'));
 
 var options = {
