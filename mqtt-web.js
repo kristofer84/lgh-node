@@ -92,16 +92,17 @@ app.get('/favicon.ico', (req, res) => {
 app.use(express.static('./web', { index: false, extensions: ['html'] }));
 
 var options = {
-	identityMetadata: 'https://login.microsoftonline.com/common/v2.0/.well-known/openid-configuration',
+	//identityMetadata: 'https://login.microsoftonline.com/common/v2.0/.well-known/openid-configuration',
+	identityMetadata: 'https://login.microsoftonline.com/common/.well-known/openid-configuration',
 	clientID: 'bcb616b9-0f38-47ee-aeed-68dcffa68d67',
 	// validateIssuer: config.creds.validateIssuer,
-	// issuer: config.creds.issuer,
+	issuer: 'https://login.microsoftonline.com/common',
 	// passReqToCallback: config.creds.passReqToCallback,
 	// isB2C: config.creds.isB2C,
 	// policyName: config.creds.policyName,
 	// allowMultiAudiencesInToken: config.creds.allowMultiAudiencesInToken,
 	// audience: 'https://graph.windows.net/',
-	loggingLevel: 'warn',
+	loggingLevel: 'debug',
 	// loggingNoPII: 'false',
 	// clockSkew: config.creds.clockSkew,
 	// scope: ['/user_impersonation']
@@ -109,15 +110,15 @@ var options = {
 
 var bearerStrategy = new BearerStrategy(options,
 	function (token, done) {
-		// console.log('Verifying token');
-		// console.log(token, 'was the token retreived');
+		console.log('Verifying token');
+		console.log(token, 'was the token retreived');
 		if (!token.oid) {
 			console.log('error on login', token);
 			done(new Error('oid is not found in token'));
 		}
 		else {
-			// console.log('oid', token.oid);
-			// console.log('preferred_username', token.preferred_username)
+			console.log('oid', token.oid);
+			console.log('preferred_username', token.preferred_username)
 			done(null, token);
 		}
 	}
@@ -133,7 +134,7 @@ function middlewareTransform(middleware) {
 		//Transfer token from handshake to headers for passport
 		const token = socket.handshake.auth.token;
 		socket.request.headers.authorization = token;
-
+console.log(token)
 		res.setHeader = (...params) => console.log(params);
 		res.end = (...params) => {
 			console.log('Authentication error', params);

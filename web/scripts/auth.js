@@ -16,21 +16,21 @@ export default class Auth {
         }
 
         const accounts = msalInstance.getAllAccounts();
-        
+
         if (accounts.length > 0) {
             this.msalInstance = msalInstance;
             const info = document.getElementById('info');
- 
+
             const name = document.createElement('span');
             name.innerText = accounts[0].name;
             info.appendChild(name);
 
             /*
                         const aName = document.createElement('a');
-             
+
                          aName.addEventListener('click', (event) => {
                              event.preventDefault();
-             
+
                              // this.listUsers();
                              this.deleteUser();
              
