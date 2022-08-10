@@ -129,7 +129,7 @@ function middlewareTransform(middleware) {
         const res = {};
 
         //Transfer token from handshake to headers for passport
-        const token = socket.handshake.auth?.token;
+        const token = socket.handshake.auth.token;
         socket.request.headers.authorization = token;
 
         res.setHeader = (...params) => console.log(params);
