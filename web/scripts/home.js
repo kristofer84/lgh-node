@@ -12,9 +12,12 @@ async function init() {
 	await auth.login();
 }
 
-init();
 
-function connect() {
+async function connect() {
+	if (!auth) {
+		await init();
+	}
+	
 	if (socket) return;
 	socket = io({
 		auth: async (cb) => {

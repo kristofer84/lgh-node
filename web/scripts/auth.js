@@ -16,12 +16,11 @@ export default class Auth {
         }
 
         const accounts = msalInstance.getAllAccounts();
-        console.log(accounts);
         
         if (accounts.length > 0) {
             this.msalInstance = msalInstance;
             const info = document.getElementById('info');
-
+ 
             const name = document.createElement('span');
             name.innerText = accounts[0].name;
             info.appendChild(name);
