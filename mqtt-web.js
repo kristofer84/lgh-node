@@ -89,11 +89,9 @@ app.get('/favicon.ico', (req, res) => {
 
 app.use(express.static('./web'));
 
-/*
-
 var options = {
     identityMetadata: 'https://login.microsoftonline.com/common/v2.0/.well-known/openid-configuration',
-    clientID: '',
+    clientID: 'bcb616b9-0f38-47ee-aeed-68dcffa68d67',
     // validateIssuer: config.creds.validateIssuer,
     // issuer: config.creds.issuer,
     // passReqToCallback: config.creds.passReqToCallback,
@@ -123,7 +121,6 @@ var bearerStrategy = new BearerStrategy(options,
     }
 );
 
-
 passport.use(bearerStrategy);
 
 //[socket, next] to [req, res, next] 
@@ -151,12 +148,6 @@ function middlewareTransform(middleware) {
         return middleware(socket.request, res, n);
     };
 }
-
-
-io.use(middlewareTransform(passport.authenticate('oauth-bearer', { session: false })));
-io.use(middlewareTransform(utils.checkIsInRole('aog.user')));
-
-*/
 
 /*
 http.createServer(function(req, res) {
@@ -303,6 +294,9 @@ process.on('uncaughtException', (err, origin) => {
 
 // START socket.io
 const io = require('socket.io')(server);
+
+io.use(middlewareTransform(passport.authenticate('oauth-bearer', { session: false })));
+// io.use(middlewareTransform(utils.checkIsInRole('aog.user')));
 
 io.on('connection', async client => {
 	client.emit('auth', async (answer) => {
