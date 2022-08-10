@@ -1,6 +1,6 @@
 // import { BearerStrategy } from 'passport-azure-ad'
 const passportAzureAd = require('passport-azure-ad');
-const { BearerStrategy} = passportAzureAd; 
+const { BearerStrategy } = passportAzureAd;
 const passport = require('passport');
 const express = require('express');
 
@@ -80,79 +80,75 @@ const server = http.createServer(app);
 
 
 app.options('*', (res, req) => {
-    res.statusCode = 204;
+	res.statusCode = 204;
 });
 
 app.get('/favicon.ico', (req, res) => {
-    res.statusCode = 204;
-    res.setHeader('etag', 'favicon-none');
-    res.end();
+	res.statusCode = 204;
+	res.setHeader('etag', 'favicon-none');
+	res.end();
 });
 
-app.get('/dashboard', function(req, res){
-    res.redirect('/dashboard.html');
-});
-
-app.use(express.static('./web'));
+app.use(express.static('./web', { index: false, extensions: ['html'] }));
 
 var options = {
-    identityMetadata: 'https://login.microsoftonline.com/common/v2.0/.well-known/openid-configuration',
-    clientID: 'bcb616b9-0f38-47ee-aeed-68dcffa68d67',
-    // validateIssuer: config.creds.validateIssuer,
-    // issuer: config.creds.issuer,
-    // passReqToCallback: config.creds.passReqToCallback,
-    // isB2C: config.creds.isB2C,
-    // policyName: config.creds.policyName,
-    // allowMultiAudiencesInToken: config.creds.allowMultiAudiencesInToken,
-    // audience: 'https://graph.windows.net/',
-    loggingLevel: 'warn',
-    // loggingNoPII: 'false',
-    // clockSkew: config.creds.clockSkew,
-    // scope: ['/user_impersonation']
+	identityMetadata: 'https://login.microsoftonline.com/common/v2.0/.well-known/openid-configuration',
+	clientID: 'bcb616b9-0f38-47ee-aeed-68dcffa68d67',
+	// validateIssuer: config.creds.validateIssuer,
+	// issuer: config.creds.issuer,
+	// passReqToCallback: config.creds.passReqToCallback,
+	// isB2C: config.creds.isB2C,
+	// policyName: config.creds.policyName,
+	// allowMultiAudiencesInToken: config.creds.allowMultiAudiencesInToken,
+	// audience: 'https://graph.windows.net/',
+	loggingLevel: 'warn',
+	// loggingNoPII: 'false',
+	// clockSkew: config.creds.clockSkew,
+	// scope: ['/user_impersonation']
 };
 
 var bearerStrategy = new BearerStrategy(options,
-    function (token, done) {
-        // console.log('Verifying token');
-        // console.log(token, 'was the token retreived');
-        if (!token.oid) {
-            console.log('error on login', token);
-            done(new Error('oid is not found in token'));
-        }
-        else {
-            // console.log('oid', token.oid);
-            // console.log('preferred_username', token.preferred_username)
-            done(null, token);
-        }
-    }
+	function (token, done) {
+		// console.log('Verifying token');
+		// console.log(token, 'was the token retreived');
+		if (!token.oid) {
+			console.log('error on login', token);
+			done(new Error('oid is not found in token'));
+		}
+		else {
+			// console.log('oid', token.oid);
+			// console.log('preferred_username', token.preferred_username)
+			done(null, token);
+		}
+	}
 );
 
 passport.use(bearerStrategy);
 
 //[socket, next] to [req, res, next] 
 function middlewareTransform(middleware) {
-    return (socket, next) => {
-        const res = {};
+	return (socket, next) => {
+		const res = {};
 
-        //Transfer token from handshake to headers for passport
-        const token = socket.handshake.auth.token;
-        socket.request.headers.authorization = token;
+		//Transfer token from handshake to headers for passport
+		const token = socket.handshake.auth.token;
+		socket.request.headers.authorization = token;
 
-        res.setHeader = (...params) => console.log(params);
-        res.end = (...params) => {
-            console.log('Authentication error', params);
-            next(new Error('authentication_error'));
-        }
+		res.setHeader = (...params) => console.log(params);
+		res.end = (...params) => {
+			console.log('Authentication error', params);
+			next(new Error('authentication_error'));
+		}
 
-        const n = () => {
-            // console.log('Socket token validated')
-            // console.log(`${socket.request.user.preferred_username} connected`)
-            connections.set(socket.id, { user: socket.request.user.preferred_username, connected: Date.now() });
-            next();
-        }
+		const n = () => {
+			// console.log('Socket token validated')
+			// console.log(`${socket.request.user.preferred_username} connected`)
+			connections.set(socket.id, { user: socket.request.user.preferred_username, connected: Date.now() });
+			next();
+		}
 
-        return middleware(socket.request, res, n);
-    };
+		return middleware(socket.request, res, n);
+	};
 }
 
 /*
@@ -216,9 +212,9 @@ client.on('message', function (topic, message) {
 							devices[device]['onoff'] = val;
 						}
 					}
-                    else if (deviceType === 'group') {
-                        devices[device]['lastChange'] = Date.now();
-                    }
+					else if (deviceType === 'group') {
+						devices[device]['lastChange'] = Date.now();
+					}
 					else {
 						let prev = devices[device]['state'];
 						let val = devices[device].zone === 'devices'
@@ -375,11 +371,11 @@ function getDevice(dev) {
 			};
 
 		}
-        else if (d.type === 'occupancy') {
-  			r[zone][dev] = {
+		else if (d.type === 'occupancy') {
+			r[zone][dev] = {
 				lastChange: d['lastChange']
 			}
-        }
+		}
 		else if (d.type === 'sensor') {
 			r[zone][dev] = {
 				state: d['state']
@@ -429,9 +425,9 @@ function getDevice(dev) {
 					ret.onoff = device['onoff'] === 'true';
 					ret.dim = device['dim'];
 				}
-                else if (type === 'occupancy') {
+				else if (type === 'occupancy') {
 					ret.lastChange = device['lastChange'];
-                }
+				}
 				else {
 					ret.state = device['state'];
 				}
