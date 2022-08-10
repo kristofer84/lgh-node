@@ -2,7 +2,7 @@
     "msalConfig": {
       "auth": {
         "clientId": "bcb616b9-0f38-47ee-aeed-68dcffa68d67",
-        "authority": "https://login.microsoftonline.com/common",
+        "authority": "https://login.microsoftonline.com/36c95d55-c64e-4764-9205-4f92392302ab",
         "redirectUri": "https://home.xcds.net/dashboard",
         "navigateToLoginRequestUrl": true
       },
