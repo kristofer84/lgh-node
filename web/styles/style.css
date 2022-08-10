@@ -21,7 +21,7 @@ body {
   z-index: 10;
 }
 
-body.nightmode
+body.nightmode,
 body.nightmode #info {
   background: black;
   color: yellow;
