@@ -16,7 +16,8 @@ export default class Auth {
         }
 
         const accounts = msalInstance.getAllAccounts();
-
+        console.log(accounts);
+        
         if (accounts.length > 0) {
             this.msalInstance = msalInstance;
             const info = document.getElementById('info');
@@ -49,7 +50,7 @@ export default class Auth {
     }
 
     async getAccessToken() {
-        const accounts = msalInstance.getAllAccounts();
+        const accounts = this.msalInstance.getAllAccounts();
         const request = {
             scopes: ["User.ReadBasic.All"],
             // scopes: ["bcb616b9-0f38-47ee-aeed-68dcffa68d67/user_impersonation"],
@@ -58,7 +59,7 @@ export default class Auth {
         if (accounts.length > 0) {
             try {
                 request["account"] = accounts[0];
-                const tokenResponse = await msalInstance.acquireTokenSilent(request);
+                const tokenResponse = await this.msalInstance.acquireTokenSilent(request);
                 // store.commit("setAccessToken", tokenResponse.accessToken);
                 // console.log("Token silent");
                 return tokenResponse.accessToken;
@@ -68,7 +69,7 @@ export default class Auth {
         }
 
         //Check if redirect
-        const redirectResponse = await msalInstance.handleRedirectPromise();
+        const redirectResponse = await this.msalInstance.handleRedirectPromise();
 
         if (redirectResponse !== null) {
             console.log("Token received");
@@ -78,16 +79,16 @@ export default class Auth {
 
         //Redirect
         console.log("Redirecting to sign in");
-        await msalInstance.acquireTokenRedirect(request);
+        await this.msalInstance.acquireTokenRedirect(request);
     }
 
     getRoles() {
-        const accounts = msalInstance.getAllAccounts();
+        const accounts = this.msalInstance.getAllAccounts();
         return accounts[0].idTokenClaims?.roles ?? [];
     }
 
     getEmail() {
-        const accounts = msalInstance.getAllAccounts();
+        const accounts = this.msalInstance.getAllAccounts();
         return accounts[0].username;
     }
 }
