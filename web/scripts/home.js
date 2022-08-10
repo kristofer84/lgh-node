@@ -5,6 +5,7 @@ var socket;
 var reconnect = false;
 var raw = [];
 var socketKey;
+let auth;
 
 async function init() {
 	const auth = new Auth();
@@ -15,13 +16,20 @@ init();
 
 function connect() {
 	if (socket) return;
-	socket = io();
+	socket = io({
+		auth: async (cb) => {
+			cb({
+				token: `Bearer ${await auth.getAccessToken()}`
+			});
+		}
+	});
+
 	appendLog('connected');
 
-	socket.on('auth', (callback) => {
-		appendLog('authenticating');
-		callback({ socketKey: socketKey });
-	});
+	// socket.on('auth', (callback) => {
+	// 	appendLog('authenticating');
+	// 	callback({ socketKey: socketKey });
+	// });
 
 	socket.on('device.all', function (msg) {
 		let obj = JSON.parse(msg);
