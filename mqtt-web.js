@@ -59,18 +59,18 @@ const client = mqtt.connect(config.config.mqttAddress);
 // const certFolder = config.config.certFolder;
 // END Init
 
-// START Http config
-async function webLog(req, data, port) {
-	let { headers, method, url } = req;
-	let date = new Date();
-	if (data !== undefined && data.length > 0) {
-		data = '_POST-data: ' + data;
-	}
+// // START Http config
+// async function webLog(req, data, port) {
+// 	let { headers, method, url } = req;
+// 	let date = new Date();
+// 	if (data !== undefined && data.length > 0) {
+// 		data = '_POST-data: ' + data;
+// 	}
 
-	fs.appendFile('./log/web-raw.log', `${date.toISOString()}_${port}_${method}_(${req.connection.remoteAddress}:${req.connection.remotePort})_${url}${data}\n`, function (err) {
-		if (err) lg.log(err);
-	});
-}
+// 	fs.appendFile('./log/web-raw.log', `${date.toISOString()}_${port}_${method}_(${req.connection.remoteAddress}:${req.connection.remotePort})_${url}${data}\n`, function (err) {
+// 		if (err) lg.log(err);
+// 	});
+// }
 
 const app = express();
 app.use(passport.initialize());
@@ -510,4 +510,5 @@ process.on('SIGINT1', exitHandler.bind(null, { devices: devices, exit: true }));
 process.on('SIGINT2', exitHandler.bind(null, { devices: devices, exit: true }));
 process.on('uncaughtException', exitHandler.bind(null, { devices: devices, exit: true }));
 
-server.listen(8080, () => console.log(`Server started on port ${port}`));
+const port = 8080;
+server.listen(port, () => console.log(`Server started on port ${port}`));
