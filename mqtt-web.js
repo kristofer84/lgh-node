@@ -1,4 +1,6 @@
-import { BearerStrategy } from 'passport-azure-ad'
+// import { BearerStrategy } from 'passport-azure-ad'
+const passportAzureAd = require('passport-azure-ad');
+const { BearerStrategy} = passportAzureAd; 
 const passport = require('passport');
 const express = require('express');
 
