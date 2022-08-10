@@ -8,7 +8,7 @@ var socketKey;
 let auth;
 
 async function init() {
-	const auth = new Auth();
+	auth = new Auth();
 	await auth.login();
 }
 
