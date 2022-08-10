@@ -96,14 +96,14 @@ var options = {
     identityMetadata: 'https://login.microsoftonline.com/36c95d55-c64e-4764-9205-4f92392302ab/v2.0/.well-known/openid-configuration',
 	clientID: 'bcb616b9-0f38-47ee-aeed-68dcffa68d67',
 	// validateIssuer: config.creds.validateIssuer,
-	// issuer: 'https://login.microsoftonline.com/common',
+	issuer: 'https://login.microsoftonline.com/36c95d55-c64e-4764-9205-4f92392302ab/v2.0',
 	// passReqToCallback: config.creds.passReqToCallback,
 	// isB2C: config.creds.isB2C,
 	// policyName: config.creds.policyName,
 	// allowMultiAudiencesInToken: config.creds.allowMultiAudiencesInToken,
 	// audience: 'https://graph.windows.net/',
 	loggingLevel: 'debug',
-	// loggingNoPII: 'false',
+	loggingNoPII: 'false',
 	// clockSkew: config.creds.clockSkew,
 	// scope: ['/user_impersonation']
 };
@@ -134,7 +134,7 @@ function middlewareTransform(middleware) {
 		//Transfer token from handshake to headers for passport
 		const token = socket.handshake.auth.token;
 		socket.request.headers.authorization = token;
-console.log(token)
+// console.log(token)
 		res.setHeader = (...params) => console.log(params);
 		res.end = (...params) => {
 			console.log('Authentication error', params);
