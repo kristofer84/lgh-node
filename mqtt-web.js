@@ -1,11 +1,15 @@
+import { BearerStrategy } from 'passport-azure-ad'
+const passport = require('passport');
+const express = require('express');
+
 const mqtt = require('mqtt');
 const fs = require('fs').promises;
 const fssync = require('fs');
 const http = require('http');
-const https = require('https');
-const concat = require('concat-stream');
-const qs = require('querystring');
-const url = require('url');
+// const https = require('https');
+// const concat = require('concat-stream');
+// const qs = require('querystring');
+// const url = require('url');
 const lg = require('./log.js');
 const us = require('./user.js');
 
@@ -50,7 +54,7 @@ function init() {
 
 init();
 const client = mqtt.connect(config.config.mqttAddress);
-const certFolder = config.config.certFolder;
+// const certFolder = config.config.certFolder;
 // END Init
 
 // START Http config
@@ -66,9 +70,93 @@ async function webLog(req, data, port) {
 	});
 }
 
-const server = http.createServer({
-}, (res, req) => {
-}).listen(8080);
+const app = express();
+app.use(passport.initialize());
+app.use(express.json());
+
+const server = http.createServer(app);
+
+
+app.options('*', (res, req) => {
+    res.statusCode = 204;
+});
+
+app.get('/favicon.ico', (req, res) => {
+    res.statusCode = 204;
+    res.setHeader('etag', 'favicon-none');
+    res.end();
+});
+
+app.use(express.static('./web'));
+
+/*
+
+var options = {
+    identityMetadata: 'https://login.microsoftonline.com/common/v2.0/.well-known/openid-configuration',
+    clientID: '',
+    // validateIssuer: config.creds.validateIssuer,
+    // issuer: config.creds.issuer,
+    // passReqToCallback: config.creds.passReqToCallback,
+    // isB2C: config.creds.isB2C,
+    // policyName: config.creds.policyName,
+    // allowMultiAudiencesInToken: config.creds.allowMultiAudiencesInToken,
+    // audience: 'https://graph.windows.net/',
+    loggingLevel: 'warn',
+    // loggingNoPII: 'false',
+    // clockSkew: config.creds.clockSkew,
+    // scope: ['/user_impersonation']
+};
+
+var bearerStrategy = new BearerStrategy(options,
+    function (token, done) {
+        // console.log('Verifying token');
+        // console.log(token, 'was the token retreived');
+        if (!token.oid) {
+            console.log('error on login', token);
+            done(new Error('oid is not found in token'));
+        }
+        else {
+            // console.log('oid', token.oid);
+            // console.log('preferred_username', token.preferred_username)
+            done(null, token);
+        }
+    }
+);
+
+
+passport.use(bearerStrategy);
+
+//[socket, next] to [req, res, next] 
+function middlewareTransform(middleware) {
+    return (socket, next) => {
+        const res = {};
+
+        //Transfer token from handshake to headers for passport
+        const token = socket.handshake.auth?.token;
+        socket.request.headers.authorization = token;
+
+        res.setHeader = (...params) => console.log(params);
+        res.end = (...params) => {
+            console.log('Authentication error', params);
+            next(new Error('authentication_error'));
+        }
+
+        const n = () => {
+            // console.log('Socket token validated')
+            // console.log(`${socket.request.user.preferred_username} connected`)
+            connections.set(socket.id, { user: socket.request.user.preferred_username, connected: Date.now() });
+            next();
+        }
+
+        return middleware(socket.request, res, n);
+    };
+}
+
+
+io.use(middlewareTransform(passport.authenticate('oauth-bearer', { session: false })));
+io.use(middlewareTransform(utils.checkIsInRole('aog.user')));
+
+*/
 
 /*
 http.createServer(function(req, res) {
@@ -183,109 +271,6 @@ function queueSend(device) {
 function rand() {
 	return Math.random().toString(36).replace(/[^a-z]+/g, '').substr(0, 7);
 }
-const fileCache = {};
-
-async function returnFile(res, file) {
-	try {
-		let cf = fileCache[file];
-		let mtimeStat = await fs.stat(file, function (err, stat) {
-			if (err == null) return stat;
-			else lg.log(err);
-		});
-		let mtime = mtimeStat.mtime.toISOString();
-		let data;
-		let etag;
-
-		if (cf === undefined || mtime !== cf.mtime) {
-			data = await fs.readFile(`${file}`, 'binary');
-			etag = rand();
-			fileCache[file] = { data: data, mtime: mtime, etag: etag };
-		}
-		else {
-			data = cf.data;
-			etag = cf.etag;
-			lg.debug(`Read ${file} from cache`);
-		}
-
-		let ct = undefined;
-		if (file.endsWith('.html')) ct = 'text/html'
-		if (file.endsWith('.json')) ct = 'application/json'
-		if (file.endsWith('.js')) ct = 'application/javascript'
-		if (file.endsWith('.css')) ct = 'text/css'
-		if (file.endsWith('.svg')) ct = 'image/svg+xml'
-		if (file.endsWith('.png')) ct = 'image/png'
-		if (file.endsWith('.jpeg')) ct = 'image/jpeg'
-		res.statusCode = 200;
-		if (ct !== undefined) res.setHeader('Content-Type', ct);
-		//	res.setHeader('Cache-Control', 'max-age=600');
-		res.setHeader('etag', etag);
-
-		if (ct === 'image/jpeg' || ct === 'image/png') {
-			res.end(data, 'binary');
-		}
-		else {
-			res.end(data.toString());
-		}
-	}
-	catch (e) {
-		console.log(e);
-	}
-}
-
-function returnContent(res, json) {
-	let ct = 'application/json'
-	res.setHeader('Content-Type', 'application/json');
-	res.end(json);
-}
-
-async function verifyUser(headers) {
-	if (headers.cookie !== undefined) {
-		let split = headers.cookie.split(';');
-		var ac = split.find(s => s.trim().split('=')[0] === 'socketKey');
-		if (ac !== undefined) {
-			let key = ac.trim().split('=')[1];
-			let user = await us.validateKey(key);
-			if (user !== undefined) return true;
-		}
-	}
-	return false;
-}
-
-async function verifyLogin(req, res, data) {
-	//	const chunks = [];
-
-	//	req.on('data', chunk => chunks.push(chunk));
-	//	return await req.on('end', async () => {
-	//		const data = Buffer.concat(chunks);
-	let strings = data.split('&');
-
-	let userVar = strings.find(s => s.split('=')[0] === 'username');
-	let passVar = strings.find(s => s.split('=')[0] === 'password');
-	let username = userVar ? userVar.split('=')[1] : undefined;
-	let password = passVar ? passVar.split('=')[1] : undefined;
-
-	if (username && password) {
-		let socketKey = await us.validate(username, password);
-		if (socketKey) {
-			let date = new Date((new Date()).valueOf() + 1000 * 60 * 60 * 24 * 7 * 2);
-			res.writeHead(302, {
-				location: './dashboard',
-				'Set-Cookie': `socketKey=${socketKey}; Expires=${date.toUTCString()}`
-			});
-
-			lg.log(`${username} logged in`);
-			res.end();
-			return;
-		}
-		else {
-			lg.log(`Failed login attempt ${username}:${password} (${req.connection.remoteAddress})`);
-		}
-	}
-
-	returnFile(res, './web/login.html');
-	return;
-	//	});
-}
 
 /*
 process.on('uncaughtException', (err, origin) => {
@@ -299,114 +284,20 @@ process.on('uncaughtException', (err, origin) => {
 
 */
 
-server.on('request', async (req, res) => {
-	const chunks = [];
-	var data = '';
-	req.on('data', chunk => chunks.push(chunk));
-	await req.on('end', async () => {
 
-		if (chunks.length > 0) { data = Buffer.concat(chunks).toString(); }
+// server.on('request', async (req, res) => {
+// 	const chunks = [];
+// 	var data = '';
+// 	req.on('data', chunk => chunks.push(chunk));
+// 	await req.on('end', async () => {
 
-		webLog(req, data, 8443);
-		await handleRequest(req, res, data);
-	});
-});
+// 		if (chunks.length > 0) { data = Buffer.concat(chunks).toString(); }
 
-async function handleRequest(req, res, data) {
-	let { headers, method, url } = req;
-	if (method === 'OPTIONS') {
-		res.statusCode = 204;
-		//		res.setHeader('Cache-Control', 'max-age=600');
-		res.end();
-		return;
-	}
+// 		webLog(req, data, 8443);
+// 		await handleRequest(req, res, data);
+// 	});
+// });
 
-	if (url === '/favicon.ico') {
-		res.statusCode = 204;
-		//		res.setHeader('Cache-Control', 'max-age=600');
-		res.setHeader('etag', 'favicon-none');
-		res.end();
-		return;
-	}
-
-	//Verify user
-	let loggedIn = await verifyUser(headers);
-
-	let logInUrl = url.startsWith('/login4321');
-
-	//	if (!loggedIn && url == '/secret_hass') {
-	//		const temp_login = 'username=hemma&password=jfdskljflwiefjelkwjfkweljflkew';
-	//		await verifyLogin(req, res, temp_login);
-	//		return;
-	//	}
-
-	if (!loggedIn && !logInUrl && url !== '/dashboard') {
-		res.statusCode = 403;
-		res.end();
-		return;
-	}
-
-	if (!loggedIn && (logInUrl || url === '/dashboard')) {
-		if (method === 'POST') {
-			await verifyLogin(req, res, data);
-			return;
-		}
-		else {
-			returnFile(res, './web/login.html');
-			return;
-		}
-	}
-
-	if (url === '/favicon-192.png') {
-		returnFile(res, './web/favicon-192.png');
-		return;
-	}
-
-	if (url === '/dashboard') {
-		returnFile(res, './web/dashboard.html');
-		return;
-	}
-
-	if (url === '/styles/style.css') {
-		returnFile(res, './web/styles/style.css');
-		return;
-	}
-
-	if (url === '/scripts/home.js') {
-		returnFile(res, './web/scripts/home.js');
-		return;
-	}
-
-	if (url === '/scripts/auth.js') {
-		returnFile(res, './web/scripts/auth.js');
-		return;
-	}
-
-	if (url === '/config.json') {
-		returnFile(res, './web/config.json');
-		return;
-	}
-
-	if (url.startsWith('/images/')) {
-		returnFile(res, `./web${url}`);
-		return;
-	}
-
-	if (url.startsWith('/node_modules/')) {
-		returnFile(res, `.${url}`);
-		return;
-	}
-
-	if (url === '/api/all') {
-		var json = JSON.stringify(devices, null, '  ');
-		returnContent(res, json);
-		return;
-	}
-
-	res.statusCode = 403;
-	//	res.setHeader('Content-Type', 'text/plain');
-	res.end();
-}
 
 // END HTTP Server functions
 
@@ -622,3 +513,5 @@ process.on('SIGINT', exitHandler.bind(null, { devices: devices, exit: true }));
 process.on('SIGINT1', exitHandler.bind(null, { devices: devices, exit: true }));
 process.on('SIGINT2', exitHandler.bind(null, { devices: devices, exit: true }));
 process.on('uncaughtException', exitHandler.bind(null, { devices: devices, exit: true }));
+
+server.listen(8080, () => console.log(`Server started on port ${port}`));
