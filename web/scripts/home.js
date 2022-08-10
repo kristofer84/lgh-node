@@ -17,7 +17,7 @@ async function connect() {
 	if (!auth) {
 		await init();
 	}
-	
+	console.log(await auth.getAccessToken())
 	if (socket) return;
 	socket = io({
 		auth: async (cb) => {
