@@ -93,10 +93,10 @@ app.use(express.static('./web', { index: false, extensions: ['html'] }));
 
 var options = {
 	//identityMetadata: 'https://login.microsoftonline.com/common/v2.0/.well-known/openid-configuration',
-	identityMetadata: 'https://login.microsoftonline.com/common/.well-known/openid-configuration',
+    identityMetadata: 'https://login.microsoftonline.com/36c95d55-c64e-4764-9205-4f92392302ab/v2.0/.well-known/openid-configuration',
 	clientID: 'bcb616b9-0f38-47ee-aeed-68dcffa68d67',
 	// validateIssuer: config.creds.validateIssuer,
-	issuer: 'https://login.microsoftonline.com/common',
+	// issuer: 'https://login.microsoftonline.com/common',
 	// passReqToCallback: config.creds.passReqToCallback,
 	// isB2C: config.creds.isB2C,
 	// policyName: config.creds.policyName,
