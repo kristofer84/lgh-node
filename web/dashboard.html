@@ -1,202 +1,208 @@
 <!DOCTYPE html>
 <html>
-
-<head>
-	<link rel="icon"  type="image/png" href="./favicon-192.png">
-	<link rel="stylesheet" href="./styles/style.css">
-	<meta name="theme-color" content="#eee">
-	<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no" />
+  <head>
+    <link rel="icon" type="image/png" href="./favicon-192.png" />
+    <link rel="stylesheet" href="./styles/style.css" />
+    <meta name="theme-color" content="#eee" />
+    <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no" />
     <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:400" />
-	<script src="https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
-	<script type="module" src="./scripts/home.js"></script>
-	<script defer src="./node_modules/@fortawesome/fontawesome-free/js/all.min.js"></script>
-	<script src="/socket.io/socket.io.js"></script>
-	<script
-	type="text/javascript"
-	src="https://alcdn.msauth.net/browser/2.27.0/js/msal-browser.min.js"
-	integrity="sha384-IlUQkOwOI6mWk8GNIWu8hpPE1sasxSg3gGjZo0dncq6IhHsTlH51mp5mhFYS5po1"
-	crossorigin="anonymous"
-  ></script>
-</head>
-<body>
-	<div id="info"></div>
-	<div class="removed" id="popup"></div>
-	<div class="raw-common removed" id="raw-bg"></div>
-	<div class="raw-common removed" id="raw"></div>
-	<div id="settings" style="position: absolute; left: 20px; top: 20px; z-index: 200;">
-		<label><input id="cb-settings" type="checkbox" /><i class="fas fa-cog fa-2x"></i></label>
-		<div id="menu">
-			<label><input id="cb-refresh" name="Auto refresh" type="checkbox" /><i class="fas fa-sync-alt fa-2x"></i></label>
-			<label><input id="cb-mood" name="Max brightness" type="checkbox" /><i class="fas fa-sun fa-2x"></i></label>
-			<label><input id="cb-temp" name="Show temperatures" type="checkbox" /><i class="fas fa-thermometer-three-quarters fa-2x"></i></label>
-			<label><input id="cb-devi" name="Show devices" type="checkbox" /><i class="fas fa-plug fa-2x"></i></label>
-<!--			<label><input id="cb-energy" name="Show power usage" type="checkbox" /><i class="fas fa-bolt fa-2x"></i></label> -->
-			<label><input id="cb-raw" name="Raw messages" type="checkbox" /><i class="fas fa-stream fa-2x"></i></label>
-			<label><input id="cb-nightmode" name="Nightmode" type="checkbox" /><i class="fas fa-moon fa-2x"></i></label>
-		</div>
-	</div>
-	<div id="image-mapper">
-<!--		<svg id="image-mapper-svg" viewBox="0 0 342 557"> -->
-		<svg id="image-mapper-svg" viewBox="0 0 342 620">
-			<defs>
-				<clipPath id="vardagsrum-kok-clip"><use xlink:href="#vardagsrum-kok-outline" /></clipPath>
-				<clipPath id="sovrum-clip"><use xlink:href="#sovrum-outline" /></clipPath>
-				<clipPath id="garderob-clip"><use xlink:href="#garderob-outline" /></clipPath>
-				<clipPath id="balkong-clip"><use xlink:href="#balkong-outline" /></clipPath>
-				<clipPath id="sovrum-mk-clip"><use xlink:href="#sovrum-mk-outline" /></clipPath>
-				<clipPath id="hall-sovrum-clip"><use xlink:href="#hall-sovrum-outline" /></clipPath>
-				<clipPath id="badrum-clip"><use xlink:href="#badrum-outline" /></clipPath>
-				<clipPath id="orangeri-clip"><use xlink:href="#orangeri-outline" /></clipPath>
-				<clipPath id="entre-clip"><use xlink:href="#entre-outline" /></clipPath>
-				<clipPath id="hall-tvattstuga-clip"><use xlink:href="#hall-tvattstuga-outline" /></clipPath>
-				<clipPath id="dusch-clip"><use xlink:href="#dusch-outline" /></clipPath>
-				<clipPath id="tvattstuga-clip"><use xlink:href="#tvattstuga-outline" /></clipPath>
-				<clipPath id="kontor-clip"><use xlink:href="#kontor-outline" /></clipPath>
-				<clipPath id="garderob-kontor-clip"><use xlink:href="#garderob-kontor-outline" /></clipPath>
-				<path id="rooms-outline" d="M 16 156 L 335 5 L 335 439 h -104  v 46 h -84 v 49 h -57 v -49 L 16 485 Z" />
-				<clipPath id="clip">
-					<use xlink:href="#rooms-outline" />
-				</clipPath>
-					<radialGradient id="pf">
-					<stop offset="0%" stop-color="var(--sc)" stop-opacity="1" />
-					<stop offset="100%" stop-color="var(--sc)" stop-opacity="0" />
-				</radialGradient>
-				<radialGradient id="p-vagg" cx="0" cy="0.5">
-					<stop offset="0%" stop-color="var(--sc)" stop-opacity="1" />
-					<stop offset="100%" stop-color="var(--sc)" stop-opacity="0" />
-				</radialGradient>
-			</defs>
-			<image href="./images/lgh.jpeg" width="342" height="557" clip-path="url(#clip)" />
-			<g id="border-fade">
-				<use xlink:href="#rooms-outline" />
-			</g>
-			<g transform="translate(38, 38)">
-				<text class="temp hidden" x="0" y="17">M&#246;ja</text>
-				<text class="temp hidden" id="sensibo-moja_temperature" x="0" y="33" />
-				<text class="temp hidden" id="sensibo-moja_humidity" x="0" y="49" />
-				<text class="temp hidden" x="56" y="17">Utomhus</text>
-				<text class="temp hidden" id="th-utomhus_temperature" x="56" y="33" />
-				<text class="temp hidden" id="th-utomhus_humidity" x="56" y="49" />
-			</g>
-			<g transform="translate(238, 448)">
-				<text class="temp hidden" default="Kylsk&#229;p: " id="th-kylskap_temperature" x="6" y="33" />
-				<text class="temp hidden" default="Frys: " id="th-frys_temperature" x="6" y="49" />
-			</g>
-			<g transform="translate(30, 570)">
-				<text class="temp hidden" default="Senaste aktivitet: " id="info-senaste_aktivitet" x="0" y="0" />
-			</g>
-			<g class="room" id="vardagsrum-kok" transform="translate(19, 84)" clip-path="url(#vardagsrum-kok-clip)">
-				<rect width="70" height="10" x="55" y="110" class="name-blocker hidden" />
-				<rect id="kylskap" width="17" height="19" x="60" y="173" class="device hidden" />
-				<rect id="frys" width="17" height="19" x="60" y="192" class="device hidden" />
-				<rect id="vinkyl" width="17" height="19" x="118" y="173" class="device hidden" />
-				<rect id="diskmaskin" width="17" height="19" x="118" y="290" class="device hidden" />
-				<rect id="kaffebryggare" width="12" height="5" x="120" y="303" class="device hidden" />
-				<polygon id="vardagsrum-kok-outline" class="room-outline" points="0,74,158,0,158,170,137,170,137,311,0,311" />
-				<text class="temp hidden" id="th-vardagsrum_temperature" x="75" y="110" />
-				<text class="temp hidden" id="th-vardagsrum_humidity" x="75" y="126" />
-				<circle class="mood" cx="65" cy="54" r="40" fill="url(#pf)" />
-				<circle class="mood" cx="140" cy="40" r="40" fill="url(#pf)" />
-				<circle class="mood" cx="15" cy="180" r="40" fill="url(#pf)" />
-				<g transform="translate(53, 55) rotate(65)">
-					<path class="night lampa-vagg" fill="url(#p-vagg)" />
-				</g>
-				<rect width="45" height="22" x="38" y="245" class="name-blocker-unused hidden" />
-				<circle class="mood" cx="60" cy="265" r="50" fill="url(#pf)" />
-				<g opacity="0.6">
-					<circle class="mood" cx="127" cy="180" r="30" fill="url(#pf)" />
-					<circle class="mood" cx="127" cy="200" r="30" fill="url(#pf)" />
-					<circle class="mood" cx="127" cy="220" r="30" fill="url(#pf)" />
-					<circle class="mood" cx="127" cy="240" r="30" fill="url(#pf)" />
-					<circle class="mood" cx="127" cy="260" r="30" fill="url(#pf)" />
-					<circle class="mood" cx="127" cy="280" r="30" fill="url(#pf)" />
-					<circle class="mood" cx="127" cy="300" r="30" fill="url(#pf)" />
-				</g>
-			</g>
-			<g class="room" id="sovrum" transform="translate(177,62)" clip-path="url(#sovrum-clip)">
-				<rect width="40" height="10" x="35" y="78" class="name-blocker hidden" />
-				<polygon id="sovrum-outline" class="room-outline" points="0,22,47,0,47,33,112,33,112,128,40,128,40,154,0,154" />
-				<circle class="mood" cx="95" cy="115" r="40" fill="url(#pf)" />
-				<circle class="mood" cx="2" cy="60" r="30" fill="url(#pf)" />
-				<circle class="mood" cx="2" cy="100" r="30" fill="url(#pf)" />
-				<text class="temp hidden" id="th-sovrum_temperature" x="40" y="78" />
-				<text class="temp hidden" id="th-sovrum_humidity" x="40" y="94" />
-			</g>
-			<g class="room" id="garderob" transform="translate(224, 10)" clip-path="url(#garderob-clip)">
-				<rect width="58" height="10" x="20" y="58" class="name-blocker hidden" />
-				<rect id="element" width="17" height="7" x="7" y="74" class="device hidden" />
-				<polygon id="garderob-outline" points="0,52,107,1,107,85,0,85" class="room-outline" />
-				<text class="temp hidden" id="th-garderob_temperature" x="45" y="58" />
-				<text class="temp hidden" id="th-garderob_humidity" x="45" y="74" />
-			</g>
-			<g class="room" id="entre" transform="translate(93, 395)" clip-path="url(#entre-clip)">
-				<rect width="25" height="10" x="13" y="104" class="name-blocker-unused hidden" />
-				<polygon id="entre-outline" points="0,0,43,0,43,39,65,39,65,87,51,87,51,137,0,137" class="room-outline" />
-			</g>
-			<g class="room" id="hall-sovrum" transform="translate(177, 216)" clip-path="url(#hall-sovrum-clip)">
-				<rect id="hall-sovrum-outline" width="40" height="38" class="room-outline" />
-			</g>
-			<g class="room" id="hall-tvattstuga" transform="translate(136, 395)" clip-path="url(#hall-tvattstuga-clip)">
-				<rect id="hall-tvattstuga-outline" width="92" height="39" class="room-outline" />
-				<text class="temp hidden" id="th-hall_temperature" x="30" y="17" />
-				<text class="temp hidden" id="th-hall_humidity" x="30" y="33" />
-			</g>
-			<g class="room" id="balkong" transform="translate(289, 95)" clip-path="url(#balkong-clip)">
-				<rect width="30" height="10" x="10" y="55" class="name-blocker-unused hidden" />
-				<rect id="balkong-outline" width="44" height="95" class="room-outline" />
-			</g>
-			<g class="room" id="orangeri" transform="translate(19, 395)" clip-path="url(#orangeri-clip)">
-				<rect width="40" height="10" x="16" y="31" class="name-blocker hidden" />
-				<rect id="orangeri-outline" width="74" height="88" class="room-outline" />
-				<circle class="night" cx="15" cy="70" r="40" fill="url(#pf)" />
-				<text class="temp hidden" id="th-orangeri_temperature" x="21" y="36" />
-				<text class="temp hidden" id="th-orangeri_humidity" x="21" y="52" />
-			</g>
-			<g class="room" id="sovrum-mk" transform="translate(217, 190)" clip-path="url(#sovrum-mk-clip)">
-				<rect width="40" height="10" x="32" y="40" class="name-blocker hidden" />
-				<rect id="sovrum-mk-outline" width="114" height="80" class="room-outline" />
-				<circle class="mood" cx="10" cy="10" r="40" fill="url(#pf)" />
-				<text class="temp hidden" id="th-sovrum_mk_temperature" x="37" y="38" />
-				<text class="temp hidden" id="th-sovrum_mk_humidity" x="37" y="54" />
-			</g>
-			<g class="room" id="garderob-kontor" transform="translate(217, 270)" clip-path="url(#garderob-kontor-clip)">
-				<rect width="70" height="10" x="14" y="19" class="name-blocker-unused hidden" />
-				<rect id="garderob-kontor-outline" width="114" height="49" class="room-outline" />
-			</g>
-			<g class="room" id="kontor" transform="translate(228, 319)" clip-path="url(#kontor-clip)">
-				<rect width="40" height="10" x="32" y="48" class="name-blocker hidden" />
-				<rect id="kontor-outline" width="103" height="117" class="room-outline" />
-				<circle class="night" cx="10" cy="35" r="40" fill="url(#pf)" />
-				<circle class="night" cx="10" cy="75" r="40" fill="url(#pf)" />
-				<text class="temp hidden" id="th-kontor_temperature" x="32" y="51" />
-				<text class="temp hidden" id="th-kontor_humidity" x="32" y="67" />
-			</g>
-			<g class="room" id="badrum" transform="translate(156, 254)" clip-path="url(#badrum-clip)">
-				<rect width="22" height="10" x="27" y="24" class="name-blocker-unused hidden" />
-				<rect id="badrum-outline" width="61" height="77" class="room-outline" />
-				<circle class="mood" cx="25" cy="24" r="25" fill="url(#pf)" />
-				<circle class="mood" cx="25" cy="53" r="25" fill="url(#pf)" />
-				<circle class="mood" cx="45" cy="24" r="25" fill="url(#pf)" />
-				<circle class="mood" cx="45" cy="53" r="25" fill="url(#pf)" />
-			</g>
-			<g class="room" id="dusch" transform="translate(156, 331)" clip-path="url(#dusch-clip)">
-				<rect width="22" height="10" x="30" y="32" class="name-blocker-unused hidden" />
-				<rect id="dusch-outline" width="72" height="64" class="room-outline" />
-				<circle class="mood" cx="35" cy="20" r="25" fill="url(#pf)" />
-				<circle class="mood" cx="35" cy="50" r="25" fill="url(#pf)" />
-				<circle class="mood" cx="55" cy="20" r="25" fill="url(#pf)" />
-				<circle class="mood" cx="55" cy="50" r="25" fill="url(#pf)" />
-			</g>
-			<g class="room" id="tvattstuga" transform="translate(158, 434)" clip-path="url(#tvattstuga-clip)">
-				<rect width="30" height="10" x="15" y="18" class="name-blocker-unused hidden" />
-				<rect id="tvattmaskin" width="17" height="19" x="49" y="4" class="device hidden" />
-				<rect id="torktumlare" width="17" height="19" x="49" y="23" class="device hidden" />
-				<rect id="tvattstuga-outline" width="70" height="48" class="room-outline" />
-			</g>
-			<g class="room" id="schakt" transform="translate(217, 319)">
-				<rect width="11" height="12" class="room-outline" />
-			</g>
-		</svg>
-	</div>
-</body>
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
+    <script type="module" src="./scripts/home.js"></script>
+    <!-- <script defer src="./node_modules/@fortawesome/fontawesome-free/js/all.min.js"></script> -->
+    <script src="/socket.io/socket.io.js"></script>
+    <script
+      type="text/javascript"
+      src="https://alcdn.msauth.net/browser/2.27.0/js/msal-browser.min.js"
+      integrity="sha384-IlUQkOwOI6mWk8GNIWu8hpPE1sasxSg3gGjZo0dncq6IhHsTlH51mp5mhFYS5po1"
+      crossorigin="anonymous"
+    ></script>
+    <link
+      rel="stylesheet"
+      href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.4.1/css/all.min.css"
+      integrity="sha512-/RUbtHakVMJrg1ILtwvDIceb/cDkk97rWKvfnFSTOmNbytCyEylutDqeEr9adIBye3suD3RfcsXLOLBqYRW4gw=="
+      crossorigin="anonymous"
+      referrerpolicy="no-referrer"
+    />
+  </head>
+  <body>
+    <div id="info"></div>
+    <div class="removed" id="popup"></div>
+    <div class="raw-common removed" id="raw-bg"></div>
+    <div class="raw-common removed" id="raw"></div>
+    <div id="settings" style="position: absolute; left: 20px; top: 20px; z-index: 200">
+      <label><input id="cb-settings" type="checkbox" /><i class="fas fa-cog fa-2x"></i></label>
+      <div id="menu">
+        <label><input id="cb-refresh" name="Auto refresh" type="checkbox" /><i class="fas fa-sync-alt fa-2x"></i></label>
+        <label><input id="cb-mood" name="Max brightness" type="checkbox" /><i class="fas fa-sun fa-2x"></i></label>
+        <label><input id="cb-temp" name="Show temperatures" type="checkbox" /><i class="fas fa-thermometer-three-quarters fa-2x"></i></label>
+        <label><input id="cb-devi" name="Show devices" type="checkbox" /><i class="fas fa-plug fa-2x"></i></label>
+        <!--			<label><input id="cb-energy" name="Show power usage" type="checkbox" /><i class="fas fa-bolt fa-2x"></i></label> -->
+        <label><input id="cb-raw" name="Raw messages" type="checkbox" /><i class="fas fa-stream fa-2x"></i></label>
+        <label><input id="cb-nightmode" name="Nightmode" type="checkbox" /><i class="fas fa-moon fa-2x"></i></label>
+      </div>
+    </div>
+    <div id="image-mapper">
+      <!--		<svg id="image-mapper-svg" viewBox="0 0 342 557"> -->
+      <svg id="image-mapper-svg" viewBox="0 0 342 620">
+        <defs>
+          <clipPath id="vardagsrum-kok-clip"><use xlink:href="#vardagsrum-kok-outline" /></clipPath>
+          <clipPath id="sovrum-clip"><use xlink:href="#sovrum-outline" /></clipPath>
+          <clipPath id="garderob-clip"><use xlink:href="#garderob-outline" /></clipPath>
+          <clipPath id="balkong-clip"><use xlink:href="#balkong-outline" /></clipPath>
+          <clipPath id="sovrum-mk-clip"><use xlink:href="#sovrum-mk-outline" /></clipPath>
+          <clipPath id="hall-sovrum-clip"><use xlink:href="#hall-sovrum-outline" /></clipPath>
+          <clipPath id="badrum-clip"><use xlink:href="#badrum-outline" /></clipPath>
+          <clipPath id="orangeri-clip"><use xlink:href="#orangeri-outline" /></clipPath>
+          <clipPath id="entre-clip"><use xlink:href="#entre-outline" /></clipPath>
+          <clipPath id="hall-tvattstuga-clip"><use xlink:href="#hall-tvattstuga-outline" /></clipPath>
+          <clipPath id="dusch-clip"><use xlink:href="#dusch-outline" /></clipPath>
+          <clipPath id="tvattstuga-clip"><use xlink:href="#tvattstuga-outline" /></clipPath>
+          <clipPath id="kontor-clip"><use xlink:href="#kontor-outline" /></clipPath>
+          <clipPath id="garderob-kontor-clip"><use xlink:href="#garderob-kontor-outline" /></clipPath>
+          <path id="rooms-outline" d="M 16 156 L 335 5 L 335 439 h -104  v 46 h -84 v 49 h -57 v -49 L 16 485 Z" />
+          <clipPath id="clip">
+            <use xlink:href="#rooms-outline" />
+          </clipPath>
+          <radialGradient id="pf">
+            <stop offset="0%" stop-color="var(--sc)" stop-opacity="1" />
+            <stop offset="100%" stop-color="var(--sc)" stop-opacity="0" />
+          </radialGradient>
+          <radialGradient id="p-vagg" cx="0" cy="0.5">
+            <stop offset="0%" stop-color="var(--sc)" stop-opacity="1" />
+            <stop offset="100%" stop-color="var(--sc)" stop-opacity="0" />
+          </radialGradient>
+        </defs>
+        <image href="./images/lgh.jpeg" width="342" height="557" clip-path="url(#clip)" />
+        <g id="border-fade">
+          <use xlink:href="#rooms-outline" />
+        </g>
+        <g transform="translate(38, 38)">
+          <text class="temp hidden" x="0" y="17">M&#246;ja</text>
+          <text class="temp hidden" id="sensibo-moja_temperature" x="0" y="33" />
+          <text class="temp hidden" id="sensibo-moja_humidity" x="0" y="49" />
+          <text class="temp hidden" x="56" y="17">Utomhus</text>
+          <text class="temp hidden" id="th-utomhus_temperature" x="56" y="33" />
+          <text class="temp hidden" id="th-utomhus_humidity" x="56" y="49" />
+        </g>
+        <g transform="translate(238, 448)">
+          <text class="temp hidden" default="Kylsk&#229;p: " id="th-kylskap_temperature" x="6" y="33" />
+          <text class="temp hidden" default="Frys: " id="th-frys_temperature" x="6" y="49" />
+        </g>
+        <g transform="translate(30, 570)">
+          <text class="temp hidden" default="Senaste aktivitet: " id="info-senaste_aktivitet" x="0" y="0" />
+        </g>
+        <g class="room" id="vardagsrum-kok" transform="translate(19, 84)" clip-path="url(#vardagsrum-kok-clip)">
+          <rect width="70" height="10" x="55" y="110" class="name-blocker hidden" />
+          <rect id="kylskap" width="17" height="19" x="60" y="173" class="device hidden" />
+          <rect id="frys" width="17" height="19" x="60" y="192" class="device hidden" />
+          <rect id="vinkyl" width="17" height="19" x="118" y="173" class="device hidden" />
+          <rect id="diskmaskin" width="17" height="19" x="118" y="290" class="device hidden" />
+          <rect id="kaffebryggare" width="12" height="5" x="120" y="303" class="device hidden" />
+          <polygon id="vardagsrum-kok-outline" class="room-outline" points="0,74,158,0,158,170,137,170,137,311,0,311" />
+          <text class="temp hidden" id="th-vardagsrum_temperature" x="75" y="110" />
+          <text class="temp hidden" id="th-vardagsrum_humidity" x="75" y="126" />
+          <circle class="mood" cx="65" cy="54" r="40" fill="url(#pf)" />
+          <circle class="mood" cx="140" cy="40" r="40" fill="url(#pf)" />
+          <circle class="mood" cx="15" cy="180" r="40" fill="url(#pf)" />
+          <g transform="translate(53, 55) rotate(65)">
+            <path class="night lampa-vagg" fill="url(#p-vagg)" />
+          </g>
+          <rect width="45" height="22" x="38" y="245" class="name-blocker-unused hidden" />
+          <circle class="mood" cx="60" cy="265" r="50" fill="url(#pf)" />
+          <g opacity="0.6">
+            <circle class="mood" cx="127" cy="180" r="30" fill="url(#pf)" />
+            <circle class="mood" cx="127" cy="200" r="30" fill="url(#pf)" />
+            <circle class="mood" cx="127" cy="220" r="30" fill="url(#pf)" />
+            <circle class="mood" cx="127" cy="240" r="30" fill="url(#pf)" />
+            <circle class="mood" cx="127" cy="260" r="30" fill="url(#pf)" />
+            <circle class="mood" cx="127" cy="280" r="30" fill="url(#pf)" />
+            <circle class="mood" cx="127" cy="300" r="30" fill="url(#pf)" />
+          </g>
+        </g>
+        <g class="room" id="sovrum" transform="translate(177,62)" clip-path="url(#sovrum-clip)">
+          <rect width="40" height="10" x="35" y="78" class="name-blocker hidden" />
+          <polygon id="sovrum-outline" class="room-outline" points="0,22,47,0,47,33,112,33,112,128,40,128,40,154,0,154" />
+          <circle class="mood" cx="95" cy="115" r="40" fill="url(#pf)" />
+          <circle class="mood" cx="2" cy="60" r="30" fill="url(#pf)" />
+          <circle class="mood" cx="2" cy="100" r="30" fill="url(#pf)" />
+          <text class="temp hidden" id="th-sovrum_temperature" x="40" y="78" />
+          <text class="temp hidden" id="th-sovrum_humidity" x="40" y="94" />
+        </g>
+        <g class="room" id="garderob" transform="translate(224, 10)" clip-path="url(#garderob-clip)">
+          <rect width="58" height="10" x="20" y="58" class="name-blocker hidden" />
+          <rect id="element" width="17" height="7" x="7" y="74" class="device hidden" />
+          <polygon id="garderob-outline" points="0,52,107,1,107,85,0,85" class="room-outline" />
+          <text class="temp hidden" id="th-garderob_temperature" x="45" y="58" />
+          <text class="temp hidden" id="th-garderob_humidity" x="45" y="74" />
+        </g>
+        <g class="room" id="entre" transform="translate(93, 395)" clip-path="url(#entre-clip)">
+          <rect width="25" height="10" x="13" y="104" class="name-blocker-unused hidden" />
+          <polygon id="entre-outline" points="0,0,43,0,43,39,65,39,65,87,51,87,51,137,0,137" class="room-outline" />
+        </g>
+        <g class="room" id="hall-sovrum" transform="translate(177, 216)" clip-path="url(#hall-sovrum-clip)">
+          <rect id="hall-sovrum-outline" width="40" height="38" class="room-outline" />
+        </g>
+        <g class="room" id="hall-tvattstuga" transform="translate(136, 395)" clip-path="url(#hall-tvattstuga-clip)">
+          <rect id="hall-tvattstuga-outline" width="92" height="39" class="room-outline" />
+          <text class="temp hidden" id="th-hall_temperature" x="30" y="17" />
+          <text class="temp hidden" id="th-hall_humidity" x="30" y="33" />
+        </g>
+        <g class="room" id="balkong" transform="translate(289, 95)" clip-path="url(#balkong-clip)">
+          <rect width="30" height="10" x="10" y="55" class="name-blocker-unused hidden" />
+          <rect id="balkong-outline" width="44" height="95" class="room-outline" />
+        </g>
+        <g class="room" id="orangeri" transform="translate(19, 395)" clip-path="url(#orangeri-clip)">
+          <rect width="40" height="10" x="16" y="31" class="name-blocker hidden" />
+          <rect id="orangeri-outline" width="74" height="88" class="room-outline" />
+          <circle class="night" cx="15" cy="70" r="40" fill="url(#pf)" />
+          <text class="temp hidden" id="th-orangeri_temperature" x="21" y="36" />
+          <text class="temp hidden" id="th-orangeri_humidity" x="21" y="52" />
+        </g>
+        <g class="room" id="sovrum-mk" transform="translate(217, 190)" clip-path="url(#sovrum-mk-clip)">
+          <rect width="40" height="10" x="32" y="40" class="name-blocker hidden" />
+          <rect id="sovrum-mk-outline" width="114" height="80" class="room-outline" />
+          <circle class="mood" cx="10" cy="10" r="40" fill="url(#pf)" />
+          <text class="temp hidden" id="th-sovrum_mk_temperature" x="37" y="38" />
+          <text class="temp hidden" id="th-sovrum_mk_humidity" x="37" y="54" />
+        </g>
+        <g class="room" id="garderob-kontor" transform="translate(217, 270)" clip-path="url(#garderob-kontor-clip)">
+          <rect width="70" height="10" x="14" y="19" class="name-blocker-unused hidden" />
+          <rect id="garderob-kontor-outline" width="114" height="49" class="room-outline" />
+        </g>
+        <g class="room" id="kontor" transform="translate(228, 319)" clip-path="url(#kontor-clip)">
+          <rect width="40" height="10" x="32" y="48" class="name-blocker hidden" />
+          <rect id="kontor-outline" width="103" height="117" class="room-outline" />
+          <circle class="night" cx="10" cy="35" r="40" fill="url(#pf)" />
+          <circle class="night" cx="10" cy="75" r="40" fill="url(#pf)" />
+          <text class="temp hidden" id="th-kontor_temperature" x="32" y="51" />
+          <text class="temp hidden" id="th-kontor_humidity" x="32" y="67" />
+        </g>
+        <g class="room" id="badrum" transform="translate(156, 254)" clip-path="url(#badrum-clip)">
+          <rect width="22" height="10" x="27" y="24" class="name-blocker-unused hidden" />
+          <rect id="badrum-outline" width="61" height="77" class="room-outline" />
+          <circle class="mood" cx="25" cy="24" r="25" fill="url(#pf)" />
+          <circle class="mood" cx="25" cy="53" r="25" fill="url(#pf)" />
+          <circle class="mood" cx="45" cy="24" r="25" fill="url(#pf)" />
+          <circle class="mood" cx="45" cy="53" r="25" fill="url(#pf)" />
+        </g>
+        <g class="room" id="dusch" transform="translate(156, 331)" clip-path="url(#dusch-clip)">
+          <rect width="22" height="10" x="30" y="32" class="name-blocker-unused hidden" />
+          <rect id="dusch-outline" width="72" height="64" class="room-outline" />
+          <circle class="mood" cx="35" cy="20" r="25" fill="url(#pf)" />
+          <circle class="mood" cx="35" cy="50" r="25" fill="url(#pf)" />
+          <circle class="mood" cx="55" cy="20" r="25" fill="url(#pf)" />
+          <circle class="mood" cx="55" cy="50" r="25" fill="url(#pf)" />
+        </g>
+        <g class="room" id="tvattstuga" transform="translate(158, 434)" clip-path="url(#tvattstuga-clip)">
+          <rect width="30" height="10" x="15" y="18" class="name-blocker-unused hidden" />
+          <rect id="tvattmaskin" width="17" height="19" x="49" y="4" class="device hidden" />
+          <rect id="torktumlare" width="17" height="19" x="49" y="23" class="device hidden" />
+          <rect id="tvattstuga-outline" width="70" height="48" class="room-outline" />
+        </g>
+        <g class="room" id="schakt" transform="translate(217, 319)">
+          <rect width="11" height="12" class="room-outline" />
+        </g>
+      </svg>
+    </div>
+  </body>
 </html>
