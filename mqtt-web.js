@@ -102,30 +102,36 @@ var options = {
 	// policyName: config.creds.policyName,
 	// allowMultiAudiencesInToken: config.creds.allowMultiAudiencesInToken,
 	// audience: 'https://graph.windows.net/',
-	loggingLevel: 'debug',
-	loggingNoPII: 'false',
+	// loggingLevel: 'debug',
+	loggingLevel: 'warn',
+	// loggingNoPII: 'false',
 	// clockSkew: config.creds.clockSkew,
 	// scope: ['/user_impersonation']
 };
 
 var bearerStrategy = new BearerStrategy(options,
 	function (token, done) {
-		console.log('Verifying token');
-		console.log(token, 'was the token retreived');
-		if (!token.oid) {
-			console.log('error on login', token);
-			done(new Error('oid is not found in token'));
+		// lg.log('Verifying token');
+		// lg.log(token, 'was the token retreived');
+		if (token.preferred_username !== 'kristofer.nilsson@outlook.com') {
+			const msg = `User ${token.preferred_username} has not been granted access`;
+			lg.log(msg);
+			return done(null, false);
+        }
+
+        if (!token.oid) {
+			lg.log('error on login', token, new Error('oid is not found in token'));
+			return done(null, false);
 		}
-		else {
-			console.log('oid', token.oid);
-			console.log('preferred_username', token.preferred_username)
-			done(null, token);
-		}
+
+		// lg.log('oid', token.oid);
+		// lg.log('preferred_username', token.preferred_username)
+		return done(null, token);
 	}
 );
 
 passport.use(bearerStrategy);
-
+const connections = new Map();
 //[socket, next] to [req, res, next] 
 function middlewareTransform(middleware) {
 	return (socket, next) => {
@@ -134,17 +140,17 @@ function middlewareTransform(middleware) {
 		//Transfer token from handshake to headers for passport
 		const token = socket.handshake.auth.token;
 		socket.request.headers.authorization = token;
-// console.log(token)
-		res.setHeader = (...params) => console.log(params);
+//lg.log(token)
+		res.setHeader = (...params) => lg.log(params);
 		res.end = (...params) => {
-			console.log('Authentication error', params);
+			lg.log('Authentication error', params);
 			next(new Error('authentication_error'));
 		}
 
 		const n = () => {
-			// console.log('Socket token validated')
-			// console.log(`${socket.request.user.preferred_username} connected`)
-			connections.set(socket.id, { user: socket.request.user.preferred_username, connected: Date.now() });
+			lg.log('Token validated')
+			lg.log(`${socket.request.user.preferred_username} connected`)
+			connections.set(socket.id, { user: socket.request.user?.preferred_username ?? '', connected: Date.now() });
 			next();
 		}
 
@@ -238,7 +244,7 @@ client.on('message', function (topic, message) {
 		});
 	}
 	catch (e) {
-		console.log(e);
+		lg.log(e);
 	}
 });
 
@@ -248,7 +254,7 @@ function queueSend(device) {
 	let dev = getDevice(device);
 	if (Object.keys(dev).length > 0) {
 		let json = JSON.stringify(dev);
-		//console.log(`json: ${json}`);
+		//lg.log(`json: ${json}`);
 		//Don't send if same as last emitted message
 		if (toSend[device] !== json) {
 			io.emit('device', json);
@@ -302,6 +308,8 @@ io.use(middlewareTransform(passport.authenticate('oauth-bearer', { session: fals
 // io.use(middlewareTransform(utils.checkIsInRole('aog.user')));
 
 io.on('connection', async client => {
+    const user = connections.get(client.id);
+	clientConnected(user.user, client);
 	client.emit('auth', async (answer) => {
 		let a = JSON.stringify(answer);
 		let user = await us.validateKey(answer.socketKey);
@@ -309,7 +317,7 @@ io.on('connection', async client => {
 			lg.log(`Wrong socket key, closing connection`);
 			client.disconnect();
 		} else {
-			clientConnected(user, client);
+//			clientConnected(user, client);
 		}
 	});
 });
@@ -512,4 +520,4 @@ process.on('SIGINT2', exitHandler.bind(null, { devices: devices, exit: true }));
 process.on('uncaughtException', exitHandler.bind(null, { devices: devices, exit: true }));
 
 const port = 8080;
-server.listen(port, () => console.log(`Server started on port ${port}`));
+server.listen(port, () => lg.log(`Server started on port ${port}`));

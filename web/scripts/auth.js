@@ -51,7 +51,8 @@ export default class Auth {
     async getAccessToken() {
         const accounts = this.msalInstance.getAllAccounts();
         const request = {
-            scopes: ["User.ReadBasic.All"],
+            //scopes: ["openid"],
+            scopes: ["bcb616b9-0f38-47ee-aeed-68dcffa68d67/openid"],
             // scopes: ["bcb616b9-0f38-47ee-aeed-68dcffa68d67/user_impersonation"],
         };
 

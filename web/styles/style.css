@@ -56,11 +56,11 @@ body.nightmode text {
 }
 
 /* Menu start */
-#cb-settings ~ svg {
+#cb-settings ~ i {
   transition: transform 1s ease, color 1s ease !important;
 }
 
-#cb-settings.rotate ~ svg {
+#cb-settings.rotate ~ i {
   transform: rotate(355deg);
   color: red;
 }
@@ -69,20 +69,20 @@ input[type="checkbox"] {
   display: none;
 }
 
-input[type="checkbox"] ~ svg {
+input[type="checkbox"] ~ i {
   color: lightgray;
   transition: color 0.3s;
 }
 
-body.nightmode input[type="checkbox"] ~ svg {
+body.nightmode input[type="checkbox"] ~ i {
   color: #333;
 }
 
-input[type="checkbox"]:checked ~ svg {
+input[type="checkbox"]:checked ~ i {
   color: black;
 }
 
-body.nightmode input[type="checkbox"]:checked ~ svg {
+body.nightmode input[type="checkbox"]:checked ~ i {
   color: lawngreen;
 }
 
