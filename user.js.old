@@ -1,50 +1,43 @@
 const fs = require('fs').promises;
 const crypto = require('crypto');
+
 const lg = require('./log.js');
+
 const db = './db/users.json';
 const keyfile = './db/key.secret';
 
 var config;
 
-exports.validate = async function validate(oid, name) {
+exports.validate = async function validate(username, pwd) {
 	if (!config) config = await loadDb();
-	if (!config.users.hasOwnProperty(oid)) {
-		config.users[oid] = { name: name, enabled: false };
-		await saveDb();
-	}
+	if (!config.users.hasOwnProperty(username)) return;
 
-	if (!config.users[oid].enabled)
-	{
-		lg.log(`Unauthorized login attempt for ${name}`);
-		return;
-	}
-//	let hash = await getHash(pwd);
+	let hash = await getHash(pwd);
 
 	//Save the password first time
-//	if (config.users[username].password === undefined) {
-//		config.users[username].password = hash;
-//		await saveDb();
-//	}
-
-//	if (config.users[username].password !== hash) return;
-
-	if (!config.users[oid].generatedKey) {
-		let gk = rand();
-		config.users[oid].generatedKey = gk;
-		let date = (new Date()).toISOString();
-		config.keys[gk] = { oid: oid, generated: date };
+	if (config.users[username].password === undefined) {
+		config.users[username].password = hash;
 		await saveDb();
 	}
 
-	return config.users[oid].generatedKey;
+	if (config.users[username].password !== hash) return;
+
+	if (!config.users[username].generatedKey) {
+		let gk = rand();
+		config.users[username].generatedKey = gk;
+		let date = (new Date()).toISOString();
+		config.keys[gk] = { user: username, generated: date };
+		await saveDb();
+	}
+
+	return config.users[username].generatedKey;
 }
 
 exports.validateKey = async function validateKey(key) {
 	if (!config) config = await loadDb();
 	if (!config.keys.hasOwnProperty(key)) return;
 
-	const oid = config.keys[key].oid;
-	return config.users[oid];
+	return config.keys[key].user;
 }
 
 function rand() {
@@ -59,7 +52,7 @@ async function loadDb() {
 }
 
 async function saveDb() {
-	let content = JSON.stringify(config,null,2);
+	let content = JSON.stringify(config);
 	await fs.writeFile(db, content)
 }
 

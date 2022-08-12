@@ -3,6 +3,7 @@ const passportAzureAd = require('passport-azure-ad');
 const { BearerStrategy } = passportAzureAd;
 const passport = require('passport');
 const express = require('express');
+const cookieParser = require('cookie-parser');
 
 const mqtt = require('mqtt');
 const fs = require('fs').promises;
@@ -73,6 +74,7 @@ const client = mqtt.connect(config.config.mqttAddress);
 // }
 
 const app = express();
+app.use(cookieParser('abdjhoejsjcudnruvuejd#jdjf38txjjejgh'));
 app.use(passport.initialize());
 app.use(express.json());
 
@@ -87,6 +89,10 @@ app.get('/favicon.ico', (req, res) => {
 	res.statusCode = 204;
 	res.setHeader('etag', 'favicon-none');
 	res.end();
+});
+
+app.get('/dashboard', (req, res) => {
+    res.sendFile('./web/dashboard.html', {root: __dirname })
 });
 
 app.use(express.static('./web', { index: false, extensions: ['html'] }));
@@ -110,17 +116,18 @@ var options = {
 };
 
 var bearerStrategy = new BearerStrategy(options,
-	function (token, done) {
+	async function (token, done) {
 		// lg.log('Verifying token');
 		// lg.log(token, 'was the token retreived');
-		if (token.preferred_username !== 'kristofer.nilsson@outlook.com') {
-			const msg = `User ${token.preferred_username} has not been granted access`;
-			lg.log(msg);
-			return done(null, false);
-        }
-
         if (!token.oid) {
 			lg.log('error on login', token, new Error('oid is not found in token'));
+			return done(null, false);
+		}
+
+		const gk = await us.validate(token.oid, token.preferred_username);
+		if (!gk) {
+			const msg = `User ${token.preferred_username} has not been granted access`;
+			lg.log(msg);
 			return done(null, false);
 		}
 
@@ -147,10 +154,13 @@ function middlewareTransform(middleware) {
 			next(new Error('authentication_error'));
 		}
 
-		const n = () => {
+		const n = async () => {
 			lg.log('Token validated')
 			lg.log(`${socket.request.user.preferred_username} connected`)
 			connections.set(socket.id, { user: socket.request.user?.preferred_username ?? '', connected: Date.now() });
+			const user = socket.request.user;
+			const existing = await us.validate(user.oid, user.preferred_username);
+			lg.log(existing);
 			next();
 		}
 
@@ -310,7 +320,7 @@ io.use(middlewareTransform(passport.authenticate('oauth-bearer', { session: fals
 io.on('connection', async client => {
     const user = connections.get(client.id);
 	clientConnected(user.user, client);
-	client.emit('auth', async (answer) => {
+/*	client.emit('auth', async (answer) => {
 		let a = JSON.stringify(answer);
 		let user = await us.validateKey(answer.socketKey);
 		if (user === undefined) {
@@ -320,6 +330,7 @@ io.on('connection', async client => {
 //			clientConnected(user, client);
 		}
 	});
+*/
 });
 
 function clientConnected(user, client) {
