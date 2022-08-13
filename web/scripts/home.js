@@ -1,4 +1,4 @@
-import Auth from './auth.js';
+//import Auth from './auth.js';
 
 // START socket.io
 var socket;
@@ -6,23 +6,36 @@ var reconnect = false;
 var raw = [];
 var socketKey;
 let auth;
-
+/*
 async function init() {
 	auth = new Auth();
 	await auth.login();
-}
 
+	const myHeaders = new Headers({
+		'Authorization': `Bearer ${await auth.getAccessToken()}`
+	});
+
+	fetch('/key', { headers: myHeaders, method: 'GET' });
+
+}
+*/
 
 async function connect() {
+/*
 	if (!auth) {
 		await init();
 	}
-	console.log(await auth.getAccessToken())
+*/
+
+	//console.log(await auth.getAccessToken())
 	if (socket) return;
+
+	const key = await (await fetch('/key-from-cookie')).json();
 	socket = io({
 		auth: async (cb) => {
 			cb({
-				token: `Bearer ${await auth.getAccessToken()}`
+//				token: `Bearer ${await auth.getAccessToken()}`
+				key
 			});
 		}
 	});

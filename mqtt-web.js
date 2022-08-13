@@ -74,10 +74,11 @@ const client = mqtt.connect(config.config.mqttAddress);
 // }
 
 const app = express();
+app.use(logMiddleware);
 app.use(cookieParser('abdjhoejsjcudnruvuejd#jdjf38txjjejgh'));
 app.use(passport.initialize());
 app.use(express.json());
-
+app.use(cookieMiddleware);
 const server = http.createServer(app);
 
 
@@ -90,19 +91,85 @@ app.get('/favicon.ico', (req, res) => {
 	res.setHeader('etag', 'favicon-none');
 	res.end();
 });
+/*
 
 app.get('/dashboard', (req, res) => {
     res.sendFile('./web/dashboard.html', {root: __dirname })
 });
 
+app.get('/test', cookieMiddleware, (req, res) => {
+    res.sendFile('./web/dashboard.html', {root: __dirname })
+});
+
+app.get('/login', (req, res) => {
+    res.sendFile('./web/login.html', {root: __dirname })
+});
+*/
+
+app.get('/key', passport.authenticate('oauth-bearer', { session: false }), async (req, res) => {
+	const gk = await us.validate(req.user.oid, req.user.preferred_username);
+	res.cookie('key', gk, {signed:true});
+	res.statusCode = 204;
+	res.end();
+});
+
+app.get('/key-from-cookie', async (req, res) => {
+	const key = req.signedCookies?.key;
+	res.end(JSON.stringify({ key }));
+});
+
+async function logMiddleware(req, res, next) {
+	lg.log(req.headers['x-forwarded-for'] + ': ' + req.path)
+	next();
+}
+
+async function cookieMiddleware(req, res, next) {
+	const bypass = ['/favicon.ico', '/login', '/key', '/config.json'];
+
+	if (bypass.includes(req.path)) {
+//	if (req.path === '/login' || req.path === '/key' || req.path === '/config.json') {
+		return next();
+	}
+
+
+	let key = req.signedCookies?.key;
+	if (!key) {
+		key = req.headers.authorization?.key
+//		console.log('Sockey key: ' + key)
+	}
+
+	if (key) {
+		const user = await us.validateKey(key);
+		if (user) {
+	        req.user = user;
+			//console.log(user)
+			//lg.log('Received key: ' + key);
+			return next();
+		}
+	}
+
+	lg.log('Invalid cookie: ' + req.path)
+
+    res.statusCode = 401;
+    res.end();
+}
+
+/*
+app.get('/test2', (req, res) => {
+    res.send(`normal cookies:\n${JSON.stringify(req.cookies, null, 2)}\nsigned cookies:\n${JSON.stringify(req.signedCookies, null, 2)}`);
+    res.end();
+})
+*/
+
 app.use(express.static('./web', { index: false, extensions: ['html'] }));
 
 var options = {
 	//identityMetadata: 'https://login.microsoftonline.com/common/v2.0/.well-known/openid-configuration',
-    identityMetadata: 'https://login.microsoftonline.com/36c95d55-c64e-4764-9205-4f92392302ab/v2.0/.well-known/openid-configuration',
+    identityMetadata: 'https://login.microsoftonline.com/consumers/v2.0/.well-known/openid-configuration',
 	clientID: 'bcb616b9-0f38-47ee-aeed-68dcffa68d67',
 	// validateIssuer: config.creds.validateIssuer,
-	issuer: 'https://login.microsoftonline.com/36c95d55-c64e-4764-9205-4f92392302ab/v2.0',
+	issuer: 'https://login.microsoftonline.com/9188040d-6c67-4c5b-b112-36a304b66dad/v2.0',
+//	issuer: 'https://login.microsoftonline.com/consumers/v2.0',
 	// passReqToCallback: config.creds.passReqToCallback,
 	// isB2C: config.creds.isB2C,
 	// policyName: config.creds.policyName,
@@ -110,15 +177,15 @@ var options = {
 	// audience: 'https://graph.windows.net/',
 	// loggingLevel: 'debug',
 	loggingLevel: 'warn',
-	// loggingNoPII: 'false',
+	//loggingNoPII: 'false',
 	// clockSkew: config.creds.clockSkew,
 	// scope: ['/user_impersonation']
 };
 
 var bearerStrategy = new BearerStrategy(options,
 	async function (token, done) {
-		// lg.log('Verifying token');
-		// lg.log(token, 'was the token retreived');
+		lg.log('Token verified');
+		//console.log(token, 'was the token retreived');
         if (!token.oid) {
 			lg.log('error on login', token, new Error('oid is not found in token'));
 			return done(null, false);
@@ -139,7 +206,9 @@ var bearerStrategy = new BearerStrategy(options,
 
 passport.use(bearerStrategy);
 const connections = new Map();
-//[socket, next] to [req, res, next] 
+
+//[socket, next] to [req, res, next]
+//transformation for socket
 function middlewareTransform(middleware) {
 	return (socket, next) => {
 		const res = {};
@@ -147,6 +216,14 @@ function middlewareTransform(middleware) {
 		//Transfer token from handshake to headers for passport
 		const token = socket.handshake.auth.token;
 		socket.request.headers.authorization = token;
+
+		let type = 'Token';
+		if (!token) {
+			const key = socket.handshake.auth.key;
+			socket.request.headers.authorization = key;
+			type = 'Key';
+		}
+
 //lg.log(token)
 		res.setHeader = (...params) => lg.log(params);
 		res.end = (...params) => {
@@ -155,12 +232,14 @@ function middlewareTransform(middleware) {
 		}
 
 		const n = async () => {
-			lg.log('Token validated')
+			lg.log(type + ' validated')
 			lg.log(`${socket.request.user.preferred_username} connected`)
 			connections.set(socket.id, { user: socket.request.user?.preferred_username ?? '', connected: Date.now() });
+/*
 			const user = socket.request.user;
 			const existing = await us.validate(user.oid, user.preferred_username);
 			lg.log(existing);
+*/
 			next();
 		}
 
@@ -314,7 +393,8 @@ process.on('uncaughtException', (err, origin) => {
 // START socket.io
 const io = require('socket.io')(server);
 
-io.use(middlewareTransform(passport.authenticate('oauth-bearer', { session: false })));
+//io.use(middlewareTransform(passport.authenticate('oauth-bearer', { session: false })));
+io.use(middlewareTransform(cookieMiddleware));
 // io.use(middlewareTransform(utils.checkIsInRole('aog.user')));
 
 io.on('connection', async client => {

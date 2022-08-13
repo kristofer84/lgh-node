@@ -6,16 +6,16 @@ const keyfile = './db/key.secret';
 
 var config;
 
-exports.validate = async function validate(oid, name) {
+exports.validate = async function validate(oid, username) {
 	if (!config) config = await loadDb();
 	if (!config.users.hasOwnProperty(oid)) {
-		config.users[oid] = { name: name, enabled: false };
+		config.users[oid] = { preferred_username: username, enabled: false };
 		await saveDb();
 	}
 
 	if (!config.users[oid].enabled)
 	{
-		lg.log(`Unauthorized login attempt for ${name}`);
+		lg.log(`Unauthorized login attempt for ${username}`);
 		return;
 	}
 //	let hash = await getHash(pwd);

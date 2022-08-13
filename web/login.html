@@ -1,20 +1,83 @@
 <!DOCTYPE html>
 <html>
+  <head>
+    <script
+      type="text/javascript"
+      src="https://alcdn.msauth.net/browser/2.27.0/js/msal-browser.min.js"
+      integrity="sha384-IlUQkOwOI6mWk8GNIWu8hpPE1sasxSg3gGjZo0dncq6IhHsTlH51mp5mhFYS5po1"
+      crossorigin="anonymous"
+    ></script>
+	<script src="//cdn.jsdelivr.net/npm/eruda"></script>
+	<script>eruda.init();</script>
+	<script type="text/javascript">
+    let msalInstance;
 
-<head>
-    <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no" />
-  	<title>Login</title>
-</head>
-<body>
-	<div>
-	<form action="./login4321" method="post">
-		Username <input type="text" name="username" />
-		<br />
-		Password <input type="password" name="password" />
-		<br />
-		<input type="submit" value="Submit" />
-	</form>
-	</div>
-</body>
+	async function go() {
+		await initMsal();
+		const headers = new Headers({
+			'Authorization': `Bearer ${await getAccessToken()}`
+		});
+
+		await fetch('/key', { headers: headers, method: 'GET' });
+		window.location.href = '/dashboard';
+	}
+
+	async function initMsal() {
+    	const configJson = await (await fetch("/config.json")).text();
+        const config = JSON.parse(configJson);
+        msalInstance = new msal.PublicClientApplication(config.msalConfig);
+
+        //Check if redirect
+        const redirectResponse = await msalInstance.handleRedirectPromise();
+        if (redirectResponse !== null) {
+            // Acquire token silent success
+            console.log("Token received from redirect");
+            var newurl = window.location.protocol + "//" + window.location.host + window.location.pathname;
+            window.history.pushState({ path: newurl }, '', newurl);
+        }
+
+        const accounts = msalInstance.getAllAccounts();
+
+        if (accounts.length === 0) {
+            console.log("Redirecting to login");
+            msalInstance.loginRedirect();
+        }
+    }
+
+    async function getAccessToken() {
+        const accounts = msalInstance.getAllAccounts();
+        const request = {
+            scopes: ["openid","email"],
+        };
+
+        if (accounts.length > 0) {
+            try {
+                request["account"] = accounts[0];
+                const tokenResponse = await msalInstance.acquireTokenSilent(request);
+                return tokenResponse.idToken;
+            } catch (error) {
+                console.error("Silent token acquisition failed. Using interactive mode: ", error);
+            }
+        }
+
+        //Check if redirect
+        const redirectResponse = await msalInstance.handleRedirectPromise();
+
+        if (redirectResponse !== null) {
+            console.log("Token received");
+            // Acquire token silent success
+            return redirectResponse.idToken;
+        }
+
+        //Redirect
+        console.log("Redirecting to sign in");
+        await msalInstance.acquireTokenRedirect(request);
+    }
+
+	go();
+	</script>
+  </head>
+  <body>
+  </body>
 </html>
 

@@ -51,8 +51,8 @@ export default class Auth {
     async getAccessToken() {
         const accounts = this.msalInstance.getAllAccounts();
         const request = {
-            //scopes: ["openid"],
-            scopes: ["bcb616b9-0f38-47ee-aeed-68dcffa68d67/openid"],
+            scopes: ["openid","email"],
+            //scopes: ["bcb616b9-0f38-47ee-aeed-68dcffa68d67"],
             // scopes: ["bcb616b9-0f38-47ee-aeed-68dcffa68d67/user_impersonation"],
         };
 
@@ -62,7 +62,9 @@ export default class Auth {
                 const tokenResponse = await this.msalInstance.acquireTokenSilent(request);
                 // store.commit("setAccessToken", tokenResponse.accessToken);
                 // console.log("Token silent");
-                return tokenResponse.accessToken;
+//console.log(tokenResponse.accessToken)
+                return tokenResponse.idToken;
+//                return tokenResponse.accessToken;
             } catch (error) {
                 console.error("Silent token acquisition failed. Using interactive mode: ", error);
             }
@@ -74,7 +76,8 @@ export default class Auth {
         if (redirectResponse !== null) {
             console.log("Token received");
             // Acquire token silent success
-            return redirectResponse.accessToken;
+            //return redirectResponse.accessToken;
+            return redirectResponse.idToken;
         }
 
         //Redirect
