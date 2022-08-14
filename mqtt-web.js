@@ -107,14 +107,28 @@ app.get('/login', (req, res) => {
 */
 
 app.get('/key', passport.authenticate('oauth-bearer', { session: false }), async (req, res) => {
-	const gk = await us.validate(req.user.oid, req.user.preferred_username);
-	res.cookie('key', gk, {signed:true});
+	const key = await us.validate(req.user.oid, req.user.preferred_username);
+	setCookie(key, res);
+});
+
+app.get('/refresh-key', async (req, res) => {
+	const key = req.signedCookies?.key;
+	setCookie(key, res);
+});
+
+function setCookie(key, res) {
+	res.cookie('key', key, {signed:true, httpOnly: true, sameSite: 'strict', maxAge: 1000 * 60 * 60 * 24 * 7 });
 	res.statusCode = 204;
 	res.end();
-});
+}
 
 app.get('/key-from-cookie', async (req, res) => {
 	const key = req.signedCookies?.key;
+	res.end(JSON.stringify({ key }));
+});
+
+app.get('/cookies', async (req, res) => {
+	const key = req.headers.cookie;
 	res.end(JSON.stringify({ key }));
 });
 
@@ -146,9 +160,12 @@ async function cookieMiddleware(req, res, next) {
 			//lg.log('Received key: ' + key);
 			return next();
 		}
-	}
 
-	lg.log('Invalid cookie: ' + req.path)
+		lg.log('Invalid cookie: ' + req.path)
+	}
+	else {
+		lg.log('No cookie: ' + req.path)
+	}
 
     res.statusCode = 401;
     res.end();
@@ -217,11 +234,11 @@ function middlewareTransform(middleware) {
 		const token = socket.handshake.auth.token;
 		socket.request.headers.authorization = token;
 
-		let type = 'Token';
+		let type = 'token';
 		if (!token) {
 			const key = socket.handshake.auth.key;
 			socket.request.headers.authorization = key;
-			type = 'Key';
+			type = 'key';
 		}
 
 //lg.log(token)
@@ -232,8 +249,8 @@ function middlewareTransform(middleware) {
 		}
 
 		const n = async () => {
-			lg.log(type + ' validated')
-			lg.log(`${socket.request.user.preferred_username} connected`)
+			lg.log(`${socket.id} socket ${type} validated`)
+//			lg.log(`${socket.request.user.preferred_username} connected`)
 			connections.set(socket.id, { user: socket.request.user?.preferred_username ?? '', connected: Date.now() });
 /*
 			const user = socket.request.user;

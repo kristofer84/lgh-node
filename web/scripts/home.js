@@ -28,6 +28,8 @@ async function connect() {
 */
 
 	//console.log(await auth.getAccessToken())
+	await fetch('/refresh-key');
+
 	if (socket) return;
 
 	const key = await (await fetch('/key-from-cookie')).json();
