@@ -13,20 +13,19 @@ exports.validate = async function validate(oid, username) {
 		await saveDb();
 	}
 
-	if (!config.users[oid].enabled)
-	{
+	if (!config.users[oid].enabled) {
 		lg.log(`Unauthorized login attempt for ${username}`);
 		return;
 	}
-//	let hash = await getHash(pwd);
+	//	let hash = await getHash(pwd);
 
 	//Save the password first time
-//	if (config.users[username].password === undefined) {
-//		config.users[username].password = hash;
-//		await saveDb();
-//	}
+	//	if (config.users[username].password === undefined) {
+	//		config.users[username].password = hash;
+	//		await saveDb();
+	//	}
 
-//	if (config.users[username].password !== hash) return;
+	//	if (config.users[username].password !== hash) return;
 
 	if (!config.users[oid].generatedKey) {
 		let gk = rand();
@@ -59,7 +58,7 @@ async function loadDb() {
 }
 
 async function saveDb() {
-	let content = JSON.stringify(config,null,2);
+	let content = JSON.stringify(config, null, 2);
 	await fs.writeFile(db, content)
 }
 

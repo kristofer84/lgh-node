@@ -91,20 +91,6 @@ app.get('/favicon.ico', (req, res) => {
 	res.setHeader('etag', 'favicon-none');
 	res.end();
 });
-/*
-
-app.get('/dashboard', (req, res) => {
-    res.sendFile('./web/dashboard.html', {root: __dirname })
-});
-
-app.get('/test', cookieMiddleware, (req, res) => {
-    res.sendFile('./web/dashboard.html', {root: __dirname })
-});
-
-app.get('/login', (req, res) => {
-    res.sendFile('./web/login.html', {root: __dirname })
-});
-*/
 
 app.get('/key', passport.authenticate('oauth-bearer', { session: false }), async (req, res) => {
 	const key = await us.validate(req.user.oid, req.user.preferred_username);
@@ -117,7 +103,7 @@ app.get('/refresh-key', async (req, res) => {
 });
 
 function setCookie(key, res) {
-	res.cookie('key', key, {signed:true, httpOnly: true, sameSite: 'strict', maxAge: 1000 * 60 * 60 * 24 * 7 });
+	res.cookie('key', key, { signed: true, httpOnly: true, sameSite: 'strict', maxAge: 1000 * 60 * 60 * 24 * 7 });
 	res.statusCode = 204;
 	res.end();
 }
@@ -141,21 +127,19 @@ async function cookieMiddleware(req, res, next) {
 	const bypass = ['/favicon.ico', '/login', '/key', '/config.json'];
 
 	if (bypass.includes(req.path)) {
-//	if (req.path === '/login' || req.path === '/key' || req.path === '/config.json') {
 		return next();
 	}
-
 
 	let key = req.signedCookies?.key;
 	if (!key) {
 		key = req.headers.authorization?.key
-//		console.log('Sockey key: ' + key)
+		//		console.log('Sockey key: ' + key)
 	}
 
 	if (key) {
 		const user = await us.validateKey(key);
 		if (user) {
-	        req.user = user;
+			req.user = user;
 			//console.log(user)
 			//lg.log('Received key: ' + key);
 			return next();
@@ -167,26 +151,19 @@ async function cookieMiddleware(req, res, next) {
 		lg.log('No cookie: ' + req.path)
 	}
 
-    res.statusCode = 401;
-    res.end();
+	res.statusCode = 401;
+	res.end();
 }
-
-/*
-app.get('/test2', (req, res) => {
-    res.send(`normal cookies:\n${JSON.stringify(req.cookies, null, 2)}\nsigned cookies:\n${JSON.stringify(req.signedCookies, null, 2)}`);
-    res.end();
-})
-*/
 
 app.use(express.static('./web', { index: false, extensions: ['html'] }));
 
 var options = {
 	//identityMetadata: 'https://login.microsoftonline.com/common/v2.0/.well-known/openid-configuration',
-    identityMetadata: 'https://login.microsoftonline.com/consumers/v2.0/.well-known/openid-configuration',
+	identityMetadata: 'https://login.microsoftonline.com/consumers/v2.0/.well-known/openid-configuration',
 	clientID: 'bcb616b9-0f38-47ee-aeed-68dcffa68d67',
 	// validateIssuer: config.creds.validateIssuer,
 	issuer: 'https://login.microsoftonline.com/9188040d-6c67-4c5b-b112-36a304b66dad/v2.0',
-//	issuer: 'https://login.microsoftonline.com/consumers/v2.0',
+	//	issuer: 'https://login.microsoftonline.com/consumers/v2.0',
 	// passReqToCallback: config.creds.passReqToCallback,
 	// isB2C: config.creds.isB2C,
 	// policyName: config.creds.policyName,
@@ -203,7 +180,7 @@ var bearerStrategy = new BearerStrategy(options,
 	async function (token, done) {
 		lg.log('Token verified');
 		//console.log(token, 'was the token retreived');
-        if (!token.oid) {
+		if (!token.oid) {
 			lg.log('error on login', token, new Error('oid is not found in token'));
 			return done(null, false);
 		}
@@ -241,7 +218,7 @@ function middlewareTransform(middleware) {
 			type = 'key';
 		}
 
-//lg.log(token)
+		//lg.log(token)
 		res.setHeader = (...params) => lg.log(params);
 		res.end = (...params) => {
 			lg.log('Authentication error', params);
@@ -250,13 +227,13 @@ function middlewareTransform(middleware) {
 
 		const n = async () => {
 			lg.log(`${socket.id} socket ${type} validated`)
-//			lg.log(`${socket.request.user.preferred_username} connected`)
+			//			lg.log(`${socket.request.user.preferred_username} connected`)
 			connections.set(socket.id, { user: socket.request.user?.preferred_username ?? '', connected: Date.now() });
-/*
-			const user = socket.request.user;
-			const existing = await us.validate(user.oid, user.preferred_username);
-			lg.log(existing);
-*/
+			/*
+						const user = socket.request.user;
+						const existing = await us.validate(user.oid, user.preferred_username);
+						lg.log(existing);
+			*/
 			next();
 		}
 
@@ -325,9 +302,9 @@ client.on('message', function (topic, message) {
 							devices[device]['onoff'] = val;
 						}
 					}
-					else if (deviceType === 'group') {
-						devices[device]['lastChange'] = Date.now();
-					}
+					// else if (deviceType === 'group') {
+					// 	devices[device]['lastChange'] = Date.now();
+					// }
 					else {
 						let prev = devices[device]['state'];
 						let val = devices[device].zone === 'devices'
@@ -339,6 +316,7 @@ client.on('message', function (topic, message) {
 						}
 					}
 
+					devices[device]['lastChange'] = Date.now();
 					queueSend(device);
 				}
 			}
@@ -415,19 +393,19 @@ io.use(middlewareTransform(cookieMiddleware));
 // io.use(middlewareTransform(utils.checkIsInRole('aog.user')));
 
 io.on('connection', async client => {
-    const user = connections.get(client.id);
+	const user = connections.get(client.id);
 	clientConnected(user.user, client);
-/*	client.emit('auth', async (answer) => {
-		let a = JSON.stringify(answer);
-		let user = await us.validateKey(answer.socketKey);
-		if (user === undefined) {
-			lg.log(`Wrong socket key, closing connection`);
-			client.disconnect();
-		} else {
-//			clientConnected(user, client);
-		}
-	});
-*/
+	/*	client.emit('auth', async (answer) => {
+			let a = JSON.stringify(answer);
+			let user = await us.validateKey(answer.socketKey);
+			if (user === undefined) {
+				lg.log(`Wrong socket key, closing connection`);
+				client.disconnect();
+			} else {
+	//			clientConnected(user, client);
+			}
+		});
+	*/
 });
 
 function clientConnected(user, client) {
@@ -490,7 +468,7 @@ function getDevice(dev) {
 		}
 		else if (d.type === 'occupancy') {
 			r[zone][dev] = {
-				lastChange: d['lastChange']
+				// lastChange: d['lastChange']
 			}
 		}
 		else if (d.type === 'sensor') {
@@ -516,6 +494,8 @@ function getDevice(dev) {
 		else {
 			return {};
 		}
+
+		r[zone][dev].lastChange = d.lastChange;
 
 		return r;
 	}
