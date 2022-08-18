@@ -21,11 +21,11 @@ async function init() {
 */
 
 async function connect() {
-/*
-	if (!auth) {
-		await init();
-	}
-*/
+	/*
+		if (!auth) {
+			await init();
+		}
+	*/
 
 	//console.log(await auth.getAccessToken())
 	await fetch('/refresh-key');
@@ -36,7 +36,7 @@ async function connect() {
 	socket = io({
 		auth: async (cb) => {
 			cb({
-//				token: `Bearer ${await auth.getAccessToken()}`
+				//				token: `Bearer ${await auth.getAccessToken()}`
 				key
 			});
 		}
@@ -261,6 +261,7 @@ function updateMap(data) {
 			if (model[zone][device] === undefined) { model[zone][device] = {}; }
 			Object.keys(data[zone][device]).forEach(valueKey => {
 				model[zone][device][valueKey] = data[zone][device][valueKey];
+				model[zone][device].lastChange = data[zone][device].lastChange;
 			});
 		});
 	});

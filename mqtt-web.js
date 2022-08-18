@@ -271,20 +271,35 @@ client.on('connect', function () {
 
 client.on('message', function (topic, message) {
 	try {
-		let split = topic.split('/');
+		const split = topic.split('/');
+		const valueTypes = ['state', 'current_temperature', 'current_humidity'];
+		const valueType = split[3];
 
 		//homeassistant/light/entre/state: on
-		if (split[0] === 'homeassistant') {
-			let device = split[2];
+		if (split[0] === 'homeassistant' && valueTypes.includes(valueType) && message.toString() !== 'unavailable' && message.toString() !== 'unknown') {
 			let deviceType = split[1];
-			let valueType = split[3];
-
+			let device = split[2];
 			let values = split.slice(2);
 
 			//Convert '/'-separated string to object properties
 			const reducer = (prev, curr, count) => prev[curr] = count === values.length - 1 ? message.toString() : prev.hasOwnProperty(curr) ? prev[curr] : {};
 			values.reduce(reducer, devices);
 
+			if (deviceType === 'climate') {
+				split.shift()
+				split.shift()
+				device = split.join('_').replace('current_', '');
+			}
+
+			let colorCode = '';
+			const colorEnd = '\x1b[0m';
+			if (message.toString() == 'on') {
+				colorCode = '\x1b[1m\x1b[32m';
+			} else if (message.toString() == 'off') {
+				colorCode = '\x1b[1m\x1b[31m';
+			}
+
+			console.log(device, colorCode, message.toString(), colorEnd);
 			//Implicit change of known values (onoff and dim)
 			//		if (valueType === 'state' && message.toString() === 'off' && devices[device].hasOwnProperty('dim')) {
 			//			let prev = devices[device]['dim'];
@@ -292,33 +307,32 @@ client.on('message', function (topic, message) {
 			//				devices[device]['dim'] = '0';
 			//			}
 			//		}
-
 			if (devices.hasOwnProperty(device) && devices[device].hasOwnProperty('zone')) {
-				if (valueType === 'state') {
-					if (deviceType === 'light' || deviceType === 'switch') {
-						let prev = devices[device]['onoff'];
-						let val = message.toString() === 'on' ? 'true' : 'false';
-						if (prev !== val) {
-							devices[device]['onoff'] = val;
-						}
+				if (deviceType === 'light' || deviceType === 'switch') {
+					let prev = devices[device]['onoff'];
+					let val = message.toString() === 'on' ? 'true' : 'false';
+					if (prev !== val) {
+						devices[device]['onoff'] = val;
 					}
-					// else if (deviceType === 'group') {
-					// 	devices[device]['lastChange'] = Date.now();
-					// }
-					else {
-						let prev = devices[device]['state'];
-						let val = devices[device].zone === 'devices'
-							? parseFloat(message.toString()) > 2.5
-							: message.toString();
-
-						if (prev !== val) {
-							devices[device]['state'] = val;
-						}
-					}
-
-					devices[device]['lastChange'] = Date.now();
-					queueSend(device);
 				}
+				// else if (deviceType === 'group') {
+				// 	devices[device]['lastChange'] = Date.now();
+				// }
+				else {
+					let prev = devices[device]['state'];
+
+					//Devices are on if consumption is > 2.5
+					let val = devices[device].zone === 'devices'
+						? parseFloat(message.toString()) > 2.5
+						: message.toString();
+
+					if (prev !== val) {
+						devices[device]['state'] = val;
+					}
+				}
+
+				devices[device]['lastChange'] = Date.now();
+				queueSend(device);
 			}
 		}
 
