@@ -87,6 +87,10 @@ body.nightmode input[type="checkbox"]:checked ~ i {
 }
 
 #settings {
+  position: absolute;
+  left: 20px;
+  top: 20px;
+  z-index: 200;
   width: 300px;
 }
 

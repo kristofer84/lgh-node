@@ -74,7 +74,27 @@ const client = mqtt.connect(config.config.mqttAddress);
 // }
 
 const app = express();
+app.disable('x-powered-by');
+
+let csp = [];
+csp.push("default-src 'none'");
+csp.push("script-src-elem 'self' https://alcdn.msauth.net/browser/2.27.0/js/msal-browser.min.js https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js");
+csp.push("connect-src 'self' https://login.microsoftonline.com");
+csp.push("img-src 'self'");
+csp.push("style-src 'self' https://fonts.googleapis.com https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.4.1/css/");
+csp.push("font-src 'self' https://fonts.gstatic.com https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.4.1/webfonts/");
+
 app.use(logMiddleware);
+app.use(function (req, res, next) {
+    res.header('content-security-policy', csp.join(';'))
+    res.header('permissions-policy', 'accelerometer=(), autoplay=(), camera=(), cross-origin-isolated=(), display-capture=(), document-domain=(), encrypted-media=(), fullscreen=(), geolocation=(), gyroscope=(), keyboard-map=(), magnetometer=(), microphone=(), midi=(), payment=(), picture-in-picture=(), publickey-credentials-get=(), screen-wake-lock=(), sync-xhr=(), usb=(), web-share=(), xr-spatial-tracking=()')
+    next();
+});
+
+app.get('/', async (req, res) => {
+	res.end('hi');
+});
+
 app.use(cookieParser('abdjhoejsjcudnruvuejd#jdjf38txjjejgh'));
 app.use(passport.initialize());
 app.use(express.json());
