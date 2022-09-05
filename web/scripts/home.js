@@ -320,7 +320,7 @@ function get() {
 	});
 }*/
 
-function getNextState(element) {
+function getNextStateRoom(element) {
 	var current = element.getAttribute("light");
 	var moodable = element.getAttribute("moodable");
 	var nightable = element.getAttribute("nightable");
@@ -341,8 +341,27 @@ function getNextState(element) {
 	}
 }
 
+function getNextStateItem(element) {
+	var current = element.getAttribute("state");
+
+	switch (current) {
+		case "on":
+			return "off";
+		case "off":
+			return "on";
+	}
+
+	const cssObj = window.getComputedStyle(element, null);
+	let opacity = cssObj.getPropertyValue("opacity");
+	return opacity == 0 ? 'on' : 'off';
+}
+
 function updateArea(element, value) {
-	if (element) element.setAttribute("light", value);
+	element?.setAttribute("light", value);
+}
+
+function updateItem(element, value) {
+	element?.setAttribute("state", value);
 }
 
 // END Update model and view
@@ -352,14 +371,35 @@ $(document).ready(function () {
 	$(".room").click(e => {
 		let ar = e.currentTarget;
 		var name = ar.id;
+		let nextState = getNextStateRoom(ar);
 
-		let nextState = getNextState(ar);
+		$(ar).find('*').removeAttr('state');
+
 		var item = {
+			type: 'room',
 			name: name,
 			value: nextState
 		};
 
 		updateArea(ar, nextState);
+		queue(item);
+	});
+});
+
+$(document).ready(function () {
+	$(".item").click(e => {
+		e.stopPropagation();
+		let ar = e.currentTarget;
+		var name = ar.id;
+		let nextState = getNextStateItem(ar);
+
+		var item = {
+			type: 'item',
+			name: name,
+			value: nextState
+		};
+
+		updateItem(ar, nextState);
 		queue(item);
 	});
 });

@@ -103,30 +103,38 @@
           <polygon id="vardagsrum-kok-outline" class="room-outline" points="0,74,158,0,158,170,137,170,137,311,0,311" />
           <text class="temp hidden" id="th-vardagsrum_temperature" x="75" y="110" />
           <text class="temp hidden" id="th-vardagsrum_humidity" x="75" y="126" />
-          <circle class="mood" cx="65" cy="54" r="40" fill="url(#pf)" />
-          <circle class="mood" cx="140" cy="40" r="40" fill="url(#pf)" />
-          <circle class="mood" cx="15" cy="180" r="40" fill="url(#pf)" />
+          <g id="z_lampor_vardagsrum" class="item">
+            <circle id="v1" class="mood" cx="65" cy="54" r="40" fill="url(#pf)" />
+            <circle id="golvlampa" class="mood" cx="140" cy="40" r="40" fill="url(#pf)" />
+            <circle id="v2" class="mood" cx="15" cy="180" r="40" fill="url(#pf)" />
+          </g>
+          <g id="vardagsrum_vaggar" class="item">
+            <circle class="mood" cx="140" cy="100" r="40" fill="url(#pf)" />
+            <circle class="mood" cx="15" cy="100" r="40" fill="url(#pf)" />
+          </g>
           <g transform="translate(53, 55) rotate(65)">
             <path class="night lampa-vagg" fill="url(#p-vagg)" />
           </g>
           <rect width="45" height="22" x="38" y="245" class="name-blocker-unused hidden" />
-          <circle class="mood" cx="60" cy="265" r="50" fill="url(#pf)" />
+          <circle id="koksbord" class="mood item" cx="60" cy="265" r="50" fill="url(#pf)" />
           <g opacity="0.6">
-            <circle class="mood" cx="127" cy="180" r="30" fill="url(#pf)" />
-            <circle class="mood" cx="127" cy="200" r="30" fill="url(#pf)" />
-            <circle class="mood" cx="127" cy="220" r="30" fill="url(#pf)" />
-            <circle class="mood" cx="127" cy="240" r="30" fill="url(#pf)" />
-            <circle class="mood" cx="127" cy="260" r="30" fill="url(#pf)" />
-            <circle class="mood" cx="127" cy="280" r="30" fill="url(#pf)" />
-            <circle class="mood" cx="127" cy="300" r="30" fill="url(#pf)" />
+            <g id="koksbank" class="item">
+              <circle class="mood" cx="127" cy="180" r="30" fill="url(#pf)" />
+              <circle class="mood" cx="127" cy="200" r="30" fill="url(#pf)" />
+              <circle class="mood" cx="127" cy="220" r="30" fill="url(#pf)" />
+              <circle class="mood" cx="127" cy="240" r="30" fill="url(#pf)" />
+              <circle class="mood" cx="127" cy="260" r="30" fill="url(#pf)" />
+              <circle class="mood" cx="127" cy="280" r="30" fill="url(#pf)" />
+              <circle class="mood" cx="127" cy="300" r="30" fill="url(#pf)" />
+            </g>
           </g>
         </g>
         <g class="room" id="sovrum" transform="translate(177,62)" clip-path="url(#sovrum-clip)">
           <rect width="40" height="10" x="35" y="78" class="name-blocker hidden" />
           <polygon id="sovrum-outline" class="room-outline" points="0,22,47,0,47,33,112,33,112,128,40,128,40,154,0,154" />
-          <circle class="mood" cx="95" cy="115" r="40" fill="url(#pf)" />
-          <circle class="mood" cx="2" cy="60" r="30" fill="url(#pf)" />
-          <circle class="mood" cx="2" cy="100" r="30" fill="url(#pf)" />
+          <circle id="sovrum_byra" class="mood item" cx="95" cy="115" r="40" fill="url(#pf)" />
+          <circle id="sang_hoger" class="mood item" cx="2" cy="60" r="30" fill="url(#pf)" />
+          <circle id="sang_vanster" class="mood item" cx="2" cy="100" r="30" fill="url(#pf)" />
           <text class="temp hidden" id="th-sovrum_temperature" x="40" y="78" />
           <text class="temp hidden" id="th-sovrum_humidity" x="40" y="94" />
         </g>
@@ -174,8 +182,8 @@
         <g class="room" id="kontor" transform="translate(228, 319)" clip-path="url(#kontor-clip)">
           <rect width="40" height="10" x="32" y="48" class="name-blocker hidden" />
           <rect id="kontor-outline" width="103" height="117" class="room-outline" />
-          <circle class="night" cx="10" cy="35" r="40" fill="url(#pf)" />
-          <circle class="night" cx="10" cy="75" r="40" fill="url(#pf)" />
+          <circle id="kontor_hoger" class="night item" cx="10" cy="35" r="40" fill="url(#pf)" />
+          <circle id="kontor_vanster" class="night item" cx="10" cy="75" r="40" fill="url(#pf)" />
           <text class="temp hidden" id="th-kontor_temperature" x="32" y="51" />
           <text class="temp hidden" id="th-kontor_humidity" x="32" y="67" />
         </g>

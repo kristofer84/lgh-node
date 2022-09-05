@@ -81,18 +81,20 @@ csp.push("default-src 'none'");
 csp.push("script-src-elem 'self' https://alcdn.msauth.net/browser/2.27.0/js/msal-browser.min.js https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js");
 csp.push("connect-src 'self' https://login.microsoftonline.com");
 csp.push("img-src 'self'");
+csp.push("frame-src https://login.microsoftonline.com/");
 csp.push("style-src 'self' https://fonts.googleapis.com https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.4.1/css/");
 csp.push("font-src 'self' https://fonts.gstatic.com https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.4.1/webfonts/");
 
 app.use(logMiddleware);
 app.use(function (req, res, next) {
-    res.header('content-security-policy', csp.join(';'))
-    res.header('permissions-policy', 'accelerometer=(), autoplay=(), camera=(), cross-origin-isolated=(), display-capture=(), document-domain=(), encrypted-media=(), fullscreen=(), geolocation=(), gyroscope=(), keyboard-map=(), magnetometer=(), microphone=(), midi=(), payment=(), picture-in-picture=(), publickey-credentials-get=(), screen-wake-lock=(), sync-xhr=(), usb=(), web-share=(), xr-spatial-tracking=()')
-    next();
+	res.header('content-security-policy', csp.join(';'))
+	res.header('permissions-policy', 'accelerometer=(), autoplay=(), camera=(), cross-origin-isolated=(), display-capture=(), document-domain=(), encrypted-media=(), fullscreen=(), geolocation=(), gyroscope=(), keyboard-map=(), magnetometer=(), microphone=(), midi=(), payment=(), picture-in-picture=(), publickey-credentials-get=(), screen-wake-lock=(), sync-xhr=(), usb=(), web-share=(), xr-spatial-tracking=()')
+	next();
 });
 
 app.get('/', async (req, res) => {
-	res.end('hi');
+	res.header('content-type', 'text/html');
+	res.end('<html><body>hi</body></html>');
 });
 
 app.use(cookieParser('abdjhoejsjcudnruvuejd#jdjf38txjjejgh'));
@@ -144,7 +146,7 @@ async function logMiddleware(req, res, next) {
 }
 
 async function cookieMiddleware(req, res, next) {
-	const bypass = ['/favicon.ico', '/login', '/key', '/config.json'];
+	const bypass = ['/favicon.ico', '/login', '/login.js', '/key', '/config.json'];
 
 	if (bypass.includes(req.path)) {
 		return next();
@@ -452,7 +454,13 @@ function clientConnected(user, client) {
 
 	client.on('toggle', data => {
 		var obj = JSON.parse(data.toString());
-		toggle(obj.name, obj.value);
+
+		if (obj.type === 'room') {
+			toggle(obj.name, obj.value);
+		}
+		else {
+			toggleItem(obj.name, obj.value);
+		}
 	});
 
 	client.on('disconnect', () => { lg.log(`${client.id} disconnected`); });
@@ -625,6 +633,24 @@ function toggle(zone, value) {
 			publish(split[1] + '.' + split[0], 'state', value)
 		});
 	}
+}
+
+
+function toggleItem(item, value) {
+	if (value === undefined) {
+		lg.log(`Missing value`);
+		return;
+	}
+
+	Object.values(config.zones).forEach(zone => zone.forEach(device => {
+		var split = device.split('.');
+		if (split[0] !== item) return;
+		console.log(split)
+		if (split[1] !== 'light' && split[1] !== 'switch') return;
+		publish(split[1] + '.' + split[0], 'state', value)
+	}));
+
+	// publish(split[1] + '.' + split[0], 'state', toState);
 }
 
 function publish(device, property, message) {

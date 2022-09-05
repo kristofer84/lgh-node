@@ -236,6 +236,14 @@ body.nightmode .room[light="on"] .room-outline {
   opacity: 1;
 }
 
+[state="off"] {
+  opacity: 0 !important;
+}
+
+[state="on"] {
+  opacity: 1 !important;
+}
+
 /*
 .room:hover {
 	fill: rgb(102, 102, 102);
