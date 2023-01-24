@@ -3,6 +3,11 @@ exports.log = function log(str) {
 	console.log(`INFO: ${date} - ${str}`);
 }
 
+exports.mqtt = function mqtt(str) {
+	let date = new Date().toISOString();
+	console.log(`MQTT: ${date} - ${str}`);
+}
+
 const d = false;
 exports.debug = function debug(str) {
 	if (d) {

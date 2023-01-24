@@ -81,7 +81,7 @@ csp.push("default-src 'none'");
 csp.push("script-src-elem 'self' https://alcdn.msauth.net/browser/2.27.0/js/msal-browser.min.js https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js");
 csp.push("connect-src 'self' https://login.microsoftonline.com");
 csp.push("img-src 'self'");
-csp.push("frame-src https://login.microsoftonline.com/");
+csp.push("frame-src 'self' https://login.live.com/ https://login.microsoftonline.com/");
 csp.push("style-src 'self' https://fonts.googleapis.com https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.4.1/css/");
 csp.push("font-src 'self' https://fonts.gstatic.com https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.4.1/webfonts/");
 
@@ -359,9 +359,10 @@ client.on('message', function (topic, message) {
 		}
 
 		let date = new Date();
-		fs.appendFile('./log/mqtt-raw.log', `${date.toISOString()}-${topic}: ${message.toString()}\n`, function (err) {
-			if (err) lg.log(err);
-		});
+		lg.mqtt(`${topic} - ${message.toString()}`);
+		//fs.appendFile('./log/mqtt-raw.log', `${date.toISOString()}-${topic}: ${message.toString()}\n`, function (err) {
+		//	if (err) lg.log(err);
+		//});
 	}
 	catch (e) {
 		lg.log(e);
