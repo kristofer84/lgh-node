@@ -80,7 +80,10 @@ let csp = [];
 csp.push("default-src 'none'");
 csp.push("script-src-elem 'self' https://alcdn.msauth.net/browser/2.27.0/js/msal-browser.min.js https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js");
 csp.push("connect-src 'self' https://login.microsoftonline.com");
+csp.push("manifest-src 'self'");
 csp.push("img-src 'self'");
+csp.push("worker-src 'self'");
+csp.push("script-src 'self'");
 csp.push("frame-src 'self' https://login.live.com/ https://login.microsoftonline.com/");
 csp.push("style-src 'self' https://fonts.googleapis.com https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.4.1/css/");
 csp.push("font-src 'self' https://fonts.gstatic.com https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.4.1/webfonts/");
@@ -88,7 +91,7 @@ csp.push("font-src 'self' https://fonts.gstatic.com https://cdnjs.cloudflare.com
 app.use(logMiddleware);
 app.use(function (req, res, next) {
 	res.header('content-security-policy', csp.join(';'))
-	res.header('permissions-policy', 'accelerometer=(), autoplay=(), camera=(), cross-origin-isolated=(), display-capture=(), document-domain=(), encrypted-media=(), fullscreen=(), geolocation=(), gyroscope=(), keyboard-map=(), magnetometer=(), microphone=(), midi=(), payment=(), picture-in-picture=(), publickey-credentials-get=(), screen-wake-lock=(), sync-xhr=(), usb=(), web-share=(), xr-spatial-tracking=()')
+	res.header('permissions-policy', 'accelerometer=(), autoplay=(), camera=(), cross-origin-isolated=(), display-capture=(), encrypted-media=(), fullscreen=(), geolocation=(), gyroscope=(), keyboard-map=(), magnetometer=(), microphone=(), midi=(), payment=(), picture-in-picture=(), publickey-credentials-get=(), screen-wake-lock=(), sync-xhr=(), usb=(), web-share=(), xr-spatial-tracking=()')
 	next();
 });
 
@@ -107,13 +110,13 @@ const server = http.createServer(app);
 app.options('*', (res, req) => {
 	res.statusCode = 204;
 });
-
+/*
 app.get('/favicon.ico', (req, res) => {
 	res.statusCode = 204;
 	res.setHeader('etag', 'favicon-none');
 	res.end();
 });
-
+*/
 app.get('/key', passport.authenticate('oauth-bearer', { session: false }), async (req, res) => {
 	const key = await us.validate(req.user.oid, req.user.preferred_username);
 	setCookie(key, res);
@@ -146,7 +149,7 @@ async function logMiddleware(req, res, next) {
 }
 
 async function cookieMiddleware(req, res, next) {
-	const bypass = ['/favicon.ico', '/login', '/login.js', '/key', '/config.json'];
+	const bypass = ['/favicon-192.png', '/favicon.ico', '/login', '/login.js', '/key', '/config.json', '/manifest.json', '/scripts/sw.js', '/scripts/sw-init.js', '/init.js' ,'/dashboard'];
 
 	if (bypass.includes(req.path)) {
 		return next();

@@ -529,7 +529,7 @@ $(document).ready(function () {
 	let checkboxes = $('input[type=checkbox]').click(e => {
 		let cb = e.currentTarget;
 		let d = new Date();
-		d.setTime(d.getTime() + (7 * 24 * 60 * 60 * 1000)); //seconds
+		d.setTime(d.getTime() + (365 * 24 * 60 * 60 * 1000)); //seconds
 		let cookie = `${cb.id}=${cb.checked}; expires=${d.toGMTString()};path=/`;
 		document.cookie = cookie;
 		if (cb.id === 'cb-refresh' || cb.id === 'cb-mood') {
