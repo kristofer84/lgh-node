@@ -23,7 +23,7 @@ body {
 
 body.nightmode,
 body.nightmode #info {
-  background: black;
+  background: #222;
   color: yellow;
 }
 
@@ -256,7 +256,7 @@ body.nightmode .room[light="on"] .room-outline {
 
 #image-mapper {
   position: relative;
-  top: 15px;
+  top: 40px;
   left: -5px;
   border-radius: 3px;
 }
@@ -286,4 +286,31 @@ body.nightmode .room[light="on"] .room-outline {
   50% {
     stroke-opacity: 0.1;
   }
+}
+
+#install,
+#subscribe {
+  border: 1px solid gray;
+  position: fixed;
+  bottom: 10px;
+  padding: 5px;
+  border-radius: 5px;
+  user-select: none;
+  z-index: 100;
+}
+
+#install {
+  left: 10px;
+}
+
+#subscribe {
+  right: 10px;
+}
+
+
+body.nightmode #install,
+body.nightmode #subscribe {
+  /* background: rgba(0, 0, 134,0); */
+  color: white;
+
 }

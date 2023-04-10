@@ -2,7 +2,7 @@
 
 // START socket.io
 var socket;
-var reconnect = false;
+var stayOn = false;
 var raw = [];
 var socketKey;
 let auth;
@@ -29,7 +29,6 @@ async function connect() {
 
 	//console.log(await auth.getAccessToken())
 	await fetch('/refresh-key');
-
 	if (socket) return;
 
 	const key = await (await fetch('/key-from-cookie')).json();
@@ -79,11 +78,13 @@ function disconnect() {
 }
 
 $(window).focus(function () {
-	if (reconnect) connect();
+	connect();
+	if (stayOn) lock();
 });
 
 $(window).blur(function () {
 	if (socket) disconnect();
+	unlock();
 });
 
 // END socket.io
@@ -193,7 +194,7 @@ var updateViewFlag = true;
 
 function send(item) {
 	//If auto-refresh, disable view updates for a few seconds
-	if ($('#cb-refresh').is(':checked')) {
+	if ($('#cb-lock').is(':checked')) {
 		//To avoid overlapping updates, set a key
 		let key = rand();
 		updateViewFlagKey = key;
@@ -409,14 +410,14 @@ function ensureState(cb) {
 	var state = cb.is(':checked')
 	let hasClass;
 	switch (cb.prop('id')) {
-		case 'cb-refresh':
-			if (state && !socket) {
-				connect();
-				reconnect = true;
+		case 'cb-lock':
+			if (state) {
+				stayOn = true;
+				lock();
 			}
-			else if (!state && socket) {
-				disconnect();
-				reconnect = false;
+			else if (!state) {
+				stayOn = false;
+				unlock();
 			}
 			break;
 
@@ -532,7 +533,7 @@ $(document).ready(function () {
 		d.setTime(d.getTime() + (365 * 24 * 60 * 60 * 1000)); //seconds
 		let cookie = `${cb.id}=${cb.checked}; expires=${d.toGMTString()};path=/`;
 		document.cookie = cookie;
-		if (cb.id === 'cb-refresh' || cb.id === 'cb-mood') {
+		if (cb.id === 'cb-lock' || cb.id === 'cb-mood') {
 			popup(cb);
 		}
 	});
@@ -557,3 +558,26 @@ function popup(cb) {
 		popupTimerInner = setTimeout(function () { $('#popup').addClass('removed'); }, 1200);
 	}, 300);
 }
+
+// Create a reference for the Wake Lock.
+let wakeLock = null;
+
+async function lock() {
+	if (!navigator.wakeLock) return;
+	// create an async function to request a wake lock
+	try { wakeLock = await navigator.wakeLock.request("screen"); 
+//	  statusElem.textContent = "Wake Lock is active!";
+	} catch (err) {
+	  // The Wake Lock request has failed - usually system related, such 
+	  // as battery.
+	  alert(`${err.name}, ${err.message}`);
+//	  statusElem.textContent = `${err.name}, ${err.message}`;
+	}
+}
+
+function unlock() {
+	if (!wakeLock) return;
+	wakeLock.release().then(() => { wakeLock = null; });
+}
+
+connect();

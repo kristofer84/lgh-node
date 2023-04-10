@@ -1,20 +1,27 @@
 // import { BearerStrategy } from 'passport-azure-ad'
-const passportAzureAd = require('passport-azure-ad');
+import passportAzureAd from 'passport-azure-ad';
 const { BearerStrategy } = passportAzureAd;
-const passport = require('passport');
-const express = require('express');
-const cookieParser = require('cookie-parser');
+import passport from 'passport';
+import express from 'express';
+import cookieParser from 'cookie-parser';
 
-const mqtt = require('mqtt');
-const fs = require('fs').promises;
-const fssync = require('fs');
-const http = require('http');
+import { connect } from 'mqtt';
+import { promises as fs } from 'fs';
+import { readFileSync, writeFileSync } from 'fs';
+import { createServer } from 'http';
 // const https = require('https');
 // const concat = require('concat-stream');
 // const qs = require('querystring');
 // const url = require('url');
-const lg = require('./log.js');
-const us = require('./user.js');
+import { log, mqtt as lgMqtt } from './log.js';
+import { validate, validateKey } from './user.js';
+import bodyParser from 'body-parser';
+
+import { Server } from 'socket.io';
+// import low from 'lowdb';
+// import FileSync from 'lowdb/adapters/FileSync';
+// const adapter = new FileSync('./db/database.json');
+// const db = low(adapter);
 
 process.stdin.resume();
 
@@ -22,12 +29,16 @@ process.stdin.resume();
 var devices;
 var config;
 
+// db.defaults({
+// 	subscriptions: []
+//   }).write();
+
 function init() {
-	let buffer = fssync.readFileSync('./log/mqtt.log');
+	let buffer = readFileSync('./log/mqtt.log');
 	let json = buffer.toString();
 	devices = JSON.parse(json);
 
-	let buffer2 = fssync.readFileSync('./db/config.json');
+	let buffer2 = readFileSync('./db/config.json');
 	config = JSON.parse(buffer2.toString());
 
 	//Save zone for each light for faster processing
@@ -56,7 +67,7 @@ function init() {
 }
 
 init();
-const client = mqtt.connect(config.config.mqttAddress);
+const client = connect(config.config.mqttAddress);
 // const certFolder = config.config.certFolder;
 // END Init
 
@@ -91,9 +102,12 @@ csp.push("font-src 'self' https://fonts.gstatic.com https://cdnjs.cloudflare.com
 app.use(logMiddleware);
 app.use(function (req, res, next) {
 	res.header('content-security-policy', csp.join(';'))
-	res.header('permissions-policy', 'accelerometer=(), autoplay=(), camera=(), cross-origin-isolated=(), display-capture=(), encrypted-media=(), fullscreen=(), geolocation=(), gyroscope=(), keyboard-map=(), magnetometer=(), microphone=(), midi=(), payment=(), picture-in-picture=(), publickey-credentials-get=(), screen-wake-lock=(), sync-xhr=(), usb=(), web-share=(), xr-spatial-tracking=()')
+	res.header('permissions-policy', 'accelerometer=(), autoplay=(), camera=(), cross-origin-isolated=(), display-capture=(), encrypted-media=(), fullscreen=(), geolocation=(), gyroscope=(), keyboard-map=(), magnetometer=(), microphone=(), midi=(), payment=(), picture-in-picture=(), publickey-credentials-get=(), screen-wake-lock=(self), sync-xhr=(), usb=(), web-share=(), xr-spatial-tracking=()')
 	next();
 });
+
+app.use(express.json());
+app.use(express.urlencoded({ extended: false }));
 
 app.get('/', async (req, res) => {
 	res.header('content-type', 'text/html');
@@ -104,7 +118,7 @@ app.use(cookieParser('abdjhoejsjcudnruvuejd#jdjf38txjjejgh'));
 app.use(passport.initialize());
 app.use(express.json());
 app.use(cookieMiddleware);
-const server = http.createServer(app);
+const server = createServer(app);
 
 
 app.options('*', (res, req) => {
@@ -118,7 +132,7 @@ app.get('/favicon.ico', (req, res) => {
 });
 */
 app.get('/key', passport.authenticate('oauth-bearer', { session: false }), async (req, res) => {
-	const key = await us.validate(req.user.oid, req.user.preferred_username);
+	const key = await validate(req.user.oid, req.user.preferred_username);
 	setCookie(key, res);
 });
 
@@ -143,13 +157,22 @@ app.get('/cookies', async (req, res) => {
 	res.end(JSON.stringify({ key }));
 });
 
+app.post('/subscribe', async (req, res) => {
+	const key = req.headers.cookie;
+	const data = req.body;
+	console.log(data);
+	res.end('Data Received: ' + JSON.stringify(data));
+
+	// res.end(JSON.stringify({ key }));
+});
+
 async function logMiddleware(req, res, next) {
-	lg.log(req.headers['x-forwarded-for'] + ': ' + req.path)
+	log(req.headers['x-forwarded-for'] + ': ' + req.path)
 	next();
 }
 
 async function cookieMiddleware(req, res, next) {
-	const bypass = ['/favicon-192.png', '/favicon.ico', '/login', '/login.js', '/key', '/config.json', '/manifest.json', '/scripts/sw.js', '/scripts/sw-init.js', '/init.js' ,'/dashboard'];
+	const bypass = ['/favicon-192.png', '/favicon.ico', '/login', '/login.js', '/key', '/config.json', '/manifest.json', '/scripts/sw.js', '/scripts/sw-init.js', '/init.js', '/dashboard'];
 
 	if (bypass.includes(req.path)) {
 		return next();
@@ -162,7 +185,7 @@ async function cookieMiddleware(req, res, next) {
 	}
 
 	if (key) {
-		const user = await us.validateKey(key);
+		const user = await validateKey(key);
 		if (user) {
 			req.user = user;
 			//console.log(user)
@@ -170,10 +193,10 @@ async function cookieMiddleware(req, res, next) {
 			return next();
 		}
 
-		lg.log('Invalid cookie: ' + req.path)
+		log('Invalid cookie: ' + req.path)
 	}
 	else {
-		lg.log('No cookie: ' + req.path)
+		log('No cookie: ' + req.path)
 	}
 
 	res.statusCode = 401;
@@ -203,17 +226,17 @@ var options = {
 
 var bearerStrategy = new BearerStrategy(options,
 	async function (token, done) {
-		lg.log('Token verified');
+		log('Token verified');
 		//console.log(token, 'was the token retreived');
 		if (!token.oid) {
-			lg.log('error on login', token, new Error('oid is not found in token'));
+			log('error on login', token, new Error('oid is not found in token'));
 			return done(null, false);
 		}
 
-		const gk = await us.validate(token.oid, token.preferred_username);
+		const gk = await validate(token.oid, token.preferred_username);
 		if (!gk) {
 			const msg = `User ${token.preferred_username} has not been granted access`;
-			lg.log(msg);
+			log(msg);
 			return done(null, false);
 		}
 
@@ -244,14 +267,14 @@ function middlewareTransform(middleware) {
 		}
 
 		//lg.log(token)
-		res.setHeader = (...params) => lg.log(params);
+		res.setHeader = (...params) => log(params);
 		res.end = (...params) => {
-			lg.log('Authentication error', params);
+			log('Authentication error', params);
 			next(new Error('authentication_error'));
 		}
 
 		const n = async () => {
-			lg.log(`${socket.id} socket ${type} validated`)
+			log(`${socket.id} socket ${type} validated`)
 			//			lg.log(`${socket.request.user.preferred_username} connected`)
 			connections.set(socket.id, { user: socket.request.user?.preferred_username ?? '', connected: Date.now() });
 			/*
@@ -286,10 +309,10 @@ const server = https.createServer({
 client.on('connect', function () {
 	client.subscribe('#', function (err) {
 		if (!err) {
-			lg.log('MQTT connected');
+			log('MQTT connected');
 		}
 		else {
-			lg.log(err);
+			log(err);
 		}
 	});
 });
@@ -362,13 +385,13 @@ client.on('message', function (topic, message) {
 		}
 
 		let date = new Date();
-		lg.mqtt(`${topic} - ${message.toString()}`);
+		lgMqtt(`${topic} - ${message.toString()}`);
 		//fs.appendFile('./log/mqtt-raw.log', `${date.toISOString()}-${topic}: ${message.toString()}\n`, function (err) {
 		//	if (err) lg.log(err);
 		//});
 	}
 	catch (e) {
-		lg.log(e);
+		log(e);
 	}
 });
 
@@ -426,7 +449,7 @@ process.on('uncaughtException', (err, origin) => {
 // END HTTP Server functions
 
 // START socket.io
-const io = require('socket.io')(server);
+const io = new Server(server);
 
 //io.use(middlewareTransform(passport.authenticate('oauth-bearer', { session: false })));
 io.use(middlewareTransform(cookieMiddleware));
@@ -449,7 +472,7 @@ io.on('connection', async client => {
 });
 
 function clientConnected(user, client) {
-	lg.log(`${client.id} (${user}) connected, sending data`);
+	log(`${client.id} (${user}) connected, sending data`);
 
 	let lights = getDevice(null);
 	var json = JSON.stringify(lights, null, '  ');
@@ -467,7 +490,7 @@ function clientConnected(user, client) {
 		}
 	});
 
-	client.on('disconnect', () => { lg.log(`${client.id} disconnected`); });
+	client.on('disconnect', () => { log(`${client.id} disconnected`); });
 }
 // END socket.io
 
@@ -547,7 +570,7 @@ function getDevice(dev) {
 	}
 
 	Object.keys(config.zones).forEach(zone => {
-		zoneDevices = {};
+		const zoneDevices = {};
 		let values = config.zones[zone];
 
 		values.forEach(light => {
@@ -594,23 +617,23 @@ function exitHandler(options, exitCode) {
 
 	let str = JSON.stringify(devices, null, '\t');
 	if (str) {
-		fssync.writeFileSync('./log/mqtt.log', str);
+		writeFileSync('./log/mqtt.log', str);
 	}
 
 	if (options.exit) {
-		lg.log(`Exiting: ${exitCode}`);
+		log(`Exiting: ${exitCode}`);
 		process.exit();
 	}
 }
 
 function toggle(zone, value) {
 	if (config.zones[zone] === undefined) {
-		lg.log(`Missing zone: ${zone}`);
+		log(`Missing zone: ${zone}`);
 		return;
 	}
 
 	if (value === undefined) {
-		lg.log(`Missing value`);
+		log(`Missing value`);
 		return;
 	}
 
@@ -642,7 +665,7 @@ function toggle(zone, value) {
 
 function toggleItem(item, value) {
 	if (value === undefined) {
-		lg.log(`Missing value`);
+		log(`Missing value`);
 		return;
 	}
 
@@ -661,7 +684,7 @@ function publish(device, property, message) {
 	// lg.log(`homeassistant/light/${device}/${property}/set: ${message.toString()}`);
 	if (message === undefined) return;
 	var topic = `webapp/switch/${device}/${property}/set`;
-	lg.log(`${topic}: ${message.toString()}`);
+	log(`${topic}: ${message.toString()}`);
 	client.publish(topic, message.toString());
 }
 
@@ -672,4 +695,4 @@ process.on('SIGINT2', exitHandler.bind(null, { devices: devices, exit: true }));
 process.on('uncaughtException', exitHandler.bind(null, { devices: devices, exit: true }));
 
 const port = 8080;
-server.listen(port, () => lg.log(`Server started on port ${port}`));
+server.listen(port, () => log(`Server started on port ${port}`));

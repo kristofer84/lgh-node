@@ -1,11 +1,11 @@
 <!DOCTYPE html>
 <html>
   <head>
-	<link rel="manifest" href="/manifest.json" />
+    <link rel="manifest" href="/manifest.json" />
     <link rel="shortcut icon" type="image/x-ms-bmp" href="./favicon.ico" />
-<!--    <link rel="shortcut icon" type="image/png" href="./favicon-192.png" /> -->
+    <!--    <link rel="shortcut icon" type="image/png" href="./favicon-192.png" /> -->
     <link rel="stylesheet" href="./styles/style.css" />
-    <meta name="theme-color" content="#eee" />
+    <meta name="theme-color" content="#222" />
     <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no" />
     <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:400" />
     <script src="./init.js"></script>
@@ -17,7 +17,6 @@
       crossorigin="anonymous"
     ></script>
     <script type="module" src="./scripts/home.js"></script>
-    <script src="./scripts/sw-init.js"></script>
     <!-- <script defer src="./node_modules/@fortawesome/fontawesome-free/js/all.min.js"></script> -->
     <script src="/socket.io/socket.io.js"></script>
     <link
@@ -27,19 +26,20 @@
       crossorigin="anonymous"
       referrerpolicy="no-referrer"
     />
-<!-- 
+    <!-- 
 <script src="//cdn.jsdelivr.net/npm/eruda"></script>
 <script>eruda.init();</script> -->
-
   </head>
   <body>
+    <div class="removed" id="install">Install application</div>
+    <div id="subscribe">Subscribe</div>
     <div class="removed" id="popup"></div>
     <div class="raw-common removed" id="raw-bg"></div>
     <div class="raw-common removed" id="raw"></div>
     <div id="settings">
       <label><input id="cb-settings" type="checkbox" /><i class="fas fa-cog fa-2x"></i></label>
       <div id="menu">
-        <label><input id="cb-refresh" name="Auto refresh" type="checkbox" /><i class="fas fa-sync-alt fa-2x"></i></label>
+        <label><input id="cb-lock" name="Keep screen on" type="checkbox" /><i class="fas fa-sync-alt fa-2x"></i></label>
         <label><input id="cb-mood" name="Max brightness" type="checkbox" /><i class="fas fa-sun fa-2x"></i></label>
         <label><input id="cb-temp" name="Show temperatures" type="checkbox" /><i class="fas fa-thermometer-three-quarters fa-2x"></i></label>
         <label><input id="cb-devi" name="Show devices" type="checkbox" /><i class="fas fa-plug fa-2x"></i></label>
@@ -220,5 +220,6 @@
       </svg>
     </div>
     <div id="info"></div>
+    <script src="./scripts/sw-init.js"></script>
   </body>
 </html>

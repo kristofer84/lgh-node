@@ -1,12 +1,12 @@
-const fs = require('fs').promises;
-const crypto = require('crypto');
-const lg = require('./log.js');
+import { promises as fs } from 'fs';
+import { randomUUID, createHmac } from 'crypto';
+import { log } from './log.js';
 const db = './db/users.json';
 const keyfile = './db/key.secret';
 
 var config;
 
-exports.validate = async function validate(oid, username) {
+export async function validate(oid, username) {
 	if (!config) config = await loadDb();
 	if (!config.users.hasOwnProperty(oid)) {
 		config.users[oid] = { preferred_username: username, enabled: false };
@@ -14,7 +14,7 @@ exports.validate = async function validate(oid, username) {
 	}
 
 	if (!config.users[oid].enabled) {
-		lg.log(`Unauthorized login attempt for ${username}`);
+		log(`Unauthorized login attempt for ${username}`);
 		return;
 	}
 	//	let hash = await getHash(pwd);
@@ -38,7 +38,7 @@ exports.validate = async function validate(oid, username) {
 	return config.users[oid].generatedKey;
 }
 
-exports.validateKey = async function validateKey(key) {
+export async function validateKey(key) {
 	if (!config) config = await loadDb();
 	if (!config.keys.hasOwnProperty(key)) return;
 
@@ -47,12 +47,12 @@ exports.validateKey = async function validateKey(key) {
 }
 
 function rand() {
-	return crypto.randomUUID();
+	return randomUUID();
 	//    return Math.random().toString(36).replace(/[^a-z]+/g, '').substr(0, 7);
 }
 
 async function loadDb() {
-	lg.log('Loading config');
+	log('Loading config');
 	let binary = await fs.readFile(db, 'binary');
 	return JSON.parse(binary.toString());
 }
@@ -66,7 +66,7 @@ async function saveDb() {
 var key;
 async function getHash(str) {
 	await getHmacKey();
-	return crypto.createHmac('sha256', key).update(str).digest('hex');
+	return createHmac('sha256', key).update(str).digest('hex');
 }
 
 async function getHmacKey() {
