@@ -565,13 +565,14 @@ let wakeLock = null;
 async function lock() {
 	if (!navigator.wakeLock) return;
 	// create an async function to request a wake lock
-	try { wakeLock = await navigator.wakeLock.request("screen"); 
-//	  statusElem.textContent = "Wake Lock is active!";
+	try {
+		wakeLock = await navigator.wakeLock.request("screen");
+		//	  statusElem.textContent = "Wake Lock is active!";
 	} catch (err) {
-	  // The Wake Lock request has failed - usually system related, such 
-	  // as battery.
-	  alert(`${err.name}, ${err.message}`);
-//	  statusElem.textContent = `${err.name}, ${err.message}`;
+		// The Wake Lock request has failed - usually system related, such 
+		// as battery.
+		console.log(`${err.name}, ${err.message}`);
+		//	  statusElem.textContent = `${err.name}, ${err.message}`;
 	}
 }
 
@@ -579,5 +580,11 @@ function unlock() {
 	if (!wakeLock) return;
 	wakeLock.release().then(() => { wakeLock = null; });
 }
+
+const push = document.getElementById('push')
+push.addEventListener("click", async () => {
+	await fetch('/push');
+	alert('Push sent')
+});
 
 connect();

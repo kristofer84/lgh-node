@@ -5,7 +5,7 @@ export function log(str) {
 
 export function mqtt(str) {
 	let date = new Date().toISOString();
-	console.log(`MQTT: ${date} - ${str}`);
+	// console.log(`MQTT: ${date} - ${str}`);
 }
 
 const d = false;

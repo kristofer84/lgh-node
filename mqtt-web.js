@@ -15,13 +15,11 @@ import { createServer } from 'http';
 // const url = require('url');
 import { log, mqtt as lgMqtt } from './log.js';
 import { validate, validateKey } from './user.js';
-import bodyParser from 'body-parser';
+import { getSubscriptions, saveSubscription } from './subscription.js'
+import { sendNotifications } from './notifications.js';
+// import bodyParser from 'body-parser';
 
 import { Server } from 'socket.io';
-// import low from 'lowdb';
-// import FileSync from 'lowdb/adapters/FileSync';
-// const adapter = new FileSync('./db/database.json');
-// const db = low(adapter);
 
 process.stdin.resume();
 
@@ -29,9 +27,6 @@ process.stdin.resume();
 var devices;
 var config;
 
-// db.defaults({
-// 	subscriptions: []
-//   }).write();
 
 function init() {
 	let buffer = readFileSync('./log/mqtt.log');
@@ -109,9 +104,21 @@ app.use(function (req, res, next) {
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 
+
 app.get('/', async (req, res) => {
-	res.header('content-type', 'text/html');
-	res.end('<html><body>hi</body></html>');
+	//	res.header('content-type', 'text/html');
+	//	res.end('<html><body style="background-color: black;"><center><img src="/file-FpWsQygSjs8CQvMyl2IymmpE.webp" /></center></body></html>');
+	res.sendfile('./web/index.html');
+});
+
+app.get('/moja', async (req, res) => {
+	const temperature = devices['moja_utomhus_temperature']?.state
+	const pressure = devices['moja_utomhus_pressure']?.state
+	const humidity = devices['moja_utomhus_humidity']?.state
+	const ret = { moja_utomhus: { temperature, pressure, humidity } }
+
+	res.header('content-type', 'application/json');
+	res.end(JSON.stringify(ret, null, 2));
 });
 
 app.use(cookieParser('abdjhoejsjcudnruvuejd#jdjf38txjjejgh'));
@@ -157,11 +164,19 @@ app.get('/cookies', async (req, res) => {
 	res.end(JSON.stringify({ key }));
 });
 
+app.get('/push', async (req, res) => {
+	const subs = await getSubscriptions();
+	console.log(subs)
+	sendNotifications(subs);
+	res.end(JSON.stringify({ status: 'ok' }));
+});
+
+
 app.post('/subscribe', async (req, res) => {
-	const key = req.headers.cookie;
 	const data = req.body;
-	console.log(data);
-	res.end('Data Received: ' + JSON.stringify(data));
+	console.log(data)
+	saveSubscription(data, req.user.preferred_username);
+	res.end(JSON.stringify({ status: 'ok' }));
 
 	// res.end(JSON.stringify({ key }));
 });
@@ -172,9 +187,9 @@ async function logMiddleware(req, res, next) {
 }
 
 async function cookieMiddleware(req, res, next) {
-	const bypass = ['/favicon-192.png', '/favicon.ico', '/login', '/login.js', '/key', '/config.json', '/manifest.json', '/scripts/sw.js', '/scripts/sw-init.js', '/init.js', '/dashboard'];
+	const bypass = ['/style.css', '/code.png', '/favicon-192.png', '/sk.jpeg', '/favicon.ico', '/login', '/login.js', '/key', '/config.json', '/manifest.json', '/scripts/sw.js', '/scripts/sw-init.js', '/init.js', '/dashboard'];
 
-	if (bypass.includes(req.path)) {
+	if (bypass.includes(req.path) || req.path && req.path.startsWith('/static/')) {
 		return next();
 	}
 
@@ -320,7 +335,7 @@ client.on('connect', function () {
 client.on('message', function (topic, message) {
 	try {
 		const split = topic.split('/');
-		const valueTypes = ['state', 'current_temperature', 'current_humidity'];
+		const valueTypes = ['state', 'current_temperature', 'current_humidity', 'current_pressure'];
 		const valueType = split[3];
 
 		//homeassistant/light/entre/state: on

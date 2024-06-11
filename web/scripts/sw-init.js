@@ -1,10 +1,10 @@
-if ("serviceWorker" in navigator) {
+if (navigator.serviceWorker) {
 	// Register a service worker hosted at the root of the site using 
 	// the default scope.
 	navigator.serviceWorker.register("/scripts/sw.js").then((registration) => {
 		console.log("Service worker registration succeeded:", registration);
 
-		const applicationServerKey = 'BGIiF8z1HF8R4iKJsOCI4lhiz-Rpk_eO5jtRjX_wQjpWg-XmuSIjv9hUakxYJYrierx02ptJgm13Q1iygeMVSsc';
+		const applicationServerKey = 'BF48UEbLK-xWlzN4CIqFBvbwErKCzne1J2qZyCcH5UDwyDBM9ibMwkPwXk9dhJeFz4VnvhIbhKHB55iw8Oa-Qlk';
 
 		const options = {
 			userVisibleOnly: true,

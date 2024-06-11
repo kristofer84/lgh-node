@@ -288,6 +288,7 @@ body.nightmode .room[light="on"] .room-outline {
   }
 }
 
+#push,
 #install,
 #subscribe {
   border: 1px solid gray;
@@ -307,7 +308,13 @@ body.nightmode .room[light="on"] .room-outline {
   right: 10px;
 }
 
+#push {
+  right: 10px;
+  bottom: 50px;
+}
 
+
+body.nightmode #push,
 body.nightmode #install,
 body.nightmode #subscribe {
   /* background: rgba(0, 0, 134,0); */

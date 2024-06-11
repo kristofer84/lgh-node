@@ -1,0 +1,14 @@
+{
+  "name": "Home map",
+  "icons": [
+    {
+      "src": "./favicon-192.png",
+      "type": "image/png",
+      "sizes": "192x192"
+    }
+  ],
+  "start_url": "./dashboard",
+  "display": "standalone",
+  "theme_color": "green",
+  "background_color": "red"
+}

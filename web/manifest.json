@@ -2,11 +2,21 @@
   "name": "Home map",
   "icons": [
     {
-      "src": "./favicon-192.png",
+      "src": "./code.png",
       "type": "image/png",
-      "sizes": "192x192"
+      "sizes": "192x192",
+      "purpose": "any"
+    },
+    {
+      "src": "./code.png",
+      "type": "image/png",
+      "sizes": "192x192",
+      "purpose": "maskable"
     }
   ],
   "start_url": "./dashboard",
-  "display": "standalone"
+  "display": "standalone",
+  "background_color": "#222",
+  "theme_color": "red",
+  "version": "1.4"
 }
