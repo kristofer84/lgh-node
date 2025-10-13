@@ -1,0 +1,56 @@
+body {
+  /* background: linear-gradient(45deg, #f64f59, #c471ed, #12c2e9); */
+  font-family: "Roboto", sans-serif;
+  font-weight: 400;
+  /* font-size: 1rem; */
+  /* font-family: console; */
+  transition: background 0.5s, color 0.5s;
+  -webkit-tap-highlight-color: transparent;
+
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+input,
+select,
+textarea,
+button {
+  font-family: inherit;
+}
+
+input {
+  border-radius: 0;
+  border: 0.5px solid gray;
+}
+
+#username {
+  width: 150px;
+}
+
+#wrap {
+  justify-content: space-between;
+
+  .buttons {
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    padding-top: 5px;
+  }
+}
+
+#register,
+#login {
+  width: 75px;
+}
+
+#webn-register-wrapper,
+#webn-login-wrapper {
+  display: none;
+}
+
+.link:hover {
+  text-decoration: underline;
+  color: darkblue;
+  cursor: pointer;
+}

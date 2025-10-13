@@ -1,0 +1,360 @@
+{
+  "lalalainput": {
+    "keys": [
+      {
+        "registrationInfo": {
+          "fmt": "none",
+          "counter": 0,
+          "aaguid": "53414d53-554e-4700-0000-000000000000",
+          "credentialID": "wMarCr0jPfH9dx5n0mT9AJZqkLKBsa3Cg1groPjLRnM",
+          "credentialPublicKey": "pQECAyYgASFYIKeTlKR4zucCjE5nzMbBLLzPwWCu1WtvMsqNlmajCfQpIlgg6mI55L5UjCmXgVHrbK7mcyqwhimtIKuJYaGv76A-klw",
+          "credentialType": "public-key",
+          "attestationObject": "o2NmbXRkbm9uZWdhdHRTdG10oGhhdXRoRGF0YVik6v7WpVndfm02mMoeZBmcsC92EEUke25Up5xH-VOtHxRFAAAAAFNBTVNVTkcAAAAAAAAAAAAAIMDGqwq9Iz3x_XceZ9Jk_QCWapCygbGtwoNYK6D4y0ZzpQECAyYgASFYIKeTlKR4zucCjE5nzMbBLLzPwWCu1WtvMsqNlmajCfQpIlgg6mI55L5UjCmXgVHrbK7mcyqwhimtIKuJYaGv76A-klw",
+          "userVerified": true,
+          "credentialDeviceType": "singleDevice",
+          "credentialBackedUp": false,
+          "origin": "https://home.xcds.net",
+          "rpID": "home.xcds.net"
+        },
+        "options": {
+          "challenge": "Vw6CkHR9O89FvMCc4u648OFmdewZY76Xa7NB7sel8-I",
+          "rp": {
+            "name": "Home map",
+            "id": "home.xcds.net"
+          },
+          "user": {
+            "id": "28btSzPwbH9BMpOBOfkGdHaMpeOVGbvI7VkCopz5tZ0",
+            "name": "lalalainput",
+            "displayName": ""
+          },
+          "pubKeyCredParams": [
+            {
+              "alg": -8,
+              "type": "public-key"
+            },
+            {
+              "alg": -7,
+              "type": "public-key"
+            },
+            {
+              "alg": -257,
+              "type": "public-key"
+            }
+          ],
+          "timeout": 60000,
+          "attestation": "none",
+          "excludeCredentials": [],
+          "authenticatorSelection": {
+            "residentKey": "preferred",
+            "userVerification": "preferred",
+            "requireResidentKey": false
+          },
+          "extensions": {
+            "credProps": true
+          }
+        }
+      },
+      {
+        "registrationInfo": {
+          "fmt": "none",
+          "counter": 0,
+          "aaguid": "ea9b8d66-4d01-1d21-3ce4-b6b48cb575d4",
+          "credentialID": "TFoXXhxoNMnPE3FlacoA1A",
+          "credentialPublicKey": "pQECAyYgASFYIOTJI2njCQ32XC2R6_AcS3gh2Y3tbg4TwsK4FEwGCd-cIlgg_jsujHAZ5d9ANx44fTtf2rRCqaYzjLX7eDCLoMzQ1eI",
+          "credentialType": "public-key",
+          "attestationObject": "o2NmbXRkbm9uZWdhdHRTdG10oGhhdXRoRGF0YViU6v7WpVndfm02mMoeZBmcsC92EEUke25Up5xH-VOtHxRdAAAAAOqbjWZNAR0hPOS2tIy1ddQAEExaF14caDTJzxNxZWnKANSlAQIDJiABIVgg5MkjaeMJDfZcLZHr8BxLeCHZje1uDhPCwrgUTAYJ35wiWCD-Oy6McBnl30A3Hjh9O1_atEKppjOMtft4MIugzNDV4g",
+          "userVerified": true,
+          "credentialDeviceType": "multiDevice",
+          "credentialBackedUp": true,
+          "origin": "https://home.xcds.net",
+          "rpID": "home.xcds.net"
+        },
+        "options": {
+          "challenge": "Dg_xFCWMrINaIhVDyzLlEi5z-UqOdxfi_0w90sGFc1g",
+          "rp": {
+            "name": "Home map",
+            "id": "home.xcds.net"
+          },
+          "user": {
+            "id": "VQ80n46pkg4f9opRL8Hz6wwTjfdy03e_Oj8FY0ad8tA",
+            "name": "lalalainput",
+            "displayName": ""
+          },
+          "pubKeyCredParams": [
+            {
+              "alg": -8,
+              "type": "public-key"
+            },
+            {
+              "alg": -7,
+              "type": "public-key"
+            },
+            {
+              "alg": -257,
+              "type": "public-key"
+            }
+          ],
+          "timeout": 60000,
+          "attestation": "none",
+          "excludeCredentials": [
+            {
+              "id": "wMarCr0jPfH9dx5n0mT9AJZqkLKBsa3Cg1groPjLRnM",
+              "type": "public-key"
+            }
+          ],
+          "authenticatorSelection": {
+            "residentKey": "preferred",
+            "userVerification": "preferred",
+            "requireResidentKey": false
+          },
+          "extensions": {
+            "credProps": true
+          }
+        }
+      },
+      {
+        "registrationInfo": {
+          "fmt": "none",
+          "counter": 0,
+          "aaguid": "ea9b8d66-4d01-1d21-3ce4-b6b48cb575d4",
+          "credentialID": "L1xdLBbz7j6ZOfDYOBbHTw",
+          "credentialPublicKey": "pQECAyYgASFYIKlgB7FONT8kevDx7Ye5cZjeXQM3HgTRMBGzBpDkkiVjIlggQVa8aWQWto3RK_gRwesUR5S71JZnSCsUBlBIyeJHa_s",
+          "credentialType": "public-key",
+          "attestationObject": "o2NmbXRkbm9uZWdhdHRTdG10oGhhdXRoRGF0YViU6v7WpVndfm02mMoeZBmcsC92EEUke25Up5xH-VOtHxRdAAAAAOqbjWZNAR0hPOS2tIy1ddQAEC9cXSwW8-4-mTnw2DgWx0-lAQIDJiABIVggqWAHsU41PyR68PHth7lxmN5dAzceBNEwEbMGkOSSJWMiWCBBVrxpZBa2jdEr-BHB6xRHlLvUlmdIKxQGUEjJ4kdr-w",
+          "userVerified": true,
+          "credentialDeviceType": "multiDevice",
+          "credentialBackedUp": true,
+          "origin": "https://home.xcds.net",
+          "rpID": "home.xcds.net"
+        },
+        "options": {
+          "challenge": "rsSoDrC2WtTiFayUbifPen7utZVjM4Wd0nn715YjEWU",
+          "rp": {
+            "name": "Home map",
+            "id": "home.xcds.net"
+          },
+          "user": {
+            "id": "DgUQdldrXQ3o_jqWvJRN4Asa31fN8MsJPc7rRoNbBl8",
+            "name": "lalalainput",
+            "displayName": ""
+          },
+          "pubKeyCredParams": [
+            {
+              "alg": -8,
+              "type": "public-key"
+            },
+            {
+              "alg": -7,
+              "type": "public-key"
+            },
+            {
+              "alg": -257,
+              "type": "public-key"
+            }
+          ],
+          "timeout": 60000,
+          "attestation": "none",
+          "excludeCredentials": [
+            {
+              "id": "wMarCr0jPfH9dx5n0mT9AJZqkLKBsa3Cg1groPjLRnM",
+              "type": "public-key"
+            },
+            {
+              "id": "TFoXXhxoNMnPE3FlacoA1A",
+              "type": "public-key"
+            }
+          ],
+          "authenticatorSelection": {
+            "residentKey": "preferred",
+            "userVerification": "preferred",
+            "requireResidentKey": false
+          },
+          "extensions": {
+            "credProps": true
+          }
+        }
+      },
+      {
+        "registrationInfo": {
+          "fmt": "none",
+          "counter": 0,
+          "aaguid": "ea9b8d66-4d01-1d21-3ce4-b6b48cb575d4",
+          "credentialID": "fqJAhusIEze64fI_09V1rg",
+          "credentialPublicKey": "pQECAyYgASFYIHy2Yj8uJdet8W2Oio0PownQb9D4gh1tB26asinUyAkxIlgg4Hvx9Ji7VQFmAQN_rJfijFrxfT5l4Rpc0t-at7LTKkY",
+          "credentialType": "public-key",
+          "attestationObject": "o2NmbXRkbm9uZWdhdHRTdG10oGhhdXRoRGF0YViU6v7WpVndfm02mMoeZBmcsC92EEUke25Up5xH-VOtHxRdAAAAAOqbjWZNAR0hPOS2tIy1ddQAEH6iQIbrCBM3uuHyP9PVda6lAQIDJiABIVggfLZiPy4l163xbY6KjQ-jCdBv0PiCHW0HbpqyKdTICTEiWCDge_H0mLtVAWYBA3-sl-KMWvF9PmXhGlzS35q3stMqRg",
+          "userVerified": true,
+          "credentialDeviceType": "multiDevice",
+          "credentialBackedUp": true,
+          "origin": "https://home.xcds.net",
+          "rpID": "home.xcds.net"
+        },
+        "options": {
+          "challenge": "3gtJj1ZEg3Hb8m0uAE79z_lZ3eTmTgnQW8FGvKoOCaU",
+          "rp": {
+            "name": "Home map",
+            "id": "home.xcds.net"
+          },
+          "user": {
+            "id": "oz0F_GihsxbLbOU33YewubY9nKIbmu44QIxAlObsSLY",
+            "name": "lalalainput",
+            "displayName": ""
+          },
+          "pubKeyCredParams": [
+            {
+              "alg": -8,
+              "type": "public-key"
+            },
+            {
+              "alg": -7,
+              "type": "public-key"
+            },
+            {
+              "alg": -257,
+              "type": "public-key"
+            }
+          ],
+          "timeout": 60000,
+          "attestation": "none",
+          "excludeCredentials": [
+            {
+              "id": "wMarCr0jPfH9dx5n0mT9AJZqkLKBsa3Cg1groPjLRnM",
+              "type": "public-key"
+            },
+            {
+              "id": "TFoXXhxoNMnPE3FlacoA1A",
+              "type": "public-key"
+            },
+            {
+              "id": "L1xdLBbz7j6ZOfDYOBbHTw",
+              "type": "public-key"
+            }
+          ],
+          "authenticatorSelection": {
+            "residentKey": "preferred",
+            "userVerification": "preferred",
+            "requireResidentKey": false
+          },
+          "extensions": {
+            "credProps": true
+          }
+        }
+      }
+    ]
+  },
+  "kristofer": {
+    "keys": [
+      {
+        "registrationInfo": {
+          "fmt": "none",
+          "counter": 0,
+          "aaguid": "53414d53-554e-4700-0000-000000000000",
+          "credentialID": "5CWRcdtQ7Xxgk9m753_r8KixADen04pa_ywi3fgjfBY",
+          "credentialPublicKey": "pQECAyYgASFYIHIqAyljII7JwHPwmr3r7hXX3qguHvlodE6mmuY9U_9zIlggg3inTP12TMLReKvL1uoLPCs2PtpkIiVxZCK9KQ3aAvM",
+          "credentialType": "public-key",
+          "attestationObject": "o2NmbXRkbm9uZWdhdHRTdG10oGhhdXRoRGF0YVik6v7WpVndfm02mMoeZBmcsC92EEUke25Up5xH-VOtHxRFAAAAAFNBTVNVTkcAAAAAAAAAAAAAIOQlkXHbUO18YJPZu-d_6_CosQA3p9OKWv8sIt34I3wWpQECAyYgASFYIHIqAyljII7JwHPwmr3r7hXX3qguHvlodE6mmuY9U_9zIlggg3inTP12TMLReKvL1uoLPCs2PtpkIiVxZCK9KQ3aAvM",
+          "userVerified": true,
+          "credentialDeviceType": "singleDevice",
+          "credentialBackedUp": false,
+          "origin": "https://home.xcds.net",
+          "rpID": "home.xcds.net"
+        },
+        "options": {
+          "challenge": "JGFQm_VOZX9G2edSwlG3HIWEtLEv3ShpbGqvN6TbPd4",
+          "rp": {
+            "name": "Home map",
+            "id": "home.xcds.net"
+          },
+          "user": {
+            "id": "CXYb0UBKPcxlgayx0zudyBWeHHTSqm7N4CSfbwPjjT0",
+            "name": "kristofer",
+            "displayName": ""
+          },
+          "pubKeyCredParams": [
+            {
+              "alg": -8,
+              "type": "public-key"
+            },
+            {
+              "alg": -7,
+              "type": "public-key"
+            },
+            {
+              "alg": -257,
+              "type": "public-key"
+            }
+          ],
+          "timeout": 60000,
+          "attestation": "none",
+          "excludeCredentials": [],
+          "authenticatorSelection": {
+            "residentKey": "preferred",
+            "userVerification": "preferred",
+            "requireResidentKey": false
+          },
+          "extensions": {
+            "credProps": true
+          }
+        }
+      },
+      {
+        "registrationInfo": {
+          "fmt": "none",
+          "counter": 0,
+          "aaguid": "ea9b8d66-4d01-1d21-3ce4-b6b48cb575d4",
+          "credentialID": "ZgeKhi0JvlgbsGhFhC_pNg",
+          "credentialPublicKey": "pQECAyYgASFYIDiOjUDHWDD__FMnjJuvPjDYIUjdUsey8xtXqbIULkt4IlggyT0smAbKKtum6g8G5vsmd8R70SdU8eDMdO3bcRPFM_0",
+          "credentialType": "public-key",
+          "attestationObject": "o2NmbXRkbm9uZWdhdHRTdG10oGhhdXRoRGF0YViU6v7WpVndfm02mMoeZBmcsC92EEUke25Up5xH-VOtHxRdAAAAAOqbjWZNAR0hPOS2tIy1ddQAEGYHioYtCb5YG7BoRYQv6TalAQIDJiABIVggOI6NQMdYMP_8UyeMm68-MNghSN1Sx7LzG1epshQuS3giWCDJPSyYBsoq26bqDwbm-yZ3xHvRJ1Tx4Mx07dtxE8Uz_Q",
+          "userVerified": true,
+          "credentialDeviceType": "multiDevice",
+          "credentialBackedUp": true,
+          "origin": "https://home.xcds.net",
+          "rpID": "home.xcds.net"
+        },
+        "options": {
+          "challenge": "YG_UcfuRgz1O-q3svlKqtKH5YD2Fmgvn7-yW2wIzY8M",
+          "rp": {
+            "name": "Home map",
+            "id": "home.xcds.net"
+          },
+          "user": {
+            "id": "_BKm3jz5iGlXpZLYQpywRuIsALYm7X6tHvpJwAJYZyQ",
+            "name": "kristofer",
+            "displayName": ""
+          },
+          "pubKeyCredParams": [
+            {
+              "alg": -8,
+              "type": "public-key"
+            },
+            {
+              "alg": -7,
+              "type": "public-key"
+            },
+            {
+              "alg": -257,
+              "type": "public-key"
+            }
+          ],
+          "timeout": 60000,
+          "attestation": "none",
+          "excludeCredentials": [
+            {
+              "id": "5CWRcdtQ7Xxgk9m753_r8KixADen04pa_ywi3fgjfBY",
+              "type": "public-key"
+            }
+          ],
+          "authenticatorSelection": {
+            "residentKey": "preferred",
+            "userVerification": "preferred",
+            "requireResidentKey": false
+          },
+          "extensions": {
+            "credProps": true
+          }
+        }
+      }
+    ]
+  }
+}

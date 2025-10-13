@@ -14,12 +14,13 @@ import { createServer } from 'http';
 // const qs = require('querystring');
 // const url = require('url');
 import { log, mqtt as lgMqtt } from './log.js';
-import { validate, validateKey } from './user.js';
+import { validate, validateKey, setCookie } from './user.js';
 import { getSubscriptions, saveSubscription } from './subscription.js'
 import { sendNotifications } from './notifications.js';
-// import bodyParser from 'body-parser';
+import bodyParser from 'body-parser';
 
 import { Server } from 'socket.io';
+import { registerWebnMethods } from './server-webn.js';
 
 process.stdin.resume();
 
@@ -94,16 +95,16 @@ csp.push("frame-src 'self' https://login.live.com/ https://login.microsoftonline
 csp.push("style-src 'self' https://fonts.googleapis.com https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.4.1/css/");
 csp.push("font-src 'self' https://fonts.gstatic.com https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.4.1/webfonts/");
 
+app.use(bodyParser.json());
 app.use(logMiddleware);
 app.use(function (req, res, next) {
-	res.header('content-security-policy', csp.join(';'))
-	res.header('permissions-policy', 'accelerometer=(), autoplay=(), camera=(), cross-origin-isolated=(), display-capture=(), encrypted-media=(), fullscreen=(), geolocation=(), gyroscope=(), keyboard-map=(), magnetometer=(), microphone=(), midi=(), payment=(), picture-in-picture=(), publickey-credentials-get=(), screen-wake-lock=(self), sync-xhr=(), usb=(), web-share=(), xr-spatial-tracking=()')
+	// res.header('content-security-policy', csp.join(';'))
+	res.header('permissions-policy', 'accelerometer=(), autoplay=(), camera=(), cross-origin-isolated=(), display-capture=(), encrypted-media=(), fullscreen=(), geolocation=(), gyroscope=(), keyboard-map=(), magnetometer=(), microphone=(), midi=(), payment=(), picture-in-picture=(), publickey-credentials-get=(self), screen-wake-lock=(self), sync-xhr=(), usb=(), web-share=(), xr-spatial-tracking=()')
 	next();
 });
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
-
 
 app.get('/', async (req, res) => {
 	//	res.header('content-type', 'text/html');
@@ -122,6 +123,7 @@ app.get('/moja', async (req, res) => {
 });
 
 app.use(cookieParser('abdjhoejsjcudnruvuejd#jdjf38txjjejgh'));
+registerWebnMethods(app);
 app.use(passport.initialize());
 app.use(express.json());
 app.use(cookieMiddleware);
@@ -138,21 +140,16 @@ app.get('/favicon.ico', (req, res) => {
 	res.end();
 });
 */
-app.get('/key', passport.authenticate('oauth-bearer', { session: false }), async (req, res) => {
+
+app.get('/key-msal', passport.authenticate('oauth-bearer', { session: false }), async (req, res) => {
 	const key = await validate(req.user.oid, req.user.preferred_username);
 	setCookie(key, res);
 });
 
-app.get('/refresh-key', async (req, res) => {
+app.get('/refresh-key', async (req, res) => { 
 	const key = req.signedCookies?.key;
 	setCookie(key, res);
 });
-
-function setCookie(key, res) {
-	res.cookie('key', key, { signed: true, httpOnly: true, sameSite: 'strict', maxAge: 1000 * 60 * 60 * 24 * 7 });
-	res.statusCode = 204;
-	res.end();
-}
 
 app.get('/key-from-cookie', async (req, res) => {
 	const key = req.signedCookies?.key;
@@ -187,9 +184,9 @@ async function logMiddleware(req, res, next) {
 }
 
 async function cookieMiddleware(req, res, next) {
-	const bypass = ['/style.css', '/code.png', '/favicon-192.png', '/sk.jpeg', '/favicon.ico', '/login', '/login.js', '/key', '/config.json', '/manifest.json', '/scripts/sw.js', '/scripts/sw-init.js', '/init.js', '/dashboard'];
+	const bypass = ['/style.css', '/code.png', '/favicon-192.png', '/login', '/sk.jpeg', '/favicon.ico', '/key-msal', '/config.json', '/manifest.json', '/scripts/sw.js', '/scripts/sw-init.js', '/init.js', '/dashboard'];
 
-	if (bypass.includes(req.path) || req.path && req.path.startsWith('/static/')) {
+	if (bypass.includes(req.path) || req.path && (req.path.startsWith('/static/') || req.path.startsWith('/public/'))) {
 		return next();
 	}
 
@@ -362,7 +359,7 @@ client.on('message', function (topic, message) {
 				colorCode = '\x1b[1m\x1b[31m';
 			}
 
-			console.log(device, colorCode, message.toString(), colorEnd);
+			// console.log(device, colorCode, message.toString(), colorEnd);
 			//Implicit change of known values (onoff and dim)
 			//		if (valueType === 'state' && message.toString() === 'off' && devices[device].hasOwnProperty('dim')) {
 			//			let prev = devices[device]['dim'];

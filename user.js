@@ -46,6 +46,13 @@ export async function validateKey(key) {
 	return config.users[oid];
 }
 
+export function setCookie(key, res) {
+	res.cookie('key', key, { signed: true, httpOnly: true, sameSite: 'strict', maxAge: 1000 * 60 * 60 * 24 * 7 });
+	res.statusCode = 204;
+	res.end();
+}
+
+
 function rand() {
 	return randomUUID();
 	//    return Math.random().toString(36).replace(/[^a-z]+/g, '').substr(0, 7);

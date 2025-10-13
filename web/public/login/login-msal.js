@@ -1,13 +1,21 @@
 
 let msalInstance;
 
-async function go() {
-    await initMsal();
+export async function loginMsal(event) {
+    event.preventDefault();
+
+    const accounts = msalInstance.getAllAccounts();
+
+    if (accounts.length === 0) {
+        console.log("Redirecting to login");
+        msalInstance.loginRedirect();
+    }
+
     const headers = new Headers({
         'Authorization': `Bearer ${await getAccessToken()}`
     });
 
-    await fetch('/key', { headers: headers, method: 'GET' });
+    await fetch('/key-msal', { headers: headers, method: 'GET' });
     window.location.href = '/dashboard';
 }
 
@@ -23,13 +31,6 @@ async function initMsal() {
         console.log("Token received from redirect");
         var newurl = window.location.protocol + "//" + window.location.host + window.location.pathname;
         window.history.pushState({ path: newurl }, '', newurl);
-    }
-
-    const accounts = msalInstance.getAllAccounts();
-
-    if (accounts.length === 0) {
-        console.log("Redirecting to login");
-        msalInstance.loginRedirect();
     }
 }
 
@@ -63,4 +64,4 @@ async function getAccessToken() {
     await msalInstance.acquireTokenRedirect(request);
 }
 
-go();
+initMsal();

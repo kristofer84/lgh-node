@@ -1,0 +1,94 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Speed Control</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f4f4f4;
+            color: #333;
+            margin: 0;
+            padding: 20px;
+        }
+        .input-group {
+            margin-bottom: 15px;
+        }
+        .input-group label {
+            margin-right: 10px;
+        }
+        .input-group input {
+            padding: 5px;
+            font-size: 1em;
+            width: 60px;
+        }
+        .slider-container {
+            margin-top: 20px;
+        }
+        .slider-container input[type="range"] {
+            width: 100%;
+        }
+        .slider-value {
+            text-align: center;
+            margin-top: 10px;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+    <div class="input-group">
+        <label for="minValue">Min:</label>
+        <input type="number" id="minValue" value="0">
+    </div>
+
+    <div class="input-group">
+        <label for="maxValue">Max:</label>
+        <input type="number" id="maxValue" value="100">
+    </div>
+
+    <div class="input-group">
+        <label for="currentValue">Value:</label>
+        <input type="number" id="currentValue" value="50">
+    </div>
+
+    <div class="slider-container">
+        <input type="range" id="speedSlider" min="0" max="100" value="50">
+        <div class="slider-value">Current Value: <span id="sliderValueDisplay">50</span></div>
+    </div>
+
+    <script>
+        const minValueInput = document.getElementById('minValue');
+        const maxValueInput = document.getElementById('maxValue');
+        const currentValueInput = document.getElementById('currentValue');
+        const speedSlider = document.getElementById('speedSlider');
+        const sliderValueDisplay = document.getElementById('sliderValueDisplay');
+
+        function updateSlider() {
+            const min = parseInt(minValueInput.value);
+            const max = parseInt(maxValueInput.value);
+            const value = parseInt(currentValueInput.value);
+
+            speedSlider.min = min;
+            speedSlider.max = max;
+            speedSlider.value = value;
+
+            sliderValueDisplay.textContent = value;
+        }
+
+        minValueInput.addEventListener('input', updateSlider);
+        maxValueInput.addEventListener('input', updateSlider);
+        currentValueInput.addEventListener('input', updateSlider);
+
+        speedSlider.addEventListener('input', () => {
+            currentValueInput.value = speedSlider.value;
+            sliderValueDisplay.textContent = speedSlider.value;
+        });
+
+        updateSlider(); // Initialize slider with input values
+    </script>
+
+</body>
+</html>
+
