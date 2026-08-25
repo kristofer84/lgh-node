@@ -51,8 +51,9 @@ zone, a power sensor with no marker in the plan).
    connection, which is the doorway.
 3. Moore-neighbour boundary trace + Douglas–Peucker to get 5–32 point polygons.
 4. The apartment envelope (`#rooms-outline`) is the complement of the page
-   background, with a closing pass so door-swing arcs that stick out past the
-   facade do not become bulges.
+   background, filled and slightly dilated. Do **not** add a morphological
+   closing to tidy the door-swing arcs: it eats into the facade and pulls the
+   silhouette inside the outer wall.
 
 ⚠ **Read room names from the rendered `<text>` content, not from `inkscape:label`.**
 Several labels in `lgh_rot.svg` are stale — the room whose text reads `SOV2`
@@ -70,6 +71,12 @@ scale silently rescales the entire UI.
 
 ## Gotchas paid for once
 
+- ⚠ **Never clip `#base-plan`.** It was originally clipped to `#rooms-outline`, copying the
+  old design where a rectangular photo had to be trimmed to the apartment. On line-art that
+  only destroys drawing: wherever the traced silhouette ran along the *inner* face of an
+  outer wall, the clip removed that wall — the whole angled facade and the walls around
+  KLK1/LOGGIA vanished, ~36k pixels, and the rooms looked like they spilled into empty space.
+  `#rooms-outline` is now used only for the soft border in `#border-fade`.
 - ⚠ **The room outline polygons live in `<defs>`**, and both the room group and its
   `clipPath` reference them with `<use>`. Putting the polygon inside the group it
   clips is a circular reference: the clip is then ignored and every glow bleeds

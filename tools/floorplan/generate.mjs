@@ -145,7 +145,7 @@ defs.push(`      <radialGradient id="p-vagg" cx="0" cy="0.5"><stop offset="0%" s
 
 //Apartment envelope: the soft border, and the clip for the base artwork
 defs.push(`      <polygon id="rooms-outline" points="${poly(geo.silhouette)}" />`);
-defs.push(`      <clipPath id="clip"><use xlink:href="#rooms-outline" /></clipPath>`);
+//#rooms-outline is now only the soft border drawn by #border-fade
 
 //One clip per room so a glow cannot bleed through a wall.
 //The outline polygon lives HERE, in defs, not inside the room group: a group
@@ -198,7 +198,11 @@ inner = inner.replace(/<([a-zA-Z][\w:-]*)((?:"[^"]*"|'[^']*'|[^>"'])*?)(\/?)>/g,
 	return `<${name}${rest}${selfClose}>`;
 });
 const basePlan = [
-	`        <g id="base-plan" transform="scale(${S}) translate(${-ox},${-oy})" clip-path="url(#clip)" pointer-events="none">`,
+	//NOT clipped. Clipping the drawing to #rooms-outline cut the outer walls off
+	//wherever the traced silhouette ran along their inner face -- most visibly
+	//the whole angled facade, which left rooms looking like they spilled into
+	//empty space. The drawing is the drawing; nothing should trim it.
+	`        <g id="base-plan" transform="scale(${S}) translate(${-ox},${-oy})" pointer-events="none">`,
 	inner,
 	`        </g>`,
 ];
