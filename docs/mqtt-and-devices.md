@@ -340,10 +340,14 @@ Record here rather than rediscovering them:
 - **`orangeri` has entities but no HA area** — they are scattered across `Kök`
   (`light.orangeri_tak`) and `Nattbelysning` (`light.bordslampa_orangeri`). The zone was
   assembled by name.
-- **`light.lampa_mikkel` is absent from `db/config.json` entirely** — it is in **neither** `kok`
-  nor `sov2`, and it is not "assigned to kök". The reason it was left out: its *device* area is
-  `Nytt kök` while `switch.lampa_mikkel`'s *entity* area is `Sovrum MK`, and the two disagree.
-  Decide with the operator which room it is in before adding it to either zone.
+- **RESOLVED 2026-08-25 (operator): the bedrooms are named after their occupants** —
+  `sov2` = Mikkel, `sov3` = Kai, `sov4` = Mette. This settles the `light.lampa_mikkel`
+  ambiguity (its *device* area said `Nytt kök`, its `switch.` *entity* area said `Sovrum MK`):
+  it is **Mikkel's room, `sov2`**, and the HA device area is simply wrong — one more reason not
+  to trust that registry. `lampa_kai` → `sov3` and `lampa_mette` → `sov4` follow the same rule.
+  ⚠ `mikkel_garderob` (`sov2`) and `kai_garderob` (`sov3`) are placed with their owner's
+  bedroom by **inference** — they could belong to `klk1`/`klk2` instead. Confirm before relying
+  on them.
 - **`switch.ytterdorr_1_brytare` / `light.ytterdorr_2` have no area at all** — which of
   `entre1` / `entre2` each belongs to is inference, not fact.
 - **`vinkyl` has a power sensor in `config.zones.devices` but no marker in the drawing**, so it

@@ -182,7 +182,15 @@ stop {
 
 .name-blocker {
   fill: white;
-  fill-opacity: 0.8;
+  fill-opacity: 0.85;
+}
+
+/* SVG text has no font-size anywhere, so it inherited the browser default of
+   16px -- which is 16 *user units* against a 354-unit viewBox, i.e. oversized
+   and liable to overflow its name-blocker. Set it explicitly. */
+.temp {
+  font-size: 15px;
+  font-weight: 600;
 }
 
 /* Room outline */

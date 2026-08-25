@@ -78,17 +78,56 @@ for (const zone of Object.keys(geo.rooms)) {
 // anchor (which is guaranteed to sit inside the room). Positions are written
 // back to lights.json so they can be nudged by hand and survive regeneration.
 let seeded = 0;
+
+//Shoelace area and area-centroid, in source units
+function polyArea(pts) {
+	let a = 0;
+	for (let i = 0, j = pts.length - 1; i < pts.length; j = i++) a += pts[j][0] * pts[i][1] - pts[i][0] * pts[j][1];
+	return Math.abs(a) / 2;
+}
+function polyCentroid(pts) {
+	let a = 0, cx = 0, cy = 0;
+	for (let i = 0, j = pts.length - 1; i < pts.length; j = i++) {
+		const f = pts[j][0] * pts[i][1] - pts[i][0] * pts[j][1];
+		a += f; cx += (pts[j][0] + pts[i][0]) * f; cy += (pts[j][1] + pts[i][1]) * f;
+	}
+	a /= 2;
+	return a ? [cx / (6 * a), cy / (6 * a)] : null;
+}
+function inside(pts, [x, y]) {
+	let win = false;
+	for (let i = 0, j = pts.length - 1; i < pts.length; j = i++) {
+		const [xi, yi] = pts[i], [xj, yj] = pts[j];
+		if ((yi > y) !== (yj > y) && x < ((xj - xi) * (y - yi)) / (yj - yi) + xi) win = !win;
+	}
+	return win;
+}
+
+//A room's glow centre is its area centroid where that falls inside the room
+//(concave rooms can push it into a wall), otherwise the text anchor, which is
+//inside by construction. The radius follows the room's size -- a fixed radius
+//gave a bathroom the same blob as the living room.
+function roomGeometry(zone) {
+	const room = geo.rooms[zone];
+	if (!room) return null;
+	const c = polyCentroid(room.points);
+	const centre = c && inside(room.points, c) ? c : room.anchor;
+	const size = Math.sqrt(polyArea(room.points));          //source units
+	return { centre, size };
+}
+
 function placement(zone, device, index, total) {
 	lights[zone] ??= {};
 	if (lights[zone][device]) return lights[zone][device];
-	const a = geo.rooms[zone]?.anchor;
-	if (!a) return null;
-	const R = total > 1 ? 6 : 0;                       //source units
+	const g = roomGeometry(zone);
+	if (!g) return null;
+	//Spread several lights around the centre rather than stacking them
+	const spread = total > 1 ? Math.min(g.size * 0.28, 9) : 0;
 	const ang = (index / Math.max(total, 1)) * Math.PI * 2 - Math.PI / 2;
 	const p = {
-		cx: +(a[0] + Math.cos(ang) * R).toFixed(2),
-		cy: +(a[1] + Math.sin(ang) * R).toFixed(2),
-		r: 34,                                          //dashboard units
+		cx: +(g.centre[0] + Math.cos(ang) * spread).toFixed(2),
+		cy: +(g.centre[1] + Math.sin(ang) * spread).toFixed(2),
+		r: Math.round(Math.max(16, Math.min(60, g.size * S * 0.38))),
 		auto: true,
 	};
 	lights[zone][device] = p;
@@ -182,18 +221,26 @@ for (const [zone, room] of Object.entries(geo.rooms)) {
 		out.push(`          <circle id="${l.device}" class="${l.tier} item" cx="${tx(p.cx)}" cy="${ty(p.cy)}" r="${p.r}" fill="url(#pf)" />`);
 	});
 
-	//Temperature / humidity readouts, stacked at the room's text anchor
-	const readouts = z.sensors.filter(s => /(temperature|humidity)$/.test(s.device));
-	readouts.forEach((s, i) => {
-		out.push(`          <rect class="name-blocker hidden" x="${tx(room.anchor[0]) - 4}" y="${ty(room.anchor[1]) + i * 16 - 12}" width="46" height="15" />`);
-		out.push(`          <text class="temp hidden" id="th-${s.device}" x="${tx(room.anchor[0])}" y="${ty(room.anchor[1]) + i * 16}" />`);
-	});
-
 	out.push(`        </g>`);
 }
 
+//Readouts live OUTSIDE the room groups. Inside, the room's clip-path cut off
+//any label that reached past a wall, which is most of them in a small room.
+const readoutLayer = [`        <g id="readouts">`];
+for (const [zone, room] of Object.entries(geo.rooms)) {
+	if (!config.zones[zone]) continue;
+	const readouts = zones[zone].sensors.filter(s => /(temperature|humidity)$/.test(s.device));
+	readouts.forEach((s, i) => {
+		const x = tx(room.anchor[0]), y = ty(room.anchor[1]) + i * 15;
+		readoutLayer.push(`          <rect class="name-blocker hidden" x="${x - 3}" y="${y - 11}" width="44" height="14" rx="2" />`);
+		readoutLayer.push(`          <text class="temp hidden" id="th-${s.device}" x="${x}" y="${y}" />`);
+	});
+}
+readoutLayer.push(`        </g>`);
+
 out.push(...basePlan);
 out.push(`        <g id="border-fade" pointer-events="none"><use xlink:href="#rooms-outline" /></g>`);
+out.push(...readoutLayer);
 
 //------------------------------------------------------- appliance markers
 // home.js maps a power sensor to a rect by name.split('_')[0]
