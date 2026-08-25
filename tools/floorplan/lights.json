@@ -1,0 +1,136 @@
+{
+ "bad2": {
+  "badrum_2_tak": {
+   "cx": 104.72,
+   "cy": 156.7,
+   "r": 34,
+   "auto": true
+  }
+ },
+ "bad1": {
+  "badrum_1_tak": {
+   "cx": 104.69,
+   "cy": 125.55,
+   "r": 34,
+   "auto": true
+  }
+ },
+ "kok": {
+  "koksbank": {
+   "cx": 127.86,
+   "cy": 194.78,
+   "r": 34,
+   "auto": true
+  },
+  "koksbord": {
+   "cx": 133.86,
+   "cy": 200.78,
+   "r": 34,
+   "auto": true
+  },
+  "kokso": {
+   "cx": 127.86,
+   "cy": 206.78,
+   "r": 34,
+   "auto": true
+  },
+  "golvlampa_kok": {
+   "cx": 121.86,
+   "cy": 200.78,
+   "r": 34,
+   "auto": true
+  }
+ },
+ "sov1": {
+  "sovrum_1_byra": {
+   "cx": 118.59,
+   "cy": 73.55,
+   "r": 34,
+   "auto": true
+  },
+  "sang_hoger": {
+   "cx": 123.78,
+   "cy": 82.55,
+   "r": 34,
+   "auto": true
+  },
+  "sang_vanster": {
+   "cx": 113.39,
+   "cy": 82.55,
+   "r": 34,
+   "auto": true
+  }
+ },
+ "vardagsrum": {
+  "vardagsrum_vaggar": {
+   "cx": 65.65,
+   "cy": 116.44,
+   "r": 34,
+   "auto": true
+  },
+  "vardagsrum_linje": {
+   "cx": 69.89,
+   "cy": 118.2,
+   "r": 34,
+   "auto": true
+  },
+  "vardagsrum_tak_lampa": {
+   "cx": 71.65,
+   "cy": 122.44,
+   "r": 34,
+   "auto": true
+  },
+  "taklampa_ovan_matbord": {
+   "cx": 69.89,
+   "cy": 126.68,
+   "r": 34,
+   "auto": true
+  },
+  "golvlampa": {
+   "cx": 65.65,
+   "cy": 128.44,
+   "r": 34,
+   "auto": true
+  },
+  "v1": {
+   "cx": 61.4,
+   "cy": 126.68,
+   "r": 34,
+   "auto": true
+  },
+  "v2": {
+   "cx": 59.65,
+   "cy": 122.44,
+   "r": 34,
+   "auto": true
+  },
+  "skapbelysning": {
+   "cx": 61.4,
+   "cy": 118.2,
+   "r": 34,
+   "auto": true
+  }
+ },
+ "orangeri": {
+  "bordslampa_orangeri": {
+   "cx": 58.62,
+   "cy": 174.61,
+   "r": 34,
+   "auto": true
+  }
+ },
+ "sov4": {
+  "lampa_mette": {
+   "cx": 131.97,
+   "cy": 239.84,
+   "r": 34,
+   "auto": true
+  },
+  "slinga_mette": {
+   "cx": 131.97,
+   "cy": 251.84,
+   "r": 34,
+   "auto": true
+  }
+ }
+}

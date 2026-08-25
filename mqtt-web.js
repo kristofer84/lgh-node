@@ -574,7 +574,11 @@ function getDevice(dev) {
 		let zone = d.zone === undefined ? 'nozone' : d.zone;
 		r[zone] = {};
 
-		if (d.type === 'light') {
+		//'switch' belongs here with 'light'. Without it a switch fell through to
+		//the generic onoff branch below, which drops mood/night -- so a switch
+		//declared .mood advertised mood:true in the device.all snapshot and then
+		//lost it on the next per-device update.
+		if (d.type === 'light' || d.type === 'switch') {
 			let dim = d.hasOwnProperty('dim') ? d['dim'] : undefined;
 			let mood = d.mood;
 			let night = d.night;

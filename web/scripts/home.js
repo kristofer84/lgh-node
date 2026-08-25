@@ -4,7 +4,6 @@
 var socket;
 var stayOn = false;
 var raw = [];
-var socketKey;
 let auth;
 /*
 async function init() {
@@ -273,6 +272,10 @@ function updateView() {
 		let nightable = lights.some(light => model[zone][light].night);
 
 		let ar = document.getElementById(zone);
+		//Zones without a room drawn for them (home, utomhus, moja, devices) are
+		//normal. This used to be unguarded, so any such zone containing a
+		//mood/night light threw and aborted the render for every later zone.
+		if (!ar) return;
 		if (moodable && !ar.hasAttribute("moodable")) ar.setAttribute("moodable", "moodable");
 		if (nightable && !ar.hasAttribute("nightable")) ar.setAttribute("nightable", "nightable");
 
@@ -509,10 +512,6 @@ $(document).ready(function () {
 	cookieData.forEach(data => {
 		if (data.includes('=')) {
 			let split = data.split('=');
-			if (split[0].trim() === 'socketKey') {
-				socketKey = split[1];
-			}
-
 			var cb = $("#" + split[0].trim());
 			if (cb !== undefined) {
 				cb.prop('checked', split[1] == 'true' ? 'checked' : undefined);

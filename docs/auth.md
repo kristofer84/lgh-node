@@ -6,6 +6,11 @@
 > **Verified 2026-08-25 against the working tree** — commit `eb19c0d` plus the uncommitted
 > auth-hardening pass. §8 records what that pass changed, so a stale note elsewhere can be
 > reconciled against it. Line numbers move with `git stash`.
+>
+> The same-day **new-apartment pass** (new floorplan, generated `web/dashboard.html`, rebuilt
+> `db/config.json`, `tools/floorplan/`) **changed nothing in auth** — no route, middleware,
+> allowlist entry or identity path moved. The only consequence here is what the anonymously
+> served `/dashboard` now discloses; see §1.
 
 There are two ways in — **Microsoft MSAL / Entra** and **WebAuthn passkeys**. They are entirely
 separate up front and converge on one function: `validate()` in `user.js`.
@@ -74,6 +79,12 @@ pre-auth flow it belongs to.** That is the entire mechanism. **Wrap async routes
 - ⚠ `/dashboard` being allowlisted means the page returns **200** to anyone; its sub-resources
   (`/styles/style.css`, `/scripts/home.js`) 401 and `init.js` bounces the visitor to `/login`.
   Do not describe this as "the dashboard 401s" when debugging.
+- ⚠ **What that 200 now contains has changed.** `web/dashboard.html` is generated and inlines
+  the full architectural drawing of the apartment (~300 kB of SVG), plus every zone id and every
+  mood/night device name as element ids. An anonymous visitor cannot toggle anything — the
+  socket handshake needs the cookie — but they can read the floorplan and the device inventory
+  straight out of the HTML. If that is not acceptable, the fix is to drop `/dashboard` from the
+  bypass list; nothing depends on it being public.
 
 ### socket.io reuses the same gate
 
@@ -271,7 +282,8 @@ These are live, in the working tree.
    "passkey works so-so" report. Same reason `env.js` exists instead of `process.loadEnvFile()`.
 2. ⚠ **Route order is the authorization model** (§1). No per-route guard exists.
 3. ⚠ **`/dashboard` is anonymously served** (§1, bypass list) and so is everything under
-   `web/public/` — including the dead `relative.html`.
+   `web/public/` — including the dead `relative.html`. Since the floorplan pass the dashboard
+   HTML also carries the apartment's full architectural drawing and device inventory inline.
 4. ⚠ **`validate()` caches `db/users.json` in a module variable.** Hand-edits during a run are
    silently overwritten. Stop the process before editing (§7).
 5. ⚠ **Brand-new passkey registration is open to the internet.** Accounts land disabled, but

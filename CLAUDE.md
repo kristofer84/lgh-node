@@ -28,16 +28,15 @@ ESM** (no TypeScript, no build step, no tests, no lint) + **Express 4** + **sock
 - `"type": "module"` — ESM only. `server-webn.js` uses **top-level `await`**.
 
 > ⚠ **Production runs Node v22.0.0 — the only version installed** (2026-08-25: v18.7.0 and
-> v19.8.1 were removed). It previously ran v18.7.0, which does not expose `globalThis.crypto`
-> without `--experimental-global-webcrypto`; @simplewebauthn resolves it lazily, so *every*
-> passkey operation failed until `server-webn.js` started assigning
-> `globalThis.crypto = webcrypto` from `node:crypto`. **That shim and the hand-written `env.js`
-> stay** — both are no-ops on v22 and are the reason the app is portable across versions.
-> Boot resolves node via the nvm `default` alias, so no version path is hardcoded any more.
+> v19.8.1 were removed). **The `globalThis.crypto = webcrypto` shim in `server-webn.js` and the
+> hand-written `env.js` stay** — no-ops on v22, but without them every passkey operation failed
+> on v18. Boot resolves node via the nvm `default` alias; never hardcode a version path.
+> Why, in full: `docs/where-things-live.md` → "The Node runtime".
 
 - Startup also reads `./log/mqtt.log` and `./db/config.json` **synchronously and unguarded** — a
-  missing or malformed file is a startup crash. Both are gitignored, so a fresh clone will not
-  boot until you create them (see `docs/mqtt-and-devices.md`).
+  missing/malformed file is a startup crash. Both are gitignored, so a fresh clone will not boot
+  until you create them, and the floorplan cannot be regenerated without `db/config.json`
+  either (see `docs/mqtt-and-devices.md`).
 - No dependency manifest agreement: `package-lock.json`, `pnpm-lock.yaml` and `node_modules/`
   all disagree in age. `node_modules/` is committed-adjacent reality — prefer not to reinstall.
 
@@ -49,6 +48,12 @@ ESM** (no TypeScript, no build step, no tests, no lint) + **Express 4** + **sock
 > it or silently breaks it, with no error anywhere. Read `docs/auth.md` §1 before you add, move
 > or reorder anything in that file. **Wrap every async route in `wrap()`** — that is what routes
 > a throw to the terminal error handler instead of leaving it unhandled.
+
+> ⚠ **`web/dashboard.html` is GENERATED — never hand-edit it.** `node tools/floorplan/generate.mjs`
+> builds it from `db/config.json` + the drawing (`--check` fails when it is stale) and silently
+> discards any hand edit. **`db/config.json` is the source of truth for what appears on the
+> floorplan** — change it (or `tools/floorplan/lights.json`), then regenerate.
+> **`tools/floorplan/README.md` is that pipeline's own doc; read it first.**
 
 > **Never `git add` `db/`, `log/`, `.env` or `keys.txt`** — all four are gitignored and hold live
 > secrets/state. Do not reproduce secret values in docs, commits or issues. `webauthn.json` *is*
@@ -62,8 +67,8 @@ ESM** (no TypeScript, no build step, no tests, no lint) + **Express 4** + **sock
 ## Where things live
 
 **`docs/where-things-live.md` is the authoritative concern → file map** — per concern it records
-the shape, the gotcha, and the bug already paid for. This table is only an index. ⚠ = that row
-records a landmine (a confirmed bug, or a discipline that is load-bearing).
+the shape, the gotcha, and the bug already paid for. This table is only an index; ⚠ = that row
+records a landmine (a confirmed bug, or a load-bearing discipline).
 
 | Concern | Primary path |
 |---|---|
@@ -74,12 +79,13 @@ records a landmine (a confirmed bug, or a discipline that is load-bearing).
 | MSAL / Entra bearer validation | `bearerStrategy` in `mqtt-web.js` (~line 273) + `web/config.json` |
 | WebAuthn register + login ⚠ | `server-webn.js` → `webauthn.json` (tracked!) |
 | Client login UI | `web/login.html`, `web/public/login/{login,login-msal,login-webn}.js` |
-| MQTT ingest + device state | `client.on('message')` in `mqtt-web.js` (~line 363) |
-| Zone/device config ⚠ | `db/config.json` (gitignored) — `config.zones`, dotted device strings |
+| MQTT ingest + device state | `client.on('message')` in `mqtt-web.js` (~line 363); ⚠ **what HA publishes at all** is `mqtt_statestream:` in `/media/storage/ha/homeassistant/configuration.yaml`, outside this repo |
+| Zone/device config ⚠ | `db/config.json` (gitignored) — `config.zones`, dotted device strings; **source of truth for the floorplan** |
+| Floorplan generator ⚠ | `tools/floorplan/` — `generate.mjs`, `geometry.json`, `lights.json`, `base.svg`, its own `README.md` |
 | Device state persistence ⚠ | `exitHandler` in `mqtt-web.js` → `log/mqtt.log`, **written only on exit** |
 | socket.io wiring + auth bridge | `middlewareTransform` + `io.use(...)` in `mqtt-web.js` (~line 302) |
 | Outbound commands | `publish()` in `mqtt-web.js` → `webapp/switch/<type>.<device>/state/set` |
-| Dashboard page (SVG floorplan) ⚠ | `web/dashboard.html` + `web/scripts/home.js` + `web/styles/style.css` |
+| Dashboard page (SVG floorplan) ⚠ | `web/dashboard.html` (**generated**) + `web/scripts/home.js` + `web/styles/style.css` |
 | Landing page | `web/index.html` + `web/script.js` (script.js is fully commented out) |
 | PWA / service worker / web push | `web/manifest.json`, `web/scripts/sw*.js`, `notifications.js`, `subscription.js` |
 | Logging | `log.js` — `log()` prints, `mqtt()` is a no-op, `debug()` gated by `const d = false` |
@@ -87,20 +93,24 @@ records a landmine (a confirmed bug, or a discipline that is load-bearing).
 
 ## Deep-dive docs (`docs/`)
 
-**`docs/README.md` is the annotated index.** The three that constrain day-to-day work:
+**`docs/README.md` is the annotated index.** The four that constrain day-to-day work:
 
 - `docs/where-things-live.md` — full concern → file map + every ⚠ landmine, recorded in full
 - `docs/auth.md` — both auth paths end-to-end, `db/users.json` / `webauthn.json` shapes, how to
   enable a user by hand, and the hardening pass's before/after
-- `docs/mqtt-and-devices.md` — topic convention, `db/config.json` format, `getDevice()` output,
-  the socket.io event contract, and the exit-only persistence quirk
+- `docs/mqtt-and-devices.md` — what HA publishes and what it does not, the topic convention,
+  `db/config.json` + the 22 zones, `getDevice()`, the socket.io contract, and §8: where the
+  config came from and what is still guesswork
+- `tools/floorplan/README.md` — the dashboard generator: inputs, geometry re-extraction from the
+  Inkscape drawing, and the clip/scale/label landmines
 
 ## Conventions
 
 - Tabs in `mqtt-web.js` / `user.js` / `log.js` / `env.js`; 4 spaces in `server-webn.js`,
   `notifications.js` and `web/public/`. Match the file you are in; there is no formatter.
-- Device names, zone names and UI strings are **Swedish** (`sovrum`, `kok`, `tvattstuga`).
-  Keep them; they are keys, not prose.
+- Device/zone names and UI strings are **Swedish** (`vardagsrum`, `kok`, `tvatt`, `klk1`) — keys,
+  not prose. The apartment changed; the old `sovrum` / `kontor` / `dusch` / `garderob` / `entre`
+  names are gone. Current zone list: `docs/mqtt-and-devices.md` §5.
 - There is no test suite and no CI. Verification means reading the code and restarting the
   process by hand. **Edits are not live until that restart.**
 - Commit messages end with: `Co-Authored-By: Claude Opus 5 (1M context) <noreply@anthropic.com>`.

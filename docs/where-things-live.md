@@ -5,10 +5,13 @@
 >
 > ⚠ marks a landmine: a confirmed bug, or a discipline that is load-bearing.
 >
-> **Verified 2026-08-25 against the working tree** — commit `eb19c0d` plus the uncommitted
+> **Verified 2026-08-25 against the working tree** — commit `eb19c0d`, the uncommitted
 > auth-hardening pass (`env.js`, `.env.example`, `mqtt-web.js`, `user.js`, `server-webn.js`,
-> `notifications.js`, `web/login.html`, `web/scripts/home.js`, `web/public/login/*`). Line
-> numbers refer to that working tree, so `git diff`/`git stash` will move them.
+> `notifications.js`, `web/login.html`, `web/scripts/home.js`, `web/public/login/*`) **and the
+> uncommitted new-apartment pass** (`tools/floorplan/`, a regenerated `web/dashboard.html`, a
+> rebuilt `db/config.json`, the `switch` fix in `getDevice()`, the null guard in `updateView()`,
+> the room-tint opacities in `style.css`). Line numbers refer to that working tree, so
+> `git diff`/`git stash` will move them.
 >
 > Keep it current: when you change how a concern works, update the row here, not in `CLAUDE.md`.
 
@@ -32,6 +35,8 @@
 | `keys.txt` | **Gitignored** (line 1). Plain-text copy of the old VAPID keypair. |
 | `webauthn.json` | **Tracked in git.** Registered passkeys per username. |
 | `web/` | Static root, served by `express.static('./web', { index: false, extensions: ['html'] })`. |
+| `web/dashboard.html` | ⚠ **Generated — never hand-edit.** ~11 k lines, ~300 kB, almost all of it the inlined architectural drawing. |
+| `tools/floorplan/` | The generator that produces it, plus its inputs and its own `README.md`. Untracked as of this pass. |
 | `web/public/relative.html`, `web/manifest.json2` | Dead scratch files — but see the ⚠ dead-code row. |
 | `web/script.js` | Dead — entirely commented out, but still `<script src>`-ed by `index.html`. |
 
@@ -89,7 +94,9 @@ Plus any path starting with `/static/` or `/public/`. Everything else needs a va
   allowlisted: `/styles/style.css` and `/scripts/home.js` 401, and `init.js` (which *is*
   allowlisted) fetches `/refresh-key`, gets 401, and does `window.location.href = '/login'`.
   So "the dashboard 401s" is shorthand — the page returns 200 and then bounces. Be precise
-  about this when reasoning about a login bug.
+  about this when reasoning about a login bug. ⚠ Note that the 200 body now contains the
+  **entire architectural drawing of the apartment inlined as SVG** — an anonymous visitor cannot
+  operate anything, but they can read the floorplan out of the HTML.
 - ⚠ **`/public/` is allowlisted as a prefix**, which is what makes the login JS modules
   reachable pre-auth — and also makes every other file under `web/public/` anonymously
   reachable. See the dead-code row.
@@ -242,11 +249,40 @@ Full sequences and data shapes: **`docs/auth.md`**. What matters here:
 The CSP **is now sent** (`res.header('content-security-policy', csp.join('; '))`, line 119). It
 was assembled and then never emitted before.
 
-⚠ **The policy has no `'unsafe-inline'` anywhere, and that is only viable because `web/` has no
-inline `<script>`/`<style>` and no `style=""` attributes.** Removing eruda from `login.html` is
-what made it viable. **Adding any inline script or style will break the page silently** — put it
-in a file under `web/` instead. `default-src 'none'`, plus `base-uri 'none'`,
-`frame-ancestors 'none'`, `form-action 'self'`.
+⚠ **The policy has no `'unsafe-inline'` anywhere, and that is only viable because no page
+reachable in normal use has an inline `<script>`, an inline `<style>` or a `style=""` attribute.**
+Removing eruda from `login.html` is what made it viable, and the generator (below) is what keeps
+it true. **Adding any inline script or style will break the page silently** — put it in a file
+under `web/` instead. `default-src 'none'`, plus `base-uri 'none'`, `frame-ancestors 'none'`,
+`form-action 'self'`. The comment above the CSP in `mqtt-web.js` (~line 100) states this
+accurately; keep it in sync if the policy moves.
+
+The one exception is `web/public/relative.html`, an unreferenced scratch page that has both an
+inline `<script>` and inline styles. It is anonymously reachable (the bypass list passes all of
+`/public/`) and renders inert under this policy. See the dead-code row.
+
+⚠ **`style-src` governs `style=""` attributes too** — there is no separate `style-src-attr` here,
+so the attribute form falls back to `style-src` and a browser refuses it. This is a live
+constraint on the floorplan generator, not a theoretical one: Inkscape writes presentation
+properties into `style=""`, and the first generated `web/dashboard.html` shipped **34** of them
+(the `fill:#808080` wall poché, the door-swing arcs). Those paths carry no `fill` presentation
+attribute as a fallback, so the walls would have rendered black instead of grey.
+
+**Fixed in the generator, not by relaxing the CSP** (`tools/floorplan/generate.mjs`, the
+`PRESENTATION` set ~line 137): every style declaration in the inlined artwork is rewritten into
+the equivalent presentation attribute at build time. `grep -c 'style="' web/dashboard.html` is
+**0**, and the CSP needs no exception, no hash and no `style-src-attr`. Two traps if this is ever
+re-done, both paid for once:
+
+- ⚠ **Convert per element, not with a global regex.** A style declaration *overrides* a
+  presentation attribute of the same name, so an existing `fill="…"` must be **replaced**, not
+  appended. Appending yields `Attribute fill redefined` and the document fails to parse at all.
+- ⚠ **The kept set must include `stop-color` / `stop-opacity`** (the drawing has gradients) and
+  `vector-effect`. Dropping `stop-color` silently breaks the gradients.
+
+8 declarations are still dropped, all cosmetic and Inkscape-only (`font-variation-settings` ×4,
+`-inkscape-stroke` ×4). The generator prints both counts on every run:
+`rewrote 34 style="" attribute(s) as presentation attributes …, dropped 8 non-presentation decl(s)`.
 
 Allowed third-party origins, all of which the pages genuinely use: `alcdn.msauth.net` and
 `ajax.googleapis.com` (script), `login.microsoftonline.com` (connect + frame),
@@ -266,20 +302,67 @@ Allowed third-party origins, all of which the pages genuinely use: `alcdn.msauth
 - `getAuthenticationOptions()` used to sit unused at the bottom of `server-webn.js` and is gone
   in the rewrite.
 
-### Dashboard ⚠ — `web/dashboard.html`, `web/scripts/home.js`, `web/styles/style.css`
+### Dashboard ⚠ — `web/dashboard.html` is **generated**
 
-- One inline SVG floorplan (`viewBox="0 0 342 620"`); each room is a `<g class="room" id="<zone>">`
-  whose `id` **must match a key of `config.zones`** in `db/config.json`, and each
-  `class="item"` element's `id` **must match a device name** in that zone's list.
-- ⚠ **There is a live mismatch right now** (from an uncommitted edit that predates the auth pass,
-  not part of it): `dashboard.html` renames three item ids — `sovrum_byra` → `sovrum_1_byra`,
-  `kontor_hoger` → `sovrum_3_hoger`, `kontor_vanster` → `sovrum_3_vanster` — while
-  `db/config.json` still lists `sovrum_byra.light.mood`, `kontor_hoger.light.mood` and
-  `kontor_vanster.light.mood`. `toggleItem()` matches on the config name, so **those three
-  items are currently dead clicks**. Either the SVG ids or the config must move; ask the
-  operator which way.
-- `updateView()` does `document.getElementById(zone)` per zone and `updateArea()` swallows a miss
-  with `?.`, so a renamed *zone* fails silently too.
+> ⚠ **`web/dashboard.html` is machine-generated. Do not hand-edit it — the next regeneration
+> silently discards your edit.** Change `db/config.json`, `tools/floorplan/lights.json` or
+> `tools/floorplan/geometry.json` and re-run the generator.
+>
+> ```bash
+> node tools/floorplan/generate.mjs          # writes web/dashboard.html
+> node tools/floorplan/generate.mjs --check  # exit 1 if the file is stale
+> ```
+>
+> **`tools/floorplan/README.md` is the pipeline's own documentation** — inputs, the
+> geometry re-extraction from the Inkscape drawing, and the gotchas below in full. Read it
+> before touching the plan; this row does not repeat it.
+
+Why it is generated: the markup and `db/config.json` were two hand-maintained lists that had to
+agree on **four unvalidated naming contracts** (room `id` ⟷ `config.zones` key; `class="item"`
+`id` ⟷ a `.light`/`.switch` device; `id="th-…"` ⟷ a temperature/humidity `.sensor`;
+`class="device"` `id` ⟷ a `…_electric_consumption_w` entry). They had already drifted —
+`id="sovrum_3_hoger"` and `id="sovrum_3_vanster"` matched no config entry, so those two clicks
+were silent no-ops. Deriving the markup from the config makes all four true by construction, and
+the generator warns about what it cannot fix. **`db/config.json` is now the source of truth for
+what appears on the plan.**
+
+The plan itself is the new, larger apartment: 18 rooms, `viewBox="0 0 354 692"`, drawn as
+line-art rather than the old photo. Zone names and the room list are in
+`docs/mqtt-and-devices.md` §5.
+
+Landmines carried by the new plan (each recorded in full in `tools/floorplan/README.md`):
+
+- ⚠ **Room outline polygons live in `<defs>`**, referenced by both the room `<g>` and its
+  `clipPath` via `<use>`. Putting the polygon inside the group it clips is a circular reference:
+  the clip is then silently ignored and glows bleed through walls into neighbouring rooms.
+- ⚠ **Every stroke width, font size and glow radius in `style.css` is in user units relative to
+  `viewBox="0 0 354 692"`** — there is no `vector-effect` anywhere. Changing the generator's
+  `transform.scale` silently rescales the entire UI.
+- ⚠ **Room names must be read from rendered `<text>` content, not `inkscape:label`** when
+  re-extracting geometry: several labels in `lgh_rot.svg` are stale (the room whose text reads
+  `SOV2` carries `inkscape:label="Klk2"`).
+- `home.js` binds clicks with `$(".room").click(...)` / `$(".item").click(...)` at ready —
+  **direct binding, not delegation** — so the generated markup has to be static in the file.
+  Anything injected later is inert.
+- `.temp`, `.name-blocker` and `.device` elements are emitted with `hidden`; `home.js` derives
+  the checkbox state from `$('.temp').hasClass('hidden')`, so one un-hidden element inverts it.
+- ⚠ **The generator rewrites the artwork's `style=""` attributes into presentation attributes**,
+  because the CSP forbids inline styles. If you change how `base.svg` is spliced in, keep that
+  step — details and the two traps are in the **Content Security Policy** row below.
+
+### Dashboard client ⚠ — `web/scripts/home.js`, `web/styles/style.css`
+
+- `updateView()` now **null-guards `document.getElementById(zone)`**. Before that, the four
+  zones with no room drawn for them (`home`, `utomhus`, `moja`, `devices`) threw a TypeError as
+  soon as one of them held a mood/night light, aborting the render for **every later zone**.
+  Fixed; do not re-report. `updateArea()` still swallows a miss with `?.`.
+- The dead `socketKey` cookie branch and its `var` are gone from `home.js` — nothing hands the
+  session key to page JS any more (see the socket.io row).
+- ⚠ **`style.css` room tints are tuned to line-art, not to the old photo.** `.room-outline` is
+  `fill:#000; fill-opacity: 0.06` (was 0.2), nightmode 0.45 (was 0.6), and a new
+  `.room[light="mood"] / [light="night"]` rule paints `#ffcc00` at 0.22. At the old 0.2 the room
+  tint and the grey wall poché were the same grey and the drawing disappeared. If you raise it
+  again, check the walls are still legible.
 - Room click cycles `off → night → mood → on → off` via `getNextStateRoom()`, driven by the
   `moodable` / `nightable` attributes that `updateView()` sets from the `.mood` / `.night`
   suffixes in `db/config.json`.
@@ -294,6 +377,19 @@ Allowed third-party origins, all of which the pages genuinely use: `alcdn.msauth
 ### MQTT ingest + the in-memory device model — `mqtt-web.js` 352–457
 
 See **`docs/mqtt-and-devices.md`** for the topic convention, config format and output shapes.
+
+⚠ **What reaches the broker is decided outside this repo**, by `mqtt_statestream:` in
+`/media/storage/ha/homeassistant/configuration.yaml` — a pure allowlist of the `light`, `switch`
+and `climate` domains plus a handful of entity globs. `sensor` is not an included domain and
+`binary_sensor` is never published. `docs/mqtt-and-devices.md` §2 has the block and the two globs
+in it that match no entity.
+
+⚠ **The HA area registry is unmaintained and must not be trusted** when mapping an entity to a
+room — 117 of 153 devices have no area, and several areas are actively misleading (`Kök` holds
+orangeri and vardagsrum lights; `Dusch` holds the badrum_2 lights; `Kontor` holds
+`light.sovrum_3_tak`). Use the naming convention. ⚠ **Power sensors kept their old names through
+the apartment rename**, so a power sensor's name does not identify its room either — resolve it
+through `device_id`. Full detail and the open gaps: `docs/mqtt-and-devices.md` §8.
 
 ### Device state persistence ⚠ — `exitHandler`, `mqtt-web.js` 662
 
@@ -341,3 +437,14 @@ real; each is verified fixed in the working tree.
 | `app.options('*')` params swapped, response never ended | fixed |
 | `res.sendfile` (deprecated) | `res.sendFile('index.html', { root: './web' })` |
 | Adding a passkey to an existing username was unauthenticated (account takeover) | requires a session as that same user |
+
+## Fixed in the 2026-08-25 new-apartment pass (do not re-report as bugs)
+
+| Was | Now |
+|---|---|
+| `getDevice('<name>')` had no `switch` branch, so a switch declared `.mood` advertised `mood: true` in `device.all` and lost it on the next per-device update | the branch is `d.type === 'light' \|\| d.type === 'switch'`; both paths agree |
+| `updateView()` did an unguarded `document.getElementById(zone)`; a zone with a mood/night light but no room drawn for it threw and aborted the render for every later zone | null-guarded, `if (!ar) return;` |
+| `home.js` still parsed a `socketKey` cookie that nothing sets any more | branch and `var` removed |
+| `dashboard.html` item ids `sovrum_3_hoger` / `sovrum_3_vanster` matched no config entry — two dead clicks | markup is generated from `db/config.json`; the contract cannot drift |
+| `.room-outline` at `fill-opacity: 0.2` made the room tint and the grey wall poché the same grey, so the line-art plan vanished | 0.06 (0.45 in nightmode), with a separate `#ffcc00` @ 0.22 for mood/night |
+| The first generated `dashboard.html` inlined 34 `style=""` attributes from the Inkscape artwork, which `style-src` (no `'unsafe-inline'`) refuses — the grey wall poché would have rendered black | the generator rewrites them as presentation attributes; `grep -c 'style="'` is 0 and the CSP stays strict (see the CSP row) |

@@ -1,312 +1,131 @@
-<!DOCTYPE html>
-<html>
-  <head>
-    <link rel="manifest" href="/manifest.json" />
-    <link rel="shortcut icon" type="image/x-ms-bmp" href="./favicon.ico" />
-    <!--    <link rel="shortcut icon" type="image/png" href="./favicon-192.png" /> -->
-    <link rel="stylesheet" href="./styles/style.css" />
-    <meta name="theme-color" content="#222" />
-    <meta name="theme-color" content="#222" />
-    <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no" />
-    <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:400" />
-    <script src="./init.js"></script>
-    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
-    <script
-      type="text/javascript"
-      src="https://alcdn.msauth.net/browser/2.27.0/js/msal-browser.min.js"
-      integrity="sha384-IlUQkOwOI6mWk8GNIWu8hpPE1sasxSg3gGjZo0dncq6IhHsTlH51mp5mhFYS5po1"
-      crossorigin="anonymous"
-    ></script>
-    <script type="module" src="./scripts/home.js"></script>
-    <!-- <script defer src="./node_modules/@fortawesome/fontawesome-free/js/all.min.js"></script> -->
-    <script src="/socket.io/socket.io.js"></script>
-    <link
-      rel="stylesheet"
-      href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.4.1/css/all.min.css"
-      integrity="sha512-/RUbtHakVMJrg1ILtwvDIceb/cDkk97rWKvfnFSTOmNbytCyEylutDqeEr9adIBye3suD3RfcsXLOLBqYRW4gw=="
-      crossorigin="anonymous"
-      referrerpolicy="no-referrer"
-    />
-    <!-- 
-<script src="//cdn.jsdelivr.net/npm/eruda"></script>
-<script>eruda.init();</script> -->
-  </head>
-  <body>
-    <div class="removed" id="install">Install application</div>
-    <div id="subscribe">Subscribe</div>
-    <div id="push">Push</div>
-    <div class="removed" id="popup"></div>
-    <div class="raw-common removed" id="raw-bg"></div>
-    <div class="raw-common removed" id="raw"></div>
-    <div id="settings">
-      <label><input id="cb-settings" type="checkbox" /><i class="fas fa-cog fa-2x"></i></label>
-      <div id="menu">
-        <label><input id="cb-lock" name="Keep screen on" type="checkbox" /><i class="fas fa-sync-alt fa-2x"></i></label>
-        <label><input id="cb-mood" name="Max brightness" type="checkbox" /><i class="fas fa-sun fa-2x"></i></label>
-        <label><input id="cb-temp" name="Show temperatures" type="checkbox" /><i class="fas fa-thermometer-three-quarters fa-2x"></i></label>
-        <label><input id="cb-devi" name="Show devices" type="checkbox" /><i class="fas fa-plug fa-2x"></i></label>
-        <!--			<label><input id="cb-energy" name="Show power usage" type="checkbox" /><i class="fas fa-bolt fa-2x"></i></label> -->
-        <label><input id="cb-raw" name="Raw messages" type="checkbox" /><i class="fas fa-stream fa-2x"></i></label>
-        <label><input id="cb-nightmode" name="Nightmode" type="checkbox" /><i class="fas fa-moon fa-2x"></i></label>
-      </div>
-    </div>
-    <div id="image-mapper">
-      <svg id="image-mapper-svg" viewBox="0 0 354 692">
-        <defs>
-      <radialGradient id="pf"><stop offset="0%" stop-color="var(--sc)" stop-opacity="1" /><stop offset="100%" stop-color="var(--sc)" stop-opacity="0" /></radialGradient>
-      <radialGradient id="p-vagg" cx="0" cy="0.5"><stop offset="0%" stop-color="var(--sc)" stop-opacity="1" /><stop offset="100%" stop-color="var(--sc)" stop-opacity="0" /></radialGradient>
-      <polygon id="rooms-outline" points="316.1,4.5 320.6,4.5 320.6,413.6 322.5,414 322.9,418.5 350.6,418.9 350.2,676.5 320.6,676.5 320.2,689.3 130.1,689.3 130.5,588.4 120,586.1 112.5,581.6 106.5,574.5 103.1,565.9 103.1,559.9 130.5,559.5 130.1,523.9 123.4,523.5 123.4,550.5 114.7,549.8 107.2,546 100.1,538.9 96.7,532.5 94.9,523.1 83.2,523.1 82.9,475.5 6.4,475.1 6.4,448.5 10.1,447.8 10.1,385.9 12.4,385.5 12.4,319.1 6.4,318.8 7.9,244.9 6.4,152.3 187.9,66 199.9,60 200.2,58.1 204,58.1 316.1,4.5" />
-      <clipPath id="clip"><use xlink:href="#rooms-outline" /></clipPath>
-      <polygon id="bad3-outline" points="154.9,482.6 173.6,482.6 173.6,492.4 177,496.9 180.4,496.9 183.4,494.3 184.1,482.6 199.5,482.6 198,486.4 203.6,486.4 202.1,482.6 213.4,482.6 213.4,553.5 154.9,553.5 173.2,553.1 174.4,550.5 173.2,534 154.9,534.4 154.9,529.1 168.7,528.4 168.7,510.8 154.9,510 154.9,504.4 164.6,502.1 160.1,486 154.9,485.3 154.9,482.6" />
-      <clipPath id="bad3-clip"><use xlink:href="#bad3-outline" /></clipPath>
-      <polygon id="tvatt-outline" points="158.6,427.5 192.4,427.9 192.4,468.4 154.9,468.4 154.9,427.9 158.6,427.5" />
-      <clipPath id="tvatt-clip"><use xlink:href="#tvatt-outline" /></clipPath>
-      <polygon id="hall-outline" points="123.7,355.9 124.1,388.9 173.2,388.9 175.1,397.9 178.9,404.3 186.4,410.6 193.1,413.3 199.5,413.3 199.5,388.9 271.9,388.9 271.9,438.4 235.9,438.4 235.9,431.3 245.6,430.5 244.9,423.4 184.9,423.8 183.4,415.1 178.9,407.6 172.1,402 161.6,398.6 158.6,399.4 158.6,423.8 139.5,423.8 114.4,398.6 114.4,365.3 123.7,355.9" />
-      <clipPath id="hall-clip"><use xlink:href="#hall-outline" /></clipPath>
-      <polygon id="bad2-outline" points="163.1,331.1 174.7,331.1 173.2,334.9 178.9,334.9 177.4,331.1 193.9,331.1 193.9,340.1 198.4,345.8 202.5,344.6 204.4,341.6 204.7,331.1 213.7,331.1 213.7,362.3 199.9,362.6 199.9,381 213.7,381.4 213.7,384.8 163.1,384.8 168.7,374.6 166.9,371.6 163.1,370.5 163.1,331.1" />
-      <clipPath id="bad2-clip"><use xlink:href="#bad2-outline" /></clipPath>
-      <polygon id="bad1-outline" points="153,250.1 202.9,250.1 202.9,321 201,321 199.9,300 153,300 153,292.5 162,292.5 167.2,288.4 166.5,284.3 163.9,282.4 153,281.6 153,272.6 166.9,271.9 166.9,254.3 153,253.5 153,250.1" />
-      <clipPath id="bad1-clip"><use xlink:href="#bad1-outline" /></clipPath>
-      <polygon id="entre2-outline" points="135.7,557.6 183.4,557.6 184.9,566.3 189,573.4 196.1,579.4 207,582.8 209.2,582.4 209.2,558.4 227.6,576.8 227.6,582.8 216.7,593.6 213.4,594 213.4,611.6 211.9,593.6 199.5,593.6 184.5,590.6 163.9,594 163.9,611.6 135.7,611.6 135.7,557.6" />
-      <clipPath id="entre2-clip"><use xlink:href="#entre2-outline" /></clipPath>
-      <polygon id="entre1-outline" points="98.6,365.3 114,365.3 114,398.6 139.1,423.8 123.7,424.1 124.1,445.1 133.1,445.9 133.1,468.4 123.7,468.8 123.7,475.5 129.7,475.9 129.7,517.9 86.2,517.9 85.1,385.9 78.4,385.5 98.6,365.3" />
-      <clipPath id="entre1-clip"><use xlink:href="#entre1-outline" /></clipPath>
-      <polygon id="klk2-outline" points="154.9,615.8 213.4,615.8 213.4,624.4 217.1,624.8 217.1,639.8 214.9,639.8 214.9,647.3 213.4,647.6 213.4,673.9 212.2,656.3 194.6,652.9 175.9,655.9 175.1,673.9 170.6,673.9 170.6,653.6 154.9,653.3 154.9,615.8" />
-      <clipPath id="klk2-clip"><use xlink:href="#klk2-outline" /></clipPath>
-      <polygon id="kok-outline" points="235.9,438.8 271.9,438.8 272.6,447.8 337.9,447.4 338.2,570.8 251.6,570.8 245.6,576.8 228,576.8 209.2,558 235.5,557.6 241.5,541.9 240.4,538.9 235.9,537.4 235.9,438.8" />
-      <clipPath id="kok-clip"><use xlink:href="#kok-outline" /></clipPath>
-      <polygon id="sov2-outline" points="207,184.1 307.9,184.1 307.9,285.8 244.9,285.8 233.2,287.6 207,286.1 207,244.5 216,243 222.4,239.3 229.1,231.4 232.1,221.6 231.7,218.6 207,218.6 207,184.1" />
-      <clipPath id="sov2-clip"><use xlink:href="#sov2-outline" /></clipPath>
-      <polygon id="klk1-outline" points="307.5,22.5 307.9,87 212.2,87 212.2,67.9 307.5,22.5" />
-      <clipPath id="klk1-clip"><use xlink:href="#klk1-outline" /></clipPath>
-      <polygon id="sov3-outline" points="219.7,288 241.9,288.4 242.2,289.9 307.9,289.9 307.9,423.4 276.4,423.4 276.4,385.5 245.6,384.8 241.1,370.9 230.2,361.9 219.4,360.4 219.4,384.8 217.9,384.8 217.9,289.9 219.7,288" />
-      <clipPath id="sov3-clip"><use xlink:href="#sov3-outline" /></clipPath>
-      <polygon id="sov1-outline" points="208.1,69.8 208.5,91.1 238.5,91.1 242.6,104.6 248.6,111 255.4,114.8 264.7,115.5 264.7,91.1 268.5,91.1 268.5,180 203.2,180 202.9,207.4 194.2,207.4 192.4,198 186.4,189.4 179.2,184.5 168.7,182.3 166.9,207.4 166.9,89.6 208.1,69.8" />
-      <clipPath id="sov1-clip"><use xlink:href="#sov1-outline" /></clipPath>
-      <polygon id="vardagsrum-outline" points="162.4,91.5 162.7,211.1 202.9,211.5 202.9,246 201.4,246.4 201.4,221.6 198.4,221.3 188.6,224.3 180.7,231 176.6,238.5 175.5,246.4 124.5,246.4 124.1,355.5 114.4,364.9 98.6,364.9 78,385.5 20.2,386.6 18.7,385.5 19.1,159.8 19.1,192 28.9,192.4 29.2,166.1 74.6,144.8 75,142.5 70.9,135 162.4,91.5" />
-      <clipPath id="vardagsrum-clip"><use xlink:href="#vardagsrum-outline" /></clipPath>
-      <polygon id="loggia-outline" points="281.2,100.5 315,100.5 315,170.3 281.2,170.3 281.2,149.3 294.7,143.3 301.1,135.8 304.5,126.4 304.1,121.5 281.2,121.5 281.2,100.5" />
-      <clipPath id="loggia-clip"><use xlink:href="#loggia-outline" /></clipPath>
-      <polygon id="balkong-outline" points="321.7,606 349.5,606.4 349.5,675.8 320.6,675.8 321.7,606" />
-      <clipPath id="balkong-clip"><use xlink:href="#balkong-outline" /></clipPath>
-      <polygon id="orangeri-outline" points="51.7,387.8 82.5,387.8 82.5,447.4 81,450.4 49.5,450.4 49.1,468.4 18.7,468.4 18.7,388.5 51.7,387.8" />
-      <clipPath id="orangeri-clip"><use xlink:href="#orangeri-outline" /></clipPath>
-      <polygon id="sov4-outline" points="251.6,571.1 337.9,571.1 337.9,593.6 260.2,594 260.2,597 262.5,597.8 307.9,597.8 308.2,615.4 294.7,615.8 295.9,622.1 298.9,626.6 307.5,631.5 299.2,634.9 293.2,640.1 287.2,653.3 287.6,657.8 308.2,657.8 307.9,682.1 217.5,682.1 217.5,647.6 216,647.3 216,640.1 217.5,639.8 217.5,597.8 235.5,597.8 237.7,597 237.7,594 217.1,593.6 228,582.8 228,577.1 245.6,577.1 251.6,571.1" />
-      <clipPath id="sov4-clip"><use xlink:href="#sov4-outline" /></clipPath>
-        </defs>
-        <g class="room" id="bad3" clip-path="url(#bad3-clip)">
-          <use class="room-outline" xlink:href="#bad3-outline" />
-        </g>
-        <g class="room" id="tvatt" clip-path="url(#tvatt-clip)">
-          <use class="room-outline" xlink:href="#tvatt-outline" />
-        </g>
-        <g class="room" id="hall" clip-path="url(#hall-clip)">
-          <use class="room-outline" xlink:href="#hall-outline" />
-          <rect class="name-blocker hidden" x="207.9" y="395.7" width="46" height="15" />
-          <text class="temp hidden" id="th-hall_temperature" x="211.9" y="407.7" />
-          <rect class="name-blocker hidden" x="207.9" y="411.7" width="46" height="15" />
-          <text class="temp hidden" id="th-hall_humidity" x="211.9" y="423.7" />
-        </g>
-        <g class="room" id="bad2" clip-path="url(#bad2-clip)">
-          <use class="room-outline" xlink:href="#bad2-outline" />
-          <circle id="badrum_2_tak" class="mood item" cx="176.5" cy="371.1" r="34" fill="url(#pf)" />
-        </g>
-        <g class="room" id="bad1" clip-path="url(#bad1-clip)">
-          <use class="room-outline" xlink:href="#bad1-outline" />
-          <circle id="badrum_1_tak" class="mood item" cx="176.4" cy="277.6" r="34" fill="url(#pf)" />
-        </g>
-        <g class="room" id="entre2" clip-path="url(#entre2-clip)">
-          <use class="room-outline" xlink:href="#entre2-outline" />
-        </g>
-        <g class="room" id="entre1" clip-path="url(#entre1-clip)">
-          <use class="room-outline" xlink:href="#entre1-outline" />
-        </g>
-        <g class="room" id="klk2" clip-path="url(#klk2-clip)">
-          <use class="room-outline" xlink:href="#klk2-outline" />
-        </g>
-        <g class="room" id="kok" clip-path="url(#kok-clip)">
-          <use class="room-outline" xlink:href="#kok-outline" />
-          <circle id="koksbank" class="mood item" cx="245.9" cy="485.3" r="34" fill="url(#pf)" />
-          <circle id="koksbord" class="mood item" cx="263.9" cy="503.3" r="34" fill="url(#pf)" />
-          <circle id="kokso" class="mood item" cx="245.9" cy="521.3" r="34" fill="url(#pf)" />
-          <circle id="golvlampa_kok" class="mood item" cx="227.9" cy="503.3" r="34" fill="url(#pf)" />
-        </g>
-        <g class="room" id="sov2" clip-path="url(#sov2-clip)">
-          <use class="room-outline" xlink:href="#sov2-outline" />
-          <rect class="name-blocker hidden" x="252.10000000000002" y="222.9" width="46" height="15" />
-          <text class="temp hidden" id="th-sovrum_2_temperature" x="256.1" y="234.9" />
-          <rect class="name-blocker hidden" x="252.10000000000002" y="238.9" width="46" height="15" />
-          <text class="temp hidden" id="th-sovrum_2_humidity" x="256.1" y="250.9" />
-        </g>
-        <g class="room" id="klk1" clip-path="url(#klk1-clip)">
-          <use class="room-outline" xlink:href="#klk1-outline" />
-          <rect class="name-blocker hidden" x="260.9" y="62.900000000000006" width="46" height="15" />
-          <text class="temp hidden" id="th-garderob_1_temperature" x="264.9" y="74.9" />
-          <rect class="name-blocker hidden" x="260.9" y="78.9" width="46" height="15" />
-          <text class="temp hidden" id="th-garderob_1_humidity" x="264.9" y="90.9" />
-        </g>
-        <g class="room" id="sov3" clip-path="url(#sov3-clip)">
-          <use class="room-outline" xlink:href="#sov3-outline" />
-          <rect class="name-blocker hidden" x="253.7" y="327.3" width="46" height="15" />
-          <text class="temp hidden" id="th-sovrum_3_temperature" x="257.7" y="339.3" />
-          <rect class="name-blocker hidden" x="253.7" y="343.3" width="46" height="15" />
-          <text class="temp hidden" id="th-sovrum_3_humidity" x="257.7" y="355.3" />
-        </g>
-        <g class="room" id="sov1" clip-path="url(#sov1-clip)">
-          <use class="room-outline" xlink:href="#sov1-outline" />
-          <circle id="sovrum_1_byra" class="mood item" cx="218.1" cy="121.6" r="34" fill="url(#pf)" />
-          <circle id="sang_hoger" class="mood item" cx="233.7" cy="148.6" r="34" fill="url(#pf)" />
-          <circle id="sang_vanster" class="mood item" cx="202.5" cy="148.6" r="34" fill="url(#pf)" />
-          <rect class="name-blocker hidden" x="214.1" y="127.69999999999999" width="46" height="15" />
-          <text class="temp hidden" id="th-sovrum_temperature" x="218.1" y="139.7" />
-          <rect class="name-blocker hidden" x="214.1" y="143.7" width="46" height="15" />
-          <text class="temp hidden" id="th-sovrum_humidity" x="218.1" y="155.7" />
-        </g>
-        <g class="room" id="vardagsrum" clip-path="url(#vardagsrum-clip)">
-          <use class="room-outline" xlink:href="#vardagsrum-outline" />
-          <circle id="vardagsrum_vaggar" class="mood item" cx="59.3" cy="250.3" r="34" fill="url(#pf)" />
-          <circle id="vardagsrum_linje" class="mood item" cx="72" cy="255.6" r="34" fill="url(#pf)" />
-          <circle id="vardagsrum_tak_lampa" class="mood item" cx="77.3" cy="268.3" r="34" fill="url(#pf)" />
-          <circle id="taklampa_ovan_matbord" class="mood item" cx="72" cy="281" r="34" fill="url(#pf)" />
-          <circle id="golvlampa" class="mood item" cx="59.3" cy="286.3" r="34" fill="url(#pf)" />
-          <circle id="v1" class="mood item" cx="46.6" cy="281" r="34" fill="url(#pf)" />
-          <circle id="v2" class="mood item" cx="41.3" cy="268.3" r="34" fill="url(#pf)" />
-          <circle id="skapbelysning" class="night item" cx="46.6" cy="255.6" r="34" fill="url(#pf)" />
-          <rect class="name-blocker hidden" x="55.3" y="256.3" width="46" height="15" />
-          <text class="temp hidden" id="th-vardagsrum_temperature" x="59.3" y="268.3" />
-          <rect class="name-blocker hidden" x="55.3" y="272.3" width="46" height="15" />
-          <text class="temp hidden" id="th-vardagsrum_humidity" x="59.3" y="284.3" />
-        </g>
-        <g class="room" id="loggia" clip-path="url(#loggia-clip)">
-          <use class="room-outline" xlink:href="#loggia-outline" />
-        </g>
-        <g class="room" id="balkong" clip-path="url(#balkong-clip)">
-          <use class="room-outline" xlink:href="#balkong-outline" />
-        </g>
-        <g class="room" id="orangeri" clip-path="url(#orangeri-clip)">
-          <use class="room-outline" xlink:href="#orangeri-outline" />
-          <circle id="bordslampa_orangeri" class="night item" cx="38.2" cy="424.8" r="34" fill="url(#pf)" />
-          <rect class="name-blocker hidden" x="34.2" y="412.8" width="46" height="15" />
-          <text class="temp hidden" id="th-orangeri_temperature" x="38.2" y="424.8" />
-          <rect class="name-blocker hidden" x="34.2" y="428.8" width="46" height="15" />
-          <text class="temp hidden" id="th-orangeri_humidity" x="38.2" y="440.8" />
-        </g>
-        <g class="room" id="sov4" clip-path="url(#sov4-clip)">
-          <use class="room-outline" xlink:href="#sov4-outline" />
-          <circle id="lampa_mette" class="mood item" cx="258.3" cy="620.5" r="34" fill="url(#pf)" />
-          <circle id="slinga_mette" class="night item" cx="258.3" cy="656.5" r="34" fill="url(#pf)" />
-        </g>
-        <g id="base-plan" transform="scale(3) translate(-45.88,-33)" clip-path="url(#clip)" pointer-events="none">
-<g
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!-- Created with Inkscape (http://www.inkscape.org/) -->
+
+<svg
+   width="210mm"
+   height="297mm"
+   viewBox="0 0 210 297"
+   version="1.1"
+  
+  
+  
+   xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
+   xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
+   xmlns="http://www.w3.org/2000/svg"
+   xmlns:svg="http://www.w3.org/2000/svg">
+  
+  <defs
+     />
+  <g
     
     
     >
     <path
       
        d="m 152.64,34.13 -40.22,19.11 -0.27,0.13 -0.93,0.44 -0.28,0.13 -0.42,0.21 0.42,0.91 0.28,-0.15 0.93,1.97 0.27,0.57 40.22,-19.13 z"
-        display="inline" fill="#808080" fill-opacity="1" stroke-width="0.352778"/>
+       style="display:inline;fill:#808080;fill-opacity:1;stroke-width:0.352778" />
     <path
       
        d="m 162.65,172.69 h -13.8 v 3.81 h 13.8 z"
-        display="inline" fill="#808080" fill-opacity="1" stroke-width="0.352778"/>
+       style="display:inline;fill:#808080;fill-opacity:1;stroke-width:0.352778" />
     <path
       
        d="m 152.64,162.72 h -0.99 v 0.3 h -2.79 v 9.67 h 2.79 0.99 z"
-        display="inline" fill="#808080" fill-opacity="1" stroke-width="0.352778"/>
+       style="display:inline;fill:#808080;fill-opacity:1;stroke-width:0.352778" />
     <path
       
-      
-       d="m 148.85,174.37 v 2.22 h -12.11 v -2.22 z"  display="inline" fill="#808080" fill-opacity="1" stroke-width="0.264583"/>
+       style="display:inline;fill:#808080;fill-opacity:1;stroke-width:0.264583"
+       d="m 148.85,174.37 v 2.22 h -12.11 v -2.22 z" />
     <path
       
        d="m 152.64,119.16 h -0.4 -0.59 v 0.36 h -2.81 v 26.43 h 2.81 v 0.28 h 0.59 v -9.67 h 0.4 z"
-        display="inline" fill="#808080" fill-opacity="1" stroke-width="0.352778"/>
+       style="display:inline;fill:#808080;fill-opacity:1;stroke-width:0.352778" />
     <path
       
        d="m 162.65,176.5 h -1.02 -2.79 v 8.15 h 2.79 v 0.32 h 1.02 z"
-        display="inline" fill="#808080" fill-opacity="1" stroke-width="0.352778"/>
+       style="display:inline;fill:#808080;fill-opacity:1;stroke-width:0.352778" />
     <path
       
        d="m 162.65,201.44 h -1.02 v 0.3 h -2.79 v 9.55 h 2.79 v 0.3 h 1.02 z"
-        display="inline" fill="#808080" fill-opacity="1" stroke-width="0.352778"/>
+       style="display:inline;fill:#808080;fill-opacity:1;stroke-width:0.352778" />
     <path
       
        d="m 162.65,228.06 h -0.4 v -4.85 h -0.61 v 0.3 h -2.79 v 7.62 h -0.4 v 2.79 h -0.3 v 0.99 h 0.3 0.4 2.79 0.61 0.4 z"
-        display="inline" fill="#808080" fill-opacity="1" stroke-width="0.352778"/>
+       style="display:inline;fill:#808080;fill-opacity:1;stroke-width:0.352778" />
     <path
       
        d="m 152.93,233.93 h -0.3 v -2.79 h -3.79 v 3.79 2.98 h 3.79 v -2.98 h 0.3 z"
-        display="inline" fill="#808080" fill-opacity="1" stroke-width="0.352778"/>
+       style="display:inline;fill:#808080;fill-opacity:1;stroke-width:0.352778" />
     <rect
-      
+       style="display:inline;fill:#808080;fill-opacity:1;stroke-width:0.19653"
       
        width="3.786458"
        height="10.243408"
        x="148.85603"
-       y="252.50351"  display="inline" fill="#808080" fill-opacity="1" stroke-width="0.19653"/>
+       y="252.50351" />
     <rect
-      
+       style="display:inline;fill:#808080;fill-opacity:1;stroke-width:0.264584"
       
        width="2.0462821"
        height="59.418766"
        x="260.71463"
        y="-148.86588"
-       transform="rotate(90)"  display="inline" fill="#808080" fill-opacity="1" stroke-width="0.264584"/>
+       transform="rotate(90)" />
     <path
       
-      
-       d="m 127.71,174.37 v 2.25 h -11.34 v -2.25 z"  display="inline" fill="#808080" fill-opacity="1" stroke-width="0.264583"/>
+       style="display:inline;fill:#808080;fill-opacity:1;stroke-width:0.264583"
+       d="m 127.71,174.37 v 2.25 h -11.34 v -2.25 z" />
     <path
       
-      
-       d="m 118.4,176.62 v 12.82 h -2.03 v -12.82 z"  display="inline" fill="#808080" fill-opacity="1" stroke-width="0.264583"/>
+       style="display:inline;fill:#808080;fill-opacity:1;stroke-width:0.264583"
+       d="m 118.4,176.62 v 12.82 h -2.03 v -12.82 z" />
     <path
       
        d="M 118.3,189.41 H 87.44 v 2.01 h 30.86 z"
-        display="inline" fill="#808080" fill-opacity="1" stroke-width="0.352778"/>
+       style="display:inline;fill:#808080;fill-opacity:1;stroke-width:0.352778" />
     <path
       
        d="m 52.05,182.87 h -2.79 v -0.3 h -1.02 v 8.85 h 1.02 2.79 z"
-        display="inline" fill="#808080" fill-opacity="1" stroke-width="0.352778"/>
+       style="display:inline;fill:#808080;fill-opacity:1;stroke-width:0.352778" />
     <path
       
        d="m 74.45,189.41 h -12 -10.39 v 2.01 h 10.39 12 z"
-        display="inline" fill="#808080" fill-opacity="1" stroke-width="0.352778"/>
+       style="display:inline;fill:#808080;fill-opacity:1;stroke-width:0.352778" />
     <path
       
        d="m 70.76,77.27 -0.93,-1.97 -0.25,-0.57 0.25,-0.13 -0.25,-0.57 -0.17,-0.34 -17.36,8.26 v 4.21 l 17.36,-8.25 0.17,-0.06 0.25,-0.13 z"
-        display="inline" fill="#808080" fill-opacity="1" stroke-width="0.352778"/>
+       style="display:inline;fill:#808080;fill-opacity:1;stroke-width:0.352778" />
     <path
       
        d="m 52.05,115.12 h -2.79 v -0.3 h -0.61 v 7.26 h -0.4 v 17.4 h 0.4 0.61 v -0.3 h 2.79 z"
-        display="inline" fill="#808080" fill-opacity="1" stroke-width="0.352778"/>
+       style="display:inline;fill:#808080;fill-opacity:1;stroke-width:0.352778" />
     <path
       
        d="m 52.05,81.95 -2.79,1.33 -1.02,0.49 v 17 h 1.02 v -0.3 h 2.79 z"
-        display="inline" fill="#808080" fill-opacity="1" stroke-width="0.352778"/>
+       style="display:inline;fill:#808080;fill-opacity:1;stroke-width:0.352778" />
     <path
       
        d="m 103.85,61.55 -0.93,-1.97 -0.26,-0.53 -0.02,-0.04 h 0.02 l 0.26,-0.13 -0.26,-0.53 h -0.02 l -12.45,5.93 -1.21,0.57 -0.28,0.13 -0.25,0.11 0.25,0.55 0.28,-0.13 1.21,2.52 12.45,-5.91 0.02,-0.02 0.26,-0.11 z"
-        display="inline" fill="#808080" fill-opacity="1" stroke-width="0.352778"/>
+       style="display:inline;fill:#808080;fill-opacity:1;stroke-width:0.352778" />
     <path
       
        d="m 148.85,62.29 h -12.36 -0.85 v 4.09 6.84 h 0.85 2.96 V 66.37 h 9.4 z"
-        display="inline" fill="#808080" fill-opacity="1" stroke-width="0.352778"/>
+       style="display:inline;fill:#808080;fill-opacity:1;stroke-width:0.352778" />
     <path
       
        d="m 139.75,90.12 h -0.3 v -6.92 h -3.81 v 6.92 4.11 h 3.81 v -3.11 h 0.3 z"
-        display="inline" fill="#808080" fill-opacity="1" stroke-width="0.352778"/>
+       style="display:inline;fill:#808080;fill-opacity:1;stroke-width:0.352778" />
     <path
       
        d="m 152.64,90.12 h -3.79 -0.4 -0.3 v 0.99 h 0.3 v 3.11 h 0.4 v 1.04 11.96 h 2.79 v 0.3 h 0.99 V 95.26 Z"
-        display="inline" fill="#808080" fill-opacity="1" stroke-width="0.352778"/>
+       style="display:inline;fill:#808080;fill-opacity:1;stroke-width:0.352778" />
     <path
       
        d="m 152.64,38.33 -3.79,1.82 V 66.37 h 3.79 z"
+       style="display:inline;fill:#808080;fill-opacity:1;stroke-width:0.352778"
       
       
-      
-        display="inline" fill="#808080" fill-opacity="1" stroke-width="0.352778"/>
+       />
     <path
        fill="none"
        stroke-width="0.254"
@@ -2575,49 +2394,49 @@
        d="m 70.45,183.42 -3.83,-1.19"
        />
     <path
-      
-      
-      
-      
-      
-      
-      
+       fill="none"
+       stroke-width="0.540002"
+       stroke-linecap="round"
+       stroke-linejoin="round"
+       stroke="#000000"
+       stroke-opacity="1"
+       stroke-miterlimit="10"
        d="m 116.72,63.24 h 8.46"
       
-        vector-effect="none" fill="none" fill-opacity="1" stroke="#000000" stroke-width="0.190501" stroke-linecap="round" stroke-linejoin="round" stroke-miterlimit="10" stroke-dasharray="none" stroke-dashoffset="0" stroke-opacity="1" stop-color="#000000"/>
+       style="font-variation-settings:normal;vector-effect:none;fill:none;fill-opacity:1;stroke:#000000;stroke-width:0.190501;stroke-linecap:round;stroke-linejoin:round;stroke-miterlimit:10;stroke-dasharray:none;stroke-dashoffset:0;stroke-opacity:1;-inkscape-stroke:none;stop-color:#000000" />
     <path
-      
-      
-      
-      
-      
-      
-      
+       fill="none"
+       stroke-width="0.540002"
+       stroke-linecap="round"
+       stroke-linejoin="round"
+       stroke="#000000"
+       stroke-opacity="1"
+       stroke-miterlimit="10"
        d="m 116.72,62.28 h 8.46"
       
-        vector-effect="none" fill="none" fill-opacity="1" stroke="#000000" stroke-width="0.190501" stroke-linecap="round" stroke-linejoin="round" stroke-miterlimit="10" stroke-dasharray="none" stroke-dashoffset="0" stroke-opacity="1" stop-color="#000000"/>
+       style="font-variation-settings:normal;vector-effect:none;fill:none;fill-opacity:1;stroke:#000000;stroke-width:0.190501;stroke-linecap:round;stroke-linejoin:round;stroke-miterlimit:10;stroke-dasharray:none;stroke-dashoffset:0;stroke-opacity:1;-inkscape-stroke:none;stop-color:#000000" />
     <path
-      
-      
-      
-      
-      
-      
-      
+       fill="none"
+       stroke-width="0.54"
+       stroke-linecap="round"
+       stroke-linejoin="round"
+       stroke="#000000"
+       stroke-opacity="1"
+       stroke-miterlimit="10"
        d="m 134.34,62.29 h 1.26"
       
-        vector-effect="none" fill="none" fill-opacity="1" stroke="#000000" stroke-width="0.1905" stroke-linecap="round" stroke-linejoin="round" stroke-miterlimit="10" stroke-dasharray="none" stroke-dashoffset="0" stroke-opacity="1" stop-color="#000000"/>
+       style="font-variation-settings:normal;vector-effect:none;fill:none;fill-opacity:1;stroke:#000000;stroke-width:0.1905;stroke-linecap:round;stroke-linejoin:round;stroke-miterlimit:10;stroke-dasharray:none;stroke-dashoffset:0;stroke-opacity:1;-inkscape-stroke:none;stop-color:#000000" />
     <path
-      
-      
-      
-      
-      
-      
-      
+       fill="none"
+       stroke-width="0.54"
+       stroke-linecap="round"
+       stroke-linejoin="round"
+       stroke="#000000"
+       stroke-opacity="1"
+       stroke-miterlimit="10"
        d="m 134.34,63.23 h 1.26"
       
-        vector-effect="none" fill="none" fill-opacity="1" stroke="#000000" stroke-width="0.1905" stroke-linecap="round" stroke-linejoin="round" stroke-miterlimit="10" stroke-dasharray="none" stroke-dashoffset="0" stroke-opacity="1" stop-color="#000000"/>
+       style="font-variation-settings:normal;vector-effect:none;fill:none;fill-opacity:1;stroke:#000000;stroke-width:0.1905;stroke-linecap:round;stroke-linejoin:round;stroke-miterlimit:10;stroke-dasharray:none;stroke-dashoffset:0;stroke-opacity:1;-inkscape-stroke:none;stop-color:#000000" />
     <path
        fill="none"
        stroke-width="0.1905"
@@ -4554,14 +4373,14 @@
        fill-opacity="1"
        d="m 48.58,114.82 0.06,-14.05 v 14.05"
       
-        stroke-width="0.352778"/>
+       style="stroke-width:0.352778" />
     <path
        fill-rule="evenodd"
        fill="#000000"
        fill-opacity="1"
        d="m 48.58,114.82 v -14.05 h 0.06"
       
-        stroke-width="0.352778"/>
+       style="stroke-width:0.352778" />
     <path
        fill="none"
        stroke-width="0.127"
@@ -8417,7 +8236,7 @@
       
        d="m 70.93,81.05 -1.31,-2.81 -17.19,8.17 V 97.07 h 3.09 v -8.71 z"
       
-        fill="#ffffff" fill-opacity="1" stroke="#000000" stroke-width="0.0846667" stroke-dasharray="none" stroke-opacity="1"/>
+       style="fill:#ffffff;fill-opacity:1;stroke:#000000;stroke-width:0.0846667;stroke-dasharray:none;stroke-opacity:1" />
     <g
       
        transform="matrix(0,0.35277777,-0.35277777,0,204.66252,22.027583)">
@@ -9201,10 +9020,10 @@
          />
     </g>
     <path
-      
+       style="fill:none;fill-opacity:1;stroke:#000000;stroke-width:0.0846667;stroke-dasharray:none;stroke-opacity:1"
        d="m 69.91,79.85 -15.9,7.53 v 9.17"
       
-        fill="none" fill-opacity="1" stroke="#000000" stroke-width="0.0846667" stroke-dasharray="none" stroke-opacity="1"/>
+       />
     <g
       
        transform="matrix(0,0.35277777,-0.35277777,0,209.42502,-2.8432504)">
@@ -10744,7 +10563,7 @@
          />
       <g
         
-         display="inline">
+         style="display:inline">
         <path
            fill="none"
            stroke-width="0.36"
@@ -11018,7 +10837,7 @@
       </g>
     </g>
     <path
-      
+       fill="none"
        stroke-width="0.254"
        stroke-linecap="round"
        stroke-linejoin="round"
@@ -11027,7 +10846,7 @@
        stroke-miterlimit="10"
        d="M 148.85,40.15 V 62.29"
       
-        fill="#000000" fill-opacity="0.410866"/>
+       style="fill:#000000;fill-opacity:0.410866" />
     <path
        fill="none"
        stroke-width="0.1905"
@@ -11142,20 +10961,4 @@
     
     
   </g>
-        </g>
-        <g id="border-fade" pointer-events="none"><use xlink:href="#rooms-outline" /></g>
-        <g id="appliances">
-          <rect class="device hidden" id="torktumlare" x="187.7" y="445.6" width="22" height="22" />
-          <rect class="device hidden" id="tvattmaskin" x="187.1" y="428" width="22" height="22" />
-          <rect class="device hidden" id="diskmaskin" x="211.1" y="463.9" width="22" height="22" />
-          <rect class="device hidden" id="frys" x="317.1" y="426.7" width="22" height="22" />
-          <rect class="device hidden" id="kylskap" x="298.8" y="426.8" width="22" height="22" />
-        </g>
-        <g transform="translate(12, 682)">
-          <text class="temp hidden" id="info-senaste_aktivitet" default="Senaste aktivitet: " x="0" y="0" />
-        </g>
-      </svg>
-    </div>
-    <script src="./scripts/sw-init.js"></script>
-  </body>
-</html>
+</svg>

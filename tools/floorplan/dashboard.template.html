@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <link rel="manifest" href="/manifest.json" />
+    <link rel="shortcut icon" type="image/x-ms-bmp" href="./favicon.ico" />
+    <!--    <link rel="shortcut icon" type="image/png" href="./favicon-192.png" /> -->
+    <link rel="stylesheet" href="./styles/style.css" />
+    <meta name="theme-color" content="#222" />
+    <meta name="theme-color" content="#222" />
+    <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no" />
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:400" />
+    <script src="./init.js"></script>
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
+    <script
+      type="text/javascript"
+      src="https://alcdn.msauth.net/browser/2.27.0/js/msal-browser.min.js"
+      integrity="sha384-IlUQkOwOI6mWk8GNIWu8hpPE1sasxSg3gGjZo0dncq6IhHsTlH51mp5mhFYS5po1"
+      crossorigin="anonymous"
+    ></script>
+    <script type="module" src="./scripts/home.js"></script>
+    <!-- <script defer src="./node_modules/@fortawesome/fontawesome-free/js/all.min.js"></script> -->
+    <script src="/socket.io/socket.io.js"></script>
+    <link
+      rel="stylesheet"
+      href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.4.1/css/all.min.css"
+      integrity="sha512-/RUbtHakVMJrg1ILtwvDIceb/cDkk97rWKvfnFSTOmNbytCyEylutDqeEr9adIBye3suD3RfcsXLOLBqYRW4gw=="
+      crossorigin="anonymous"
+      referrerpolicy="no-referrer"
+    />
+    <!-- 
+<script src="//cdn.jsdelivr.net/npm/eruda"></script>
+<script>eruda.init();</script> -->
+  </head>
+  <body>
+    <div class="removed" id="install">Install application</div>
+    <div id="subscribe">Subscribe</div>
+    <div id="push">Push</div>
+    <div class="removed" id="popup"></div>
+    <div class="raw-common removed" id="raw-bg"></div>
+    <div class="raw-common removed" id="raw"></div>
+    <div id="settings">
+      <label><input id="cb-settings" type="checkbox" /><i class="fas fa-cog fa-2x"></i></label>
+      <div id="menu">
+        <label><input id="cb-lock" name="Keep screen on" type="checkbox" /><i class="fas fa-sync-alt fa-2x"></i></label>
+        <label><input id="cb-mood" name="Max brightness" type="checkbox" /><i class="fas fa-sun fa-2x"></i></label>
+        <label><input id="cb-temp" name="Show temperatures" type="checkbox" /><i class="fas fa-thermometer-three-quarters fa-2x"></i></label>
+        <label><input id="cb-devi" name="Show devices" type="checkbox" /><i class="fas fa-plug fa-2x"></i></label>
+        <!--			<label><input id="cb-energy" name="Show power usage" type="checkbox" /><i class="fas fa-bolt fa-2x"></i></label> -->
+        <label><input id="cb-raw" name="Raw messages" type="checkbox" /><i class="fas fa-stream fa-2x"></i></label>
+        <label><input id="cb-nightmode" name="Nightmode" type="checkbox" /><i class="fas fa-moon fa-2x"></i></label>
+      </div>
+    </div>
+    <div id="image-mapper">
+<!--FLOORPLAN-->
+    </div>
+    <script src="./scripts/sw-init.js"></script>
+  </body>
+</html>
