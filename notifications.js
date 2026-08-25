@@ -1,11 +1,24 @@
 import webpush from 'web-push';
-const vapidDetails = {
-    publicKey: 'BF48UEbLK-xWlzN4CIqFBvbwErKCzne1J2qZyCcH5UDwyDBM9ibMwkPwXk9dhJeFz4VnvhIbhKHB55iw8Oa-Qlk',
-    privateKey: 'WRrqxsopvmZ_asI7X5QKMabOxdviCeHctddbK1IzMEE',
-    subject: 'mailto:webpush@xcds.net'
-};
+
+//Secrets live in .env (gitignored), never in this file.
+//Read lazily: ESM hoists imports, so this module is evaluated before the
+//entry point's loadEnv() call has had a chance to run.
+function getVapidDetails() {
+    const details = {
+        publicKey: process.env.VAPID_PUBLIC_KEY,
+        privateKey: process.env.VAPID_PRIVATE_KEY,
+        subject: process.env.VAPID_SUBJECT
+    };
+    if (!details.publicKey || !details.privateKey || !details.subject) return undefined;
+    return details;
+}
 
 export function sendNotifications(users) {
+    const vapidDetails = getVapidDetails();
+    if (!vapidDetails) {
+        console.log('Push disabled: VAPID_* missing from .env');
+        return;
+    }
 
     // Create the notification content.
     const notification = JSON.stringify({

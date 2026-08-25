@@ -1,3 +1,9 @@
+//Secrets come from .env (gitignored). Must run before any module that reads
+//process.env at import time (notifications.js does).
+//Values containing '#' must be QUOTED in .env or they are truncated at the '#'.
+import { loadEnv } from './env.js';
+loadEnv();
+
 // import { BearerStrategy } from 'passport-azure-ad'
 import passportAzureAd from 'passport-azure-ad';
 const { BearerStrategy } = passportAzureAd;
@@ -83,22 +89,39 @@ const client = connect(config.config.mqttAddress);
 const app = express();
 app.disable('x-powered-by');
 
+//Express 4 does not catch rejections from async handlers. An uncaught one
+//became an unhandledRejection, which Node turns into an uncaughtException --
+//and this process used to exit on those. Every async route goes through wrap().
+function wrap(handler) {
+	return (req, res, next) => Promise.resolve(handler(req, res, next)).catch(next);
+}
+
+//The header below used to be commented out, so none of this was ever sent.
+//No page reachable in normal use has an inline <script>/<style> or a style=""
+//attribute, so 'unsafe-inline' is not needed -- keep it that way.
+//Exception: web/public/relative.html is an unreferenced scratch page (a client
+//-side slider demo) that does have both, and is served anonymously because the
+//bypass list passes all of /public/. It renders inert under this policy.
 let csp = [];
 csp.push("default-src 'none'");
-csp.push("script-src-elem 'self' https://alcdn.msauth.net/browser/2.27.0/js/msal-browser.min.js https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js");
+csp.push("script-src 'self' https://alcdn.msauth.net https://ajax.googleapis.com");
 csp.push("connect-src 'self' https://login.microsoftonline.com");
 csp.push("manifest-src 'self'");
-csp.push("img-src 'self'");
+csp.push("img-src 'self' data:");
 csp.push("worker-src 'self'");
-csp.push("script-src 'self'");
-csp.push("frame-src 'self' https://login.live.com/ https://login.microsoftonline.com/");
-csp.push("style-src 'self' https://fonts.googleapis.com https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.4.1/css/");
-csp.push("font-src 'self' https://fonts.gstatic.com https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.4.1/webfonts/");
+csp.push("frame-src https://login.live.com https://login.microsoftonline.com");
+csp.push("style-src 'self' https://fonts.googleapis.com https://cdnjs.cloudflare.com");
+csp.push("font-src 'self' https://fonts.gstatic.com https://cdnjs.cloudflare.com");
+csp.push("form-action 'self'");
+csp.push("base-uri 'none'");
+csp.push("frame-ancestors 'none'");
 
 app.use(bodyParser.json());
 app.use(logMiddleware);
 app.use(function (req, res, next) {
-	// res.header('content-security-policy', csp.join(';'))
+	res.header('content-security-policy', csp.join('; '))
+	res.header('x-content-type-options', 'nosniff')
+	res.header('referrer-policy', 'same-origin')
 	res.header('permissions-policy', 'accelerometer=(), autoplay=(), camera=(), cross-origin-isolated=(), display-capture=(), encrypted-media=(), fullscreen=(), geolocation=(), gyroscope=(), keyboard-map=(), magnetometer=(), microphone=(), midi=(), payment=(), picture-in-picture=(), publickey-credentials-get=(self), screen-wake-lock=(self), sync-xhr=(), usb=(), web-share=(), xr-spatial-tracking=()')
 	next();
 });
@@ -106,13 +129,11 @@ app.use(function (req, res, next) {
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 
-app.get('/', async (req, res) => {
-	//	res.header('content-type', 'text/html');
-	//	res.end('<html><body style="background-color: black;"><center><img src="/file-FpWsQygSjs8CQvMyl2IymmpE.webp" /></center></body></html>');
-	res.sendfile('./web/index.html');
-});
+app.get('/', wrap(async (req, res) => {
+	res.sendFile('index.html', { root: './web' });
+}));
 
-app.get('/moja', async (req, res) => {
+app.get('/moja', wrap(async (req, res) => {
 	const temperature = devices['moja_utomhus_temperature']?.state
 	const pressure = devices['moja_utomhus_pressure']?.state
 	const humidity = devices['moja_utomhus_humidity']?.state
@@ -120,9 +141,15 @@ app.get('/moja', async (req, res) => {
 
 	res.header('content-type', 'application/json');
 	res.end(JSON.stringify(ret, null, 2));
-});
+}));
 
-app.use(cookieParser('abdjhoejsjcudnruvuejd#jdjf38txjjejgh'));
+const cookieSecret = process.env.COOKIE_SECRET;
+if (!cookieSecret) {
+	console.error('FATAL: COOKIE_SECRET missing. Copy .env.example to .env and set it.');
+	process.exit(1);
+}
+
+app.use(cookieParser(cookieSecret));
 registerWebnMethods(app);
 app.use(passport.initialize());
 app.use(express.json());
@@ -130,8 +157,10 @@ app.use(cookieMiddleware);
 const server = createServer(app);
 
 
-app.options('*', (res, req) => {
+//Parameters were the wrong way round here, and the response was never ended
+app.options('*', (req, res) => {
 	res.statusCode = 204;
+	res.end();
 });
 /*
 app.get('/favicon.ico', (req, res) => {
@@ -141,42 +170,39 @@ app.get('/favicon.ico', (req, res) => {
 });
 */
 
-app.get('/key-msal', passport.authenticate('oauth-bearer', { session: false }), async (req, res) => {
+app.get('/key-msal', passport.authenticate('oauth-bearer', { session: false }), wrap(async (req, res) => {
 	const key = await validate(req.user.oid, req.user.preferred_username);
+	//setCookie answers 403 when the account exists but is not enabled
 	setCookie(key, res);
-});
+}));
 
-app.get('/refresh-key', async (req, res) => { 
+app.get('/refresh-key', wrap(async (req, res) => {
 	const key = req.signedCookies?.key;
 	setCookie(key, res);
-});
+}));
 
-app.get('/key-from-cookie', async (req, res) => {
-	const key = req.signedCookies?.key;
-	res.end(JSON.stringify({ key }));
-});
+//  /key-from-cookie and /cookies used to hand the session key (and the raw
+//  cookie header) to page JavaScript, which defeated the httpOnly flag -- any
+//  XSS got a 7-day session. socket.io now authenticates from the cookie
+//  server-side instead, so nothing needs to read the key from JS.
 
-app.get('/cookies', async (req, res) => {
-	const key = req.headers.cookie;
-	res.end(JSON.stringify({ key }));
-});
-
-app.get('/push', async (req, res) => {
+app.get('/push', wrap(async (req, res) => {
 	const subs = await getSubscriptions();
-	console.log(subs)
 	sendNotifications(subs);
 	res.end(JSON.stringify({ status: 'ok' }));
-});
+}));
 
 
-app.post('/subscribe', async (req, res) => {
+app.post('/subscribe', wrap(async (req, res) => {
 	const data = req.body;
-	console.log(data)
-	saveSubscription(data, req.user.preferred_username);
-	res.end(JSON.stringify({ status: 'ok' }));
+	if (!data?.endpoint) {
+		res.statusCode = 400;
+		return res.end(JSON.stringify({ error: 'not a push subscription' }));
+	}
 
-	// res.end(JSON.stringify({ key }));
-});
+	await saveSubscription(data, req.user?.preferred_username);
+	res.end(JSON.stringify({ status: 'ok' }));
+}));
 
 async function logMiddleware(req, res, next) {
 	log(req.headers['x-forwarded-for'] + ': ' + req.path)
@@ -190,11 +216,8 @@ async function cookieMiddleware(req, res, next) {
 		return next();
 	}
 
-	let key = req.signedCookies?.key;
-	if (!key) {
-		key = req.headers.authorization?.key
-		//		console.log('Sockey key: ' + key)
-	}
+	//socket.io requests come through here too; both carry the signed cookie
+	const key = req.signedCookies?.key;
 
 	if (key) {
 		const user = await validateKey(key);
@@ -216,6 +239,20 @@ async function cookieMiddleware(req, res, next) {
 }
 
 app.use(express.static('./web', { index: false, extensions: ['html'] }));
+
+//Terminal error handler. Anything wrap() catches lands here, so a bad request
+//is a 500 for that caller instead of an exception that takes the server down.
+//The 4-argument signature is what marks it as an error handler to express.
+// eslint-disable-next-line no-unused-vars
+app.use((err, req, res, next) => {
+	//body-parser tags its own errors (malformed JSON, too large) with a status;
+	//those are the caller's fault, not ours
+	const status = err?.status ?? err?.statusCode ?? 500;
+	log(`Error on ${req.method} ${req.path}: ${status === 500 ? (err?.stack ?? err) : err.message}`);
+	if (res.headersSent) return;
+	res.statusCode = status;
+	res.end(JSON.stringify({ error: status === 500 ? 'internal error' : err.message }));
+});
 
 var options = {
 	//identityMetadata: 'https://login.microsoftonline.com/common/v2.0/.well-known/openid-configuration',
@@ -263,41 +300,38 @@ const connections = new Map();
 
 //[socket, next] to [req, res, next]
 //transformation for socket
+const socketCookieParser = cookieParser(cookieSecret);
+
 function middlewareTransform(middleware) {
 	return (socket, next) => {
-		const res = {};
+		let settled = false;
+		const res = {
+			setHeader: () => { },
+			end: () => {
+				if (settled) return;
+				settled = true;
+				log(`${socket.id} socket rejected: not authenticated`);
+				next(new Error('authentication_error'));
+			},
+		};
 
-		//Transfer token from handshake to headers for passport
-		const token = socket.handshake.auth.token;
-		socket.request.headers.authorization = token;
-
-		let type = 'token';
-		if (!token) {
-			const key = socket.handshake.auth.key;
-			socket.request.headers.authorization = key;
-			type = 'key';
-		}
-
-		//lg.log(token)
-		res.setHeader = (...params) => log(params);
-		res.end = (...params) => {
-			log('Authentication error', params);
-			next(new Error('authentication_error'));
-		}
-
-		const n = async () => {
-			log(`${socket.id} socket ${type} validated`)
-			//			lg.log(`${socket.request.user.preferred_username} connected`)
+		const n = () => {
+			if (settled) return;
+			settled = true;
+			log(`${socket.id} socket validated`);
 			connections.set(socket.id, { user: socket.request.user?.preferred_username ?? '', connected: Date.now() });
-			/*
-						const user = socket.request.user;
-						const existing = await us.validate(user.oid, user.preferred_username);
-						lg.log(existing);
-			*/
 			next();
-		}
+		};
 
-		return middleware(socket.request, res, n);
+		//The handshake is same-origin, so the browser sends the session cookie
+		//automatically. Parsing it here means nothing has to expose the key to
+		//page JavaScript.
+		socketCookieParser(socket.request, res, () => {
+			Promise.resolve(middleware(socket.request, res, n)).catch(err => {
+				log(`Socket auth error: ${err.message}`);
+				res.end();
+			});
+		});
 	};
 }
 
@@ -468,8 +502,9 @@ io.use(middlewareTransform(cookieMiddleware));
 // io.use(middlewareTransform(utils.checkIsInRole('aog.user')));
 
 io.on('connection', async client => {
+	//An unguarded .user here was another async TypeError that could exit the process
 	const user = connections.get(client.id);
-	clientConnected(user.user, client);
+	clientConnected(user?.user ?? '', client);
 	/*	client.emit('auth', async (answer) => {
 			let a = JSON.stringify(answer);
 			let user = await us.validateKey(answer.socketKey);
@@ -502,7 +537,11 @@ function clientConnected(user, client) {
 		}
 	});
 
-	client.on('disconnect', () => { log(`${client.id} disconnected`); });
+	client.on('disconnect', () => {
+		//connections used to grow for the lifetime of the process
+		connections.delete(client.id);
+		log(`${client.id} disconnected`);
+	});
 }
 // END socket.io
 
@@ -702,9 +741,19 @@ function publish(device, property, message) {
 
 process.on('exit', exitHandler.bind(null, { devices: devices }));
 process.on('SIGINT', exitHandler.bind(null, { devices: devices, exit: true }));
-process.on('SIGINT1', exitHandler.bind(null, { devices: devices, exit: true }));
-process.on('SIGINT2', exitHandler.bind(null, { devices: devices, exit: true }));
-process.on('uncaughtException', exitHandler.bind(null, { devices: devices, exit: true }));
+process.on('SIGTERM', exitHandler.bind(null, { devices: devices, exit: true }));
+
+//These used to be bound to exitHandler with exit:true, which meant ANY stray
+//error anywhere took the whole server down -- a single malformed POST to
+//the /login/finish route was enough. Log and keep serving instead; state is
+//still flushed by the 'exit' handler on a real shutdown.
+process.on('uncaughtException', (err, origin) => {
+	log(`Uncaught exception (${origin}): ${err?.stack ?? err}`);
+});
+
+process.on('unhandledRejection', (reason) => {
+	log(`Unhandled rejection: ${reason?.stack ?? reason}`);
+});
 
 const port = 8080;
 server.listen(port, () => log(`Server started on port ${port}`));

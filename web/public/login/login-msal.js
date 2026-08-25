@@ -1,21 +1,37 @@
 
 let msalInstance;
+let msalReady;
 
 export async function loginMsal(event) {
     event.preventDefault();
+
+    //A click before initMsal() finished used to throw on undefined
+    await msalReady;
 
     const accounts = msalInstance.getAllAccounts();
 
     if (accounts.length === 0) {
         console.log("Redirecting to login");
-        msalInstance.loginRedirect();
+        //Must return: the page is navigating away, and everything below
+        //depends on having an account
+        await msalInstance.loginRedirect();
+        return;
     }
 
     const headers = new Headers({
         'Authorization': `Bearer ${await getAccessToken()}`
     });
 
-    await fetch('/key-msal', { headers: headers, method: 'GET' });
+    const res = await fetch('/key-msal', { headers: headers, method: 'GET' });
+    if (!res.ok) {
+        //403 means the account exists but has not been enabled yet
+        const el = document.getElementById('res');
+        if (el) el.innerText = res.status === 403
+            ? 'This account is awaiting approval'
+            : `Sign in failed (${res.status})`;
+        return;
+    }
+
     window.location.href = '/dashboard';
 }
 
@@ -64,4 +80,4 @@ async function getAccessToken() {
     await msalInstance.acquireTokenRedirect(request);
 }
 
-initMsal();
+msalReady = initMsal().catch(err => console.error('MSAL init failed', err));

@@ -31,15 +31,10 @@ async function connect() {
 	await fetch('/refresh-key');
 	if (socket) return;
 
-	const key = await (await fetch('/key-from-cookie')).json();
-	socket = io({
-		auth: async (cb) => {
-			cb({
-				//				token: `Bearer ${await auth.getAccessToken()}`
-				key
-			});
-		}
-	});
+	//The handshake is same-origin, so the browser sends the session cookie by
+	//itself and the server validates it there. Nothing needs to read the key
+	//into JavaScript any more (that used to defeat the httpOnly flag).
+	socket = io();
 
 	appendLog('connected');
 

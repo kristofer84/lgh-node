@@ -8,9 +8,15 @@ var config;
 
 export async function validate(oid, username) {
 	if (!config) config = await loadDb();
-	if (!config.users.hasOwnProperty(oid)) {
+
+	//keyUserMap used to hand us an array here, which was then stored verbatim
+	//and flowed on as an object key elsewhere (e.g. db/subscriptions.json).
+	if (Array.isArray(username)) username = username[0];
+
+	if (!Object.hasOwn(config.users, oid)) {
 		config.users[oid] = { preferred_username: username, enabled: false };
 		await saveDb();
+		log(`Created disabled account for ${username} (${oid}) -- enable it in ${db}`);
 	}
 
 	if (!config.users[oid].enabled) {
@@ -40,16 +46,32 @@ export async function validate(oid, username) {
 
 export async function validateKey(key) {
 	if (!config) config = await loadDb();
-	if (!config.keys.hasOwnProperty(key)) return;
+	if (typeof key !== 'string' || !Object.hasOwn(config.keys, key)) return;
 
 	const oid = config.keys[key].oid;
-	return config.users[oid];
+	const user = config.users[oid];
+
+	//A key must stop working the moment the account is disabled
+	if (!user?.enabled) return;
+	return user;
 }
 
+//Never issue a cookie for a missing key -- validate() returns undefined for a
+//user that exists but is not enabled, and stringifying that produced a signed
+//'undefined' cookie plus a 204, i.e. a login that looked like it worked and
+//then 401'd on every subsequent request.
 export function setCookie(key, res) {
+	if (!key) {
+		log('Refusing to set cookie: no key (user not enabled?)');
+		res.statusCode = 403;
+		res.end();
+		return false;
+	}
+
 	res.cookie('key', key, { signed: true, httpOnly: true, sameSite: 'strict', maxAge: 1000 * 60 * 60 * 24 * 7 });
 	res.statusCode = 204;
 	res.end();
+	return true;
 }
 
 
