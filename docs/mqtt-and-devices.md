@@ -167,7 +167,7 @@ The 22 zones, matching the apartment as of the new plan:
 
 | Kind | Zones |
 |---|---|
-| Rooms drawn on the plan (18) | `vardagsrum`, `kok`, `hall`, `entre1`, `entre2`, `sov1`, `sov2`, `sov3`, `sov4`, `bad1`, `bad2`, `bad3`, `klk1`, `klk2`, `orangeri`, `tvatt`, `loggia`, `balkong` |
+| Rooms drawn on the plan (18) | `vardagsrum`, `kok`, `gang`, `entre1`, `entre2`, `sov1`, `sov2`, `sov3`, `sov4`, `bad1`, `bad2`, `bad3`, `klk1`, `klk2`, `orangeri`, `tvatt`, `loggia`, `balkong` |
 | Not rooms (4) | `home` (the one `occupancy` group), `utomhus`, `moja`, `devices` |
 
 - ⚠ `loggia` and `balkong` are **drawn and clickable but have empty device lists**, so

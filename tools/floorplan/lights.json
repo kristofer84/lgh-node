@@ -17,43 +17,43 @@
  },
  "kok": {
   "koksbank": {
-   "cx": 140.76,
-   "cy": 193.73,
-   "r": 44,
+   "cx": 141.42,
+   "cy": 200.14,
+   "r": 45,
    "auto": true
   },
   "koksbord": {
-   "cx": 149.76,
-   "cy": 202.73,
-   "r": 44,
+   "cx": 150.42,
+   "cy": 209.14,
+   "r": 45,
    "auto": true
   },
   "kokso": {
-   "cx": 140.76,
-   "cy": 211.73,
-   "r": 44,
+   "cx": 141.42,
+   "cy": 218.14,
+   "r": 45,
    "auto": true
   },
   "golvlampa_kok": {
-   "cx": 131.76,
-   "cy": 202.73,
-   "r": 44,
+   "cx": 132.42,
+   "cy": 209.14,
+   "r": 45,
    "auto": true
   }
  },
  "sov2": {
   "lampa_mikkel": {
-   "cx": 132.33,
-   "cy": 111.48,
+   "cx": 132.31,
+   "cy": 111.52,
    "r": 38,
    "auto": true
   }
  },
  "sov3": {
   "lampa_kai": {
-   "cx": 135.3,
-   "cy": 147.64,
-   "r": 37,
+   "cx": 135.14,
+   "cy": 147.04,
+   "r": 36,
    "auto": true
   }
  },
@@ -79,50 +79,50 @@
  },
  "vardagsrum": {
   "vardagsrum_vaggar": {
-   "cx": 75.54,
-   "cy": 105.09,
+   "cx": 75.96,
+   "cy": 105.44,
    "r": 60,
    "auto": true
   },
   "vardagsrum_linje": {
-   "cx": 81.9,
-   "cy": 107.72,
+   "cx": 82.32,
+   "cy": 108.08,
    "r": 60,
    "auto": true
   },
   "vardagsrum_tak_lampa": {
-   "cx": 84.54,
-   "cy": 114.09,
+   "cx": 84.96,
+   "cy": 114.44,
    "r": 60,
    "auto": true
   },
   "taklampa_ovan_matbord": {
-   "cx": 81.9,
-   "cy": 120.45,
+   "cx": 82.32,
+   "cy": 120.81,
    "r": 60,
    "auto": true
   },
   "golvlampa": {
-   "cx": 75.54,
-   "cy": 123.09,
+   "cx": 75.96,
+   "cy": 123.44,
    "r": 60,
    "auto": true
   },
   "v1": {
-   "cx": 69.18,
-   "cy": 120.45,
+   "cx": 69.6,
+   "cy": 120.81,
    "r": 60,
    "auto": true
   },
   "v2": {
-   "cx": 66.54,
-   "cy": 114.09,
+   "cx": 66.96,
+   "cy": 114.44,
    "r": 60,
    "auto": true
   },
   "skapbelysning": {
-   "cx": 69.18,
-   "cy": 107.72,
+   "cx": 69.6,
+   "cy": 108.08,
    "r": 60,
    "auto": true
   }
@@ -137,15 +137,15 @@
  },
  "sov4": {
   "lampa_mette": {
-   "cx": 134.44,
-   "cy": 232.39,
-   "r": 37,
+   "cx": 131.77,
+   "cy": 237.19,
+   "r": 33,
    "auto": true
   },
   "slinga_mette": {
-   "cx": 134.44,
-   "cy": 250.39,
-   "r": 37,
+   "cx": 131.77,
+   "cy": 253.53,
+   "r": 33,
    "auto": true
   }
  }

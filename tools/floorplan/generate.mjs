@@ -166,7 +166,11 @@ out.push(`        </defs>`);
 //fixtures stay crisp on top of the room tint, and a glow reads as light shining
 //under the drawing. pointer-events:none keeps it out of the way of clicks.
 const baseSvg = readFileSync(P.base, 'utf8');
-let inner = baseSvg.slice(baseSvg.indexOf('<g'), baseSvg.lastIndexOf('</svg>')).trim();
+//Everything inside the root <svg>, not from the first <g>: the drawing's
+//<defs> precedes it, and slicing from <g> dropped a real clipPath, leaving a
+//dangling clip-path reference (which a browser may treat as "do not render").
+let inner = baseSvg.slice(baseSvg.search(/<svg\b[^>]*>/) + baseSvg.match(/<svg\b[^>]*>/)[0].length,
+	baseSvg.lastIndexOf('</svg>')).trim();
 
 //Inkscape writes presentation properties into style="" attributes. The CSP sets
 //style-src 'self' with no 'unsafe-inline', and style-src governs style

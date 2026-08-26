@@ -38,11 +38,18 @@ zone, a power sensor with no marker in the plan).
 | `dashboard.template.html` | everything outside the `<svg>`; `<!--FLOORPLAN-->` is the splice point |
 | `../../db/config.json` | the zones. Decides what is emitted at all |
 | `lgh_rot.svg` | the original Inkscape drawing, kept for re-extraction |
+| `extract.py` | rebuilds `geometry.json` + `base.svg` from that drawing |
 
 ## Re-extracting geometry from a new drawing
 
-`segment.py` and `contours.py` derive `geometry.json` from `lgh_rot.svg`. They need
-`rsvg-convert` plus python3 with numpy/scipy.
+```bash
+cp ~/lgh_rot.svg tools/floorplan/lgh_rot.svg
+python3 tools/floorplan/extract.py      # -> geometry.json + base.svg
+node   tools/floorplan/generate.mjs     # -> web/dashboard.html
+```
+
+`extract.py` derives `geometry.json` and `base.svg` from `lgh_rot.svg`. It needs
+`rsvg-convert` plus python3 with numpy/scipy, and takes about 45 s.
 
 1. Strip `<text>` from the drawing and rasterize the walls at 8 px/mm.
 2. Seed a **multi-source geodesic flood fill** at each room's text anchor. Plain
@@ -58,6 +65,22 @@ zone, a power sensor with no marker in the plan).
 ⚠ **Read room names from the rendered `<text>` content, not from `inkscape:label`.**
 Several labels in `lgh_rot.svg` are stale — the room whose text reads `SOV2`
 carries `inkscape:label="Klk2"`.
+
+⚠ **A room label may sit outside the building.** `LOGGIA` and `BALKONG` are annotated
+from the margin, so their label coordinates are in the page background, not in the room.
+`extract.py` snaps such a seed to the nearest *room-sized* interior region — nearest
+interior *pixel* is not enough, as that is often a sliver between a wall and a railing
+and yields a room of a few square units.
+
+⚠ **The room flood fill is confined to the building envelope.** A room open to the
+exterior (the balcony, the loggia) otherwise leaks into the page background, and the
+competing seeds partition the whole sheet between them — `loggia` and `balkong` came out
+at 21 000 units² covering the entire page.
+
+⚠ **A new room label must be added to the `ZONE` map in `extract.py`**, and its zone key
+must exist in `db/config.json`. When `HALL` was renamed `GÅNG`, the zone key became
+`gang` — the HA devices are still named `hall_*`, because those are entity ids, not room
+names.
 
 ## Coordinate system
 
@@ -84,6 +107,12 @@ scale silently rescales the entire UI.
 - The glow gradient uses `var(--sc)`, defined in `style.css` as `stop { --sc: #ffcc00 }`.
   It renders black in `rsvg-convert`, which does not resolve CSS variables — that is
   a preview artefact, not a bug. Substitute the literal colour when rasterizing.
+- ⚠ **`<defs>` from the drawing must survive.** It sits *before* the first `<g>`, so
+  slicing the artwork from `indexOf('<g')` silently dropped it. The current drawing has a
+  real `<clipPath>`, and a dangling `clip-path` reference can make a browser refuse to
+  render the clipped element. `extract.py` keeps every id something points at (prefixed
+  `plan-` so a future drawing cannot collide with a generated id such as a zone name),
+  and `generate.mjs` takes everything inside the root `<svg>`.
 - ⚠ **Inkscape writes presentation properties into `style=""`, and the CSP forbids that.**
   `mqtt-web.js` sends `style-src 'self'` with no `'unsafe-inline'`, and `style-src` governs
   style *attributes* too — a browser refuses them, and the wall paths carry no `fill`
