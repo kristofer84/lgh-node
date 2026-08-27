@@ -180,10 +180,9 @@ stop {
   --sc: #ffcc00;
 }
 
-.name-blocker {
-  fill: white;
-  fill-opacity: 0.85;
-}
+/* .name-blocker is gone. Those white rects existed to mask room names printed
+   into the old background photo; the plan is line-art now, so a readout sits
+   directly on the drawing with nothing behind it. */
 
 /* SVG text has no font-size anywhere, so it inherited the browser default of
    16px -- which is 16 *user units* against a 354-unit viewBox, i.e. oversized

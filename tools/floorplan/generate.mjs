@@ -234,13 +234,16 @@ for (const [zone, room] of Object.entries(geo.rooms)) {
 
 //Readouts live OUTSIDE the room groups. Inside, the room's clip-path cut off
 //any label that reached past a wall, which is most of them in a small room.
-const readoutLayer = [`        <g id="readouts">`];
+//pointer-events:none -- this layer sits above the rooms, so without it a
+//readout swallows clicks meant for the room underneath whenever temps are shown.
+//Inside the room groups (where these used to live) clicking a label toggled the
+//room, and that behaviour is restored by letting clicks pass straight through.
+const readoutLayer = [`        <g id="readouts" pointer-events="none">`];
 for (const [zone, room] of Object.entries(geo.rooms)) {
 	if (!config.zones[zone]) continue;
 	const readouts = zones[zone].sensors.filter(s => /(temperature|humidity)$/.test(s.device));
 	readouts.forEach((s, i) => {
 		const x = tx(room.anchor[0]), y = ty(room.anchor[1]) + i * 15;
-		readoutLayer.push(`          <rect class="name-blocker hidden" x="${x - 3}" y="${y - 11}" width="44" height="14" rx="2" />`);
 		readoutLayer.push(`          <text class="temp hidden" id="th-${s.device}" x="${x}" y="${y}" />`);
 	});
 }

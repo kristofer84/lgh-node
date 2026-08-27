@@ -344,7 +344,7 @@ Landmines carried by the new plan (each recorded in full in `tools/floorplan/REA
 - `home.js` binds clicks with `$(".room").click(...)` / `$(".item").click(...)` at ready —
   **direct binding, not delegation** — so the generated markup has to be static in the file.
   Anything injected later is inert.
-- `.temp`, `.name-blocker` and `.device` elements are emitted with `hidden`; `home.js` derives
+- `.temp` and `.device` elements are emitted with `hidden`; `home.js` derives
   the checkbox state from `$('.temp').hasClass('hidden')`, so one un-hidden element inverts it.
 - ⚠ **The generator rewrites the artwork's `style=""` attributes into presentation attributes**,
   because the CSP forbids inline styles. If you change how `base.svg` is spliced in, keep that

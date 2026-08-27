@@ -449,11 +449,9 @@ function ensureState(cb) {
 			hasClass = $('.temp').hasClass('hidden');
 			if (state && hasClass) {
 				$('.temp').removeClass("hidden");
-				$('.name-blocker').removeClass("hidden");
 			}
 			else if (!state && !hasClass) {
 				$('.temp').addClass("hidden");
-				$('.name-blocker').addClass("hidden");
 			}
 			break;
 

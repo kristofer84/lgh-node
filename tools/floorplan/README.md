@@ -126,6 +126,13 @@ scale silently rescales the entire UI.
 - `home.js` binds clicks with `$(".room").click(...)` at ready — **direct binding, not
   delegation** — so the generated markup must be static in the file. Anything
   injected later is inert.
-- `.temp`, `.name-blocker` and `.device` elements must all be emitted with `hidden`.
-  `home.js` derives the current toggle state with `$('.temp').hasClass('hidden')`, so
-  one un-hidden element inverts the checkbox.
+- `.temp` and `.device` elements must all be emitted with `hidden`. `home.js` derives the
+  current toggle state with `$('.temp').hasClass('hidden')`, so one un-hidden element
+  inverts the checkbox.
+- ⚠ **`#readouts` carries `pointer-events="none"`.** The layer sits above the room groups,
+  so without it a temperature label swallows clicks meant for the room underneath whenever
+  temps are shown. (While the readouts lived *inside* the room groups, clicking a label
+  toggled the room; this keeps that behaviour.)
+- The old white `.name-blocker` rects behind each readout are gone. They existed to mask
+  room names printed into the background *photo*; the plan is line-art, so there is
+  nothing to mask and the readouts sit directly on the drawing.
