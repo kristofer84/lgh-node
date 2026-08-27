@@ -295,6 +295,16 @@ function updateView() {
 
 		updateArea(ar, value);
 
+		//Per-lamp state, straight from the model. getNextStateItem falls back to
+		//reading the element's computed opacity when there is no state attribute,
+		//and that told it nothing once the light symbols became always-visible.
+		//It also means a symbol shows whether its own lamp is on, rather than
+		//only reflecting the room's mood/night tier.
+		lights.forEach(light => {
+			let el = document.getElementById(light);
+			if (el) el.setAttribute("state", model[zone][light].onoff ? "on" : "off");
+		});
+
 		let th = Object.keys(model[zone]).filter(th => !model[zone][th].hasOwnProperty('onoff'));
 		let entities = {};
 		th.forEach(name => entities[name] = model[zone][name]);

@@ -175,7 +175,7 @@ The 22 zones, matching the apartment as of the new plan:
   That is expected, not a bug. Clicking them publishes nothing.
 - `utomhus` and `moja` have sensors but no room in the drawing, so their readings are in the
   socket payload and are never rendered anywhere. `home` drives the "senaste aktivitet" footer.
-- ⚠ Only a light carrying a **`.mood` / `.night` flag** gets its own `class="item"` glow circle
+- ⚠ Only a light carrying a **`.mood` / `.night` flag** gets its own `class="item"` group
   in the generated markup (currently 17 `mood` + 3 `night` = 20). A plain `.light` is toggled
   with the room and has no individual click target — that is by design; adding a flag is what
   makes an item clickable.

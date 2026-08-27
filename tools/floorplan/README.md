@@ -93,6 +93,34 @@ stroke width, font size and glow radius in `style.css` is in **user units** with
 `vector-effect`, so they are all implicitly relative to that number. Changing the
 scale silently rescales the entire UI.
 
+## Anatomy of a light
+
+Each lamp is emitted as a group, and the three circles have distinct jobs:
+
+```html
+<g class="item" id="<device>">                <!-- the click target, per home.js -->
+  <circle class="glow mood"  r="34" fill="url(#pf)" pointer-events="none"/>
+  <circle class="point"      r="6"            pointer-events="none"/>
+  <circle class="hit"        r="12" fill="none" pointer-events="all"/>
+</g>
+```
+
+- ⚠ **The glow must not be the click target.** While one circle was both, a lamp's hit
+  area was its entire radial gradient — up to `r=60` — so clicking anywhere in vardagsrum
+  hit whichever lamp was topmost and the room itself was nearly unclickable.
+- `.point` is the always-visible symbol: outlined when the lamp is off, filled `#ffcc00`
+  when on, driven by `state` on the group.
+- `.hit` is an invisible disc giving a tappable area (`r=6` is ~13 px on a phone).
+  ⚠ Its radius is **computed as half the distance to the nearest other lamp**, clamped to
+  7–14, so two hit areas can never overlap and steal each other's clicks. A fixed radius
+  broke as soon as two lamps sat close together.
+- ⚠ `state` on the group is set by `home.js` **from the model** (`updateView`). Do not go
+  back to the old `getComputedStyle(...).opacity` heuristic — it inferred on/off from
+  whether the glow was visible, which says nothing now the symbols are always drawn.
+- ⚠ The glow class is `glow mood`, and `[state] .glow` rules carry `!important`. Putting
+  `state` on the group while `[state="off"] { opacity: 0 }` targeted the element itself
+  would hide the symbol along with the glow.
+
 ## Gotchas paid for once
 
 - ⚠ **Never clip `#base-plan`.** It was originally clipped to `#rooms-outline`, copying the

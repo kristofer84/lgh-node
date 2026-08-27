@@ -137,6 +137,24 @@ function placement(zone, device, index, total) {
 	return p;
 }
 
+//Tap radius per lamp: half the distance to its nearest neighbour, so two hit
+//areas can never overlap and steal each other's clicks, clamped to something
+//usable on a phone. A fixed radius broke as soon as two lamps sat close (the
+//vardagsrum shelf LED is 18 units below v1).
+function hitRadius(zone, device) {
+	const here = lights[zone]?.[device];
+	if (!here) return 10;
+	let nearest = Infinity;
+	for (const devs of Object.values(lights)) {
+		for (const [d, p] of Object.entries(devs)) {
+			if (p === here) continue;
+			const dist = Math.hypot((p.cx - here.cx) * S, (p.cy - here.cy) * S);
+			if (dist < nearest) nearest = dist;
+		}
+	}
+	return Math.round(Math.max(7, Math.min(14, nearest / 2 - 1)));
+}
+
 //---------------------------------------------------------------- emit
 const out = [];
 const defs = [];
@@ -228,14 +246,19 @@ for (const [zone, room] of Object.entries(geo.rooms)) {
 	tiered.forEach((l, i) => {
 		const p = placement(zone, l.device, i, tiered.length);
 		if (!p) return;
-		out.push(`          <circle id="${l.device}" class="${l.tier} item" cx="${tx(p.cx)}" cy="${ty(p.cy)}" r="${p.r}" fill="url(#pf)" />`);
-		//A faint ring marking the tap target while the light is off. The glow
-		//itself is invisible until the room is in mood/night, so without this
-		//there is nothing on screen to say a light point is clickable.
-		//pointer-events:none so the ring never steals the click from the glow.
-		//NB point-mood / point-night, not mood / night: those carry `opacity: 0`
-//until the room is lit, which would hide the ring too.
-		out.push(`          <circle class="point point-${l.tier}" cx="${tx(p.cx)}" cy="${ty(p.cy)}" r="5" pointer-events="none" />`);
+		//The click target is the small symbol, NOT the glow. While one circle did
+		//both, a lamp's hit area was its whole radial gradient (r up to 60), so
+		//clicking anywhere in vardagsrum hit whichever lamp happened to be on
+		//top, and the room itself was almost unclickable. The glow is now
+		//pointer-events:none and the symbol carries the id and the .item class.
+		out.push(`          <g class="item" id="${l.device}">`);
+		out.push(`            <circle class="glow ${l.tier}" cx="${tx(p.cx)}" cy="${ty(p.cy)}" r="${p.r}" fill="url(#pf)" pointer-events="none" />`);
+		out.push(`            <circle class="point" cx="${tx(p.cx)}" cy="${ty(p.cy)}" r="6" pointer-events="none" />`);
+		//A bigger invisible disc so the symbol is tappable on a phone: r=6 user
+		//units is about 13 px across there. Kept under half the smallest gap
+		//between two lamps (v1/v2 are 33 units apart) so hit areas never overlap.
+		out.push(`            <circle class="hit" cx="${tx(p.cx)}" cy="${ty(p.cy)}" r="${hitRadius(zone, l.device)}" fill="none" pointer-events="all" />`);
+		out.push(`          </g>`);
 	});
 
 	out.push(`        </g>`);

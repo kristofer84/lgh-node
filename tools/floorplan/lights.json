@@ -107,10 +107,9 @@
    "r": 60
   },
   "skapbelysning": {
-   "cx": 69.6,
-   "cy": 108.08,
-   "r": 60,
-   "auto": true
+   "cx": 57,
+   "cy": 142,
+   "r": 24
   },
   "matbord": {
    "cx": 76,

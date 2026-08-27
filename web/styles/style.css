@@ -242,44 +242,50 @@ body.nightmode .room[light="on"] .room-outline {
   fill: black;
 }
 
-.mood,
-.night {
+.glow {
   opacity: 0;
   fill-opacity: 0.8;
 }
 
-[light="night"] .night,
-[light="mood"] .mood,
-[light="mood"] .night {
+[light="night"] .glow.night,
+[light="mood"] .glow.mood,
+[light="mood"] .glow.night {
   opacity: 1;
 }
 
-/* A clickable light point shows a faint ring while its glow is not lit --
-   otherwise there is nothing on screen to say the point can be tapped. The
-   ring disappears exactly when its own glow appears. */
+/* The light symbol. Always visible -- it is both the thing you tap and the
+   marker for where the lamp is -- and it fills in when that lamp is on. */
 .point {
-  fill: none;
+  fill: #fff;
+  fill-opacity: 0.55;
   stroke: #000;
-  stroke-opacity: 0.3;
+  stroke-opacity: 0.45;
   stroke-width: 1.2;
 }
 
+[state="on"] .point {
+  fill: #ffcc00;
+  fill-opacity: 1;
+  stroke-opacity: 0.6;
+}
+
 body.nightmode .point {
+  fill: #000;
+  fill-opacity: 0.35;
   stroke: #fff;
-  stroke-opacity: 0.35;
+  stroke-opacity: 0.4;
 }
 
-[light="night"] .point-night,
-[light="mood"] .point-mood,
-[light="mood"] .point-night {
-  stroke-opacity: 0;
+body.nightmode [state="on"] .point {
+  fill: #ffcc00;
+  fill-opacity: 1;
 }
 
-[state="off"] {
+[state="off"] .glow {
   opacity: 0 !important;
 }
 
-[state="on"] {
+[state="on"] .glow {
   opacity: 1 !important;
 }
 
