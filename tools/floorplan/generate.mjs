@@ -26,6 +26,7 @@ const P = {
 	base: join(here, 'base.svg'),
 	lights: join(here, 'lights.json'),
 	readouts: join(here, 'readouts.json'),
+	overrides: join(here, 'rooms-override.json'),
 	template: join(here, 'dashboard.template.html'),
 	config: join(repo, 'db', 'config.json'),
 	out: join(repo, 'web', 'dashboard.html'),
@@ -35,6 +36,11 @@ const geo = JSON.parse(readFileSync(P.geometry, 'utf8'));
 const config = JSON.parse(readFileSync(P.config, 'utf8'));
 const lights = existsSync(P.lights) ? JSON.parse(readFileSync(P.lights, 'utf8')) : {};
 const readoutNudge = existsSync(P.readouts) ? JSON.parse(readFileSync(P.readouts, 'utf8')) : {};
+//Hand-drawn replacements for rooms the flood fill gets wrong. The segmentation
+//gave gang every wardrobe niche it could reach plus an arm over the kitchen;
+//it is really just the corridor.
+const overrides = existsSync(P.overrides) ? JSON.parse(readFileSync(P.overrides, 'utf8')) : {};
+const shapeOf = zone => (Array.isArray(overrides[zone]) ? overrides[zone] : geo.rooms[zone].points);
 
 const [ox, oy] = geo.transform.origin;
 const S = geo.transform.scale;
@@ -193,7 +199,7 @@ defs.push(`      <polygon id="rooms-outline" points="${poly(geo.silhouette)}" />
 //reference, and the clip is then ignored (glows bleed across walls).
 for (const [zone, room] of Object.entries(geo.rooms)) {
 	if (!config.zones[zone]) continue;
-	defs.push(`      <polygon id="${zone}-outline" points="${poly(room.points)}" />`);
+	defs.push(`      <polygon id="${zone}-outline" points="${poly(shapeOf(zone))}" />`);
 	defs.push(`      <clipPath id="${zone}-clip"><use xlink:href="#${zone}-outline" /></clipPath>`);
 }
 

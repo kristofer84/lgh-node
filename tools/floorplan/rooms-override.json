@@ -1,0 +1,4 @@
+{
+  "_comment": "Hand-drawn replacements for room polygons the segmentation gets wrong, in DRAWING units (the same units as geometry.json). Replaces both the room tint and its clip path. extract.py never touches this file, so an override survives re-extraction. Keep the room's text anchor inside the shape -- readouts and auto lamp placement use it.",
+  "gang": [[87.5, 162.5], [150.0, 162.5], [150.0, 176.0], [87.5, 176.0]]
+}

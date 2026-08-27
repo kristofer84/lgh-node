@@ -34,6 +34,7 @@ zone, a power sensor with no marker in the plan).
 |---|---|
 | `geometry.json` | room polygons, per-room text anchors, fixture markers, and the source→dashboard transform |
 | `base.svg` | the architectural line-work, drawn over the room tint (`pointer-events: none`) |
+| `rooms-override.json` | hand-drawn replacements for room polygons the flood fill gets wrong. Replaces both the tint and the clip path |
 | `readouts.json` | per-zone nudge for the temperature/humidity readout, in drawing units. Hand-edited; `extract.py` never writes it |
 | `lights.json` | per-device glow positions. Auto-seeded in a ring around the room anchor on first run, then **hand-edit it** — `"auto": true` marks one that has never been placed properly |
 | `dashboard.template.html` | everything outside the `<svg>`; `<!--FLOORPLAN-->` is the splice point |
@@ -110,6 +111,12 @@ Each lamp is emitted as a group, and the three circles have distinct jobs:
   and toilet outlines. The layer is still clipped per room so a glow cannot cross a wall.
   Because the lamps are no longer descendants of the room group, `home.js`'s room click
   clears their `state` **by name from the model**, not with `$(ar).find('*')`.
+- ⚠ **Absorbing fixtures can also hand a room space that is not really its own.**
+  `gang` collected every wardrobe niche it could reach plus an arm along the top of the
+  kitchen, ending up at 1517 units² for what is really a corridor. It is overridden in
+  `rooms-override.json` as a plain rectangle (844 units²) covering the corridor and the
+  kitchen entry. Keep a room's text anchor inside any override — readouts and automatic
+  lamp placement both use it.
 - ⚠ **Fixtures drawn inside a room are absorbed back into it** (`extract.py`). A bathtub,
   shower tray or vanity is ink, so the flood fill cannot enter it and the room polygon
   notches around every fixture — measured at 3762 px of the bathroom lamps being clipped
