@@ -316,7 +316,12 @@ for (const zone of Object.keys(geo.rooms)) {
 		lightLayer.push(`            <g class="item" id="${l.device}">`);
 		for (const q of positionsOf(p)) {
 			lightLayer.push(`              <circle class="glow ${l.tier}" cx="${tx(q.cx)}" cy="${ty(q.cy)}" r="${p.r}" fill="url(#pf)" pointer-events="none" />`);
-			lightLayer.push(`              <circle class="point" cx="${tx(q.cx)}" cy="${ty(q.cy)}" r="6" pointer-events="none" />`);
+			//A run of strip lighting reads better as its glow alone; a row of
+			//rings along a counter just looks like a row of holes. `symbol: false`
+			//in lights.json drops the ring but keeps the glow and the tap area.
+			if (p.symbol !== false) {
+				lightLayer.push(`              <circle class="point" cx="${tx(q.cx)}" cy="${ty(q.cy)}" r="6" pointer-events="none" />`);
+			}
 			//A bigger invisible disc so the symbol is tappable on a phone:
 			//r=6 user units is only about 13 px across there.
 			lightLayer.push(`              <circle class="hit" cx="${tx(q.cx)}" cy="${ty(q.cy)}" r="${hitRadius(l.device, q)}" fill="none" pointer-events="all" />`);
