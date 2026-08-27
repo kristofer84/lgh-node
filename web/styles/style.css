@@ -254,6 +254,27 @@ body.nightmode .room[light="on"] .room-outline {
   opacity: 1;
 }
 
+/* A clickable light point shows a faint ring while its glow is not lit --
+   otherwise there is nothing on screen to say the point can be tapped. The
+   ring disappears exactly when its own glow appears. */
+.point {
+  fill: none;
+  stroke: #000;
+  stroke-opacity: 0.3;
+  stroke-width: 1.2;
+}
+
+body.nightmode .point {
+  stroke: #fff;
+  stroke-opacity: 0.35;
+}
+
+[light="night"] .point-night,
+[light="mood"] .point-mood,
+[light="mood"] .point-night {
+  stroke-opacity: 0;
+}
+
 [state="off"] {
   opacity: 0 !important;
 }

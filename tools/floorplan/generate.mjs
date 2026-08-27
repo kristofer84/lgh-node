@@ -25,6 +25,7 @@ const P = {
 	geometry: join(here, 'geometry.json'),
 	base: join(here, 'base.svg'),
 	lights: join(here, 'lights.json'),
+	readouts: join(here, 'readouts.json'),
 	template: join(here, 'dashboard.template.html'),
 	config: join(repo, 'db', 'config.json'),
 	out: join(repo, 'web', 'dashboard.html'),
@@ -33,6 +34,7 @@ const P = {
 const geo = JSON.parse(readFileSync(P.geometry, 'utf8'));
 const config = JSON.parse(readFileSync(P.config, 'utf8'));
 const lights = existsSync(P.lights) ? JSON.parse(readFileSync(P.lights, 'utf8')) : {};
+const readoutNudge = existsSync(P.readouts) ? JSON.parse(readFileSync(P.readouts, 'utf8')) : {};
 
 const [ox, oy] = geo.transform.origin;
 const S = geo.transform.scale;
@@ -227,6 +229,13 @@ for (const [zone, room] of Object.entries(geo.rooms)) {
 		const p = placement(zone, l.device, i, tiered.length);
 		if (!p) return;
 		out.push(`          <circle id="${l.device}" class="${l.tier} item" cx="${tx(p.cx)}" cy="${ty(p.cy)}" r="${p.r}" fill="url(#pf)" />`);
+		//A faint ring marking the tap target while the light is off. The glow
+		//itself is invisible until the room is in mood/night, so without this
+		//there is nothing on screen to say a light point is clickable.
+		//pointer-events:none so the ring never steals the click from the glow.
+		//NB point-mood / point-night, not mood / night: those carry `opacity: 0`
+//until the room is lit, which would hide the ring too.
+		out.push(`          <circle class="point point-${l.tier}" cx="${tx(p.cx)}" cy="${ty(p.cy)}" r="5" pointer-events="none" />`);
 	});
 
 	out.push(`        </g>`);
@@ -243,7 +252,9 @@ for (const [zone, room] of Object.entries(geo.rooms)) {
 	if (!config.zones[zone]) continue;
 	const readouts = zones[zone].sensors.filter(s => /(temperature|humidity)$/.test(s.device));
 	readouts.forEach((s, i) => {
-		const x = tx(room.anchor[0]), y = ty(room.anchor[1]) + i * 15;
+		const nudge = readoutNudge[zone] ?? {};
+		const x = tx(room.anchor[0] + (nudge.dx ?? 0));
+		const y = ty(room.anchor[1] + (nudge.dy ?? 0)) + i * 15;
 		readoutLayer.push(`          <text class="temp hidden" id="th-${s.device}" x="${x}" y="${y}" />`);
 	});
 }

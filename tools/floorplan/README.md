@@ -34,6 +34,7 @@ zone, a power sensor with no marker in the plan).
 |---|---|
 | `geometry.json` | room polygons, per-room text anchors, fixture markers, and the source→dashboard transform |
 | `base.svg` | the architectural line-work, drawn over the room tint (`pointer-events: none`) |
+| `readouts.json` | per-zone nudge for the temperature/humidity readout, in drawing units. Hand-edited; `extract.py` never writes it |
 | `lights.json` | per-device glow positions. Auto-seeded in a ring around the room anchor on first run, then **hand-edit it** — `"auto": true` marks one that has never been placed properly |
 | `dashboard.template.html` | everything outside the `<svg>`; `<!--FLOORPLAN-->` is the splice point |
 | `../../db/config.json` | the zones. Decides what is emitted at all |
@@ -133,6 +134,10 @@ scale silently rescales the entire UI.
   so without it a temperature label swallows clicks meant for the room underneath whenever
   temps are shown. (While the readouts lived *inside* the room groups, clicking a label
   toggled the room; this keeps that behaviour.)
+- ⚠ **A light-point ring must NOT carry the `mood`/`night` class.** The rings are emitted
+  as `class="point point-mood"` (not `point mood`) because `.mood, .night { opacity: 0 }`
+  applies until the room is lit — reusing the tier class hides the ring it is meant to
+  show. The hide-when-lit rules key off `.point-mood` / `.point-night`.
 - The old white `.name-blocker` rects behind each readout are gone. They existed to mask
   room names printed into the background *photo*; the plan is line-art, so there is
   nothing to mask and the readouts sit directly on the drawing.

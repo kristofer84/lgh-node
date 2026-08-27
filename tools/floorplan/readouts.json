@@ -1,0 +1,5 @@
+{
+  "_comment": "Per-zone nudge for the temperature/humidity readout, in DRAWING units (the same units as geometry.json). Applied to the room's text anchor. Hand-edited; extract.py never touches this file.",
+  "klk1": { "dy": -6 },
+  "gang": { "dy": -5 }
+}

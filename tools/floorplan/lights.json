@@ -43,38 +43,33 @@
  },
  "sov2": {
   "lampa_mikkel": {
-   "cx": 132.31,
-   "cy": 111.52,
-   "r": 38,
-   "auto": true
+   "cx": 143,
+   "cy": 112,
+   "r": 38
   }
  },
  "sov3": {
   "lampa_kai": {
-   "cx": 135.14,
-   "cy": 147.04,
-   "r": 36,
-   "auto": true
+   "cx": 124,
+   "cy": 148,
+   "r": 36
   }
  },
  "sov1": {
   "sovrum_1_byra": {
-   "cx": 116.96,
-   "cy": 69.84,
-   "r": 37,
-   "auto": true
+   "cx": 115.3,
+   "cy": 74.1,
+   "r": 37
   },
   "sang_hoger": {
-   "cx": 124.76,
-   "cy": 83.34,
-   "r": 37,
-   "auto": true
+   "cx": 120.5,
+   "cy": 83.1,
+   "r": 37
   },
   "sang_vanster": {
-   "cx": 109.17,
-   "cy": 83.34,
-   "r": 37,
-   "auto": true
+   "cx": 110.1,
+   "cy": 83.1,
+   "r": 37
   }
  },
  "vardagsrum": {
@@ -96,35 +91,31 @@
    "r": 60,
    "auto": true
   },
-  "taklampa_ovan_matbord": {
-   "cx": 82.32,
-   "cy": 120.81,
-   "r": 60,
-   "auto": true
-  },
   "golvlampa": {
-   "cx": 75.96,
-   "cy": 123.44,
-   "r": 60,
-   "auto": true
+   "cx": 89,
+   "cy": 122,
+   "r": 60
   },
   "v1": {
-   "cx": 69.6,
-   "cy": 120.81,
-   "r": 60,
-   "auto": true
+   "cx": 57,
+   "cy": 131,
+   "r": 60
   },
   "v2": {
-   "cx": 66.96,
-   "cy": 114.44,
-   "r": 60,
-   "auto": true
+   "cx": 57,
+   "cy": 120,
+   "r": 60
   },
   "skapbelysning": {
    "cx": 69.6,
    "cy": 108.08,
    "r": 60,
    "auto": true
+  },
+  "matbord": {
+   "cx": 76,
+   "cy": 96,
+   "r": 60
   }
  },
  "orangeri": {
@@ -137,10 +128,9 @@
  },
  "sov4": {
   "lampa_mette": {
-   "cx": 131.77,
-   "cy": 237.19,
-   "r": 33,
-   "auto": true
+   "cx": 141,
+   "cy": 243,
+   "r": 33
   },
   "slinga_mette": {
    "cx": 131.77,
