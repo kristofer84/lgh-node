@@ -105,6 +105,18 @@ Each lamp is emitted as a group, and the three circles have distinct jobs:
 </g>
 ```
 
+- ⚠ **The lamps are drawn in their own `#lights` layer, AFTER the base plan.** Inside the
+  room groups (below the artwork) a bathroom's ceiling lights vanished behind the bathtub
+  and toilet outlines. The layer is still clipped per room so a glow cannot cross a wall.
+  Because the lamps are no longer descendants of the room group, `home.js`'s room click
+  clears their `state` **by name from the model**, not with `$(ar).find('*')`.
+- ⚠ **Fixtures drawn inside a room are absorbed back into it** (`extract.py`). A bathtub,
+  shower tray or vanity is ink, so the flood fill cannot enter it and the room polygon
+  notches around every fixture — measured at 3762 px of the bathroom lamps being clipped
+  away. Two things that made this hard to get right: the neighbour search must dilate by
+  **more than one pixel** (a pocket is ringed by the fixture's own outline, so at 1 px it
+  borders only ink and looks unbordered), and it must run in a **per-component bounding
+  box** (dilating each of thousands of components across the full raster takes minutes).
 - ⚠ **A traced room boundary can touch itself, making the polygon non-simple.** SVG fills
   and hit-tests it with the **nonzero** rule, so the room still covers its fixtures
   correctly — but an even-odd point-in-polygon test disagrees and will wrongly report a

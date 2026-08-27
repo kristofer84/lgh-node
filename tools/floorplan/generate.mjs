@@ -252,38 +252,47 @@ const basePlan = [
 ];
 
 //------------------------------------------------------------- rooms
-for (const [zone, room] of Object.entries(geo.rooms)) {
+//Only the tint. The lamps are emitted further down, ABOVE the drawing --
+//otherwise the base plan paints over them and a bathroom's ceiling lights
+//disappear behind the bathtub and toilet outlines.
+for (const zone of Object.keys(geo.rooms)) {
 	if (!config.zones[zone]) continue;
-	const z = zones[zone];
 	out.push(`        <g class="room" id="${zone}" clip-path="url(#${zone}-clip)">`);
 	//fill/fill-opacity are inherited properties, so styling the <use> reaches
 	//the referenced polygon -- same trick the apartment border already used.
 	out.push(`          <use class="room-outline" xlink:href="#${zone}-outline" />`);
+	out.push(`        </g>`);
+}
 
-	//Glows. Only lights carrying a mood/night tier get an individual .item
-	//circle; a plain light is toggled with the room and needs no glow of its own.
-	const tiered = z.lights.filter(l => l.tier);
+//The lamps, still clipped per room so a glow cannot bleed through a wall.
+const lightLayer = [`        <g id="lights">`];
+for (const zone of Object.keys(geo.rooms)) {
+	if (!config.zones[zone]) continue;
+	//Only lights carrying a mood/night tier get their own symbol; a plain light
+	//is toggled with the room and needs no glow of its own.
+	const tiered = zones[zone].lights.filter(l => l.tier);
+	if (!tiered.length) continue;
+	lightLayer.push(`          <g clip-path="url(#${zone}-clip)">`);
 	tiered.forEach((l, i) => {
 		const p = placement(zone, l.device, i, tiered.length);
 		if (!p) return;
 		//The click target is the small symbol, NOT the glow. While one circle did
 		//both, a lamp's hit area was its whole radial gradient (r up to 60), so
 		//clicking anywhere in vardagsrum hit whichever lamp happened to be on
-		//top, and the room itself was almost unclickable. The glow is now
-		//pointer-events:none and the symbol carries the id and the .item class.
-		out.push(`          <g class="item" id="${l.device}">`);
+		//top, and the room itself was almost unclickable.
+		lightLayer.push(`            <g class="item" id="${l.device}">`);
 		for (const q of positionsOf(p)) {
-			out.push(`            <circle class="glow ${l.tier}" cx="${tx(q.cx)}" cy="${ty(q.cy)}" r="${p.r}" fill="url(#pf)" pointer-events="none" />`);
-			out.push(`            <circle class="point" cx="${tx(q.cx)}" cy="${ty(q.cy)}" r="6" pointer-events="none" />`);
+			lightLayer.push(`              <circle class="glow ${l.tier}" cx="${tx(q.cx)}" cy="${ty(q.cy)}" r="${p.r}" fill="url(#pf)" pointer-events="none" />`);
+			lightLayer.push(`              <circle class="point" cx="${tx(q.cx)}" cy="${ty(q.cy)}" r="6" pointer-events="none" />`);
 			//A bigger invisible disc so the symbol is tappable on a phone:
 			//r=6 user units is only about 13 px across there.
-			out.push(`            <circle class="hit" cx="${tx(q.cx)}" cy="${ty(q.cy)}" r="${hitRadius(l.device, q)}" fill="none" pointer-events="all" />`);
+			lightLayer.push(`              <circle class="hit" cx="${tx(q.cx)}" cy="${ty(q.cy)}" r="${hitRadius(l.device, q)}" fill="none" pointer-events="all" />`);
 		}
-		out.push(`          </g>`);
+		lightLayer.push(`            </g>`);
 	});
-
-	out.push(`        </g>`);
+	lightLayer.push(`          </g>`);
 }
+lightLayer.push(`        </g>`);
 
 //Readouts live OUTSIDE the room groups. Inside, the room's clip-path cut off
 //any label that reached past a wall, which is most of them in a small room.
@@ -305,6 +314,7 @@ for (const [zone, room] of Object.entries(geo.rooms)) {
 readoutLayer.push(`        </g>`);
 
 out.push(...basePlan);
+out.push(...lightLayer);
 out.push(`        <g id="border-fade" pointer-events="none"><use xlink:href="#rooms-outline" /></g>`);
 out.push(...readoutLayer);
 

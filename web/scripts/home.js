@@ -382,7 +382,11 @@ $(document).ready(function () {
 		var name = ar.id;
 		let nextState = getNextStateRoom(ar);
 
-		$(ar).find('*').removeAttr('state');
+		//The lamps are drawn in their own layer above the plan, so they are no
+		//longer descendants of the room group and $(ar).find() no longer reaches
+		//them. Clear this zone's lamps by name instead, so the room-level render
+		//takes over until the server echoes the change back.
+		Object.keys(model[name] ?? {}).forEach(d => document.getElementById(d)?.removeAttribute('state'));
 
 		var item = {
 			type: 'room',

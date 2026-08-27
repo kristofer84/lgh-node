@@ -236,10 +236,40 @@ def main():
             if 0 <= ny2 < H and 0 <= nx2 < W and inner[ny2, nx2] and owner[ny2, nx2] == 0:
                 owner[ny2, nx2] = o; q.append((ny2, nx2))
 
-    # NB: a traced boundary can touch itself, making the polygon non-simple.
-    # SVG fills and hit-tests it with the nonzero rule, so such a room still
-    # covers its fixtures correctly -- an even-odd point-in-polygon test will
-    # disagree and wrongly report points inside a bathtub as outside the room.
+    # A fixture drawn inside a room -- a bathtub, a shower tray, a vanity -- is
+    # ink, so the flood fill cannot enter it and the space behind it stays
+    # unclaimed. The room polygon then notches around every fixture, and a lamp
+    # placed over one gets clipped away (measured: 3762 px of the bathroom
+    # lights). Give each pocket to the room around it.
+    unclaimed = env & free & (owner == 0)
+    ulab, unum = ndimage.label(unclaimed)
+    sizes = ndimage.sum(unclaimed, ulab, range(1, unum + 1))
+    boxes = ndimage.find_objects(ulab)
+    filled = 0
+    for k in range(1, unum + 1):
+        size = int(sizes[k - 1])
+        if size < 20 or size > 20000:        # speckle, or a real space
+            continue
+        sl = boxes[k - 1]
+        # Work in a padded window. Dilating every component across the whole
+        # 1680x2376 raster takes minutes; this takes about a second.
+        PAD = 8
+        win = (slice(max(0, sl[0].start - PAD), min(H, sl[0].stop + PAD)),
+               slice(max(0, sl[1].start - PAD), min(W, sl[1].stop + PAD)))
+        comp = ulab[win] == k
+        # Dilate by more than one pixel: a pocket is ringed by the fixture's own
+        # outline, so at 1 px it touches only ink and looks unbordered.
+        near = ndimage.binary_dilation(comp, np.ones((11, 11))) & ~comp
+        ow = owner[win]
+        touching = ow[near & (ow > 0)]
+        if touching.size == 0:
+            continue
+        vals, counts = np.unique(touching, return_counts=True)
+        ow[comp] = vals[counts.argmax()]
+        filled += size
+    if filled:
+        print(f'  absorbed {filled} px of fixture pockets into their rooms')
+
     rooms = {}
     for i, zone in enumerate(names):
         if i == 0:
