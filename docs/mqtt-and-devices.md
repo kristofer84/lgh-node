@@ -84,12 +84,19 @@ out in `log.js`, so dropped messages leave no trace).
 `devices[<device>][<valueType>] = payload`. This happens for *every* matching message, whether or
 not the device is known to `db/config.json`.
 
+⚠ `valueTypes` is an **allowlist** — `['state', 'brightness', 'current_temperature',
+'current_humidity', 'current_pressure']`. Anything else HA publishes (and with
+`publish_attributes: true` it publishes a lot) is dropped on the floor. `brightness` was added
+2026-08-27; before that `getDevice()` returned `dim: device['dim']`, a key **nothing ever
+wrote**, so every lamp reported `dim: undefined` for as long as the model has existed. If you
+need another attribute client-side, adding it here is step one.
+
 **(b) A typed update, only for devices that have a `zone`** (i.e. that appear in
 `db/config.json`):
 
 | `deviceType` | What is written |
 |---|---|
-| `light`, `switch` | `devices[d].onoff = payload === 'on' ? 'true' : 'false'` — **the string `'true'`/`'false'`, not a boolean** |
+| `light`, `switch`, `valueType === 'state'` | `devices[d].onoff = payload === 'on' ? 'true' : 'false'` — **the string `'true'`/`'false'`, not a boolean**. ⚠ The `valueType` test is load-bearing: this branch used to run for *every* value type, so the moment `brightness` joined `valueTypes` a payload of `"178"` read as "not on" and flipped `onoff` to false. |
 | anything else, zone `devices` | `devices[d].state = parseFloat(payload) > 2.5` — a **boolean**. "A device is on if it draws more than 2.5 W." |
 | anything else, other zones | `devices[d].state = payload` — the raw string |
 
@@ -151,9 +158,16 @@ early if `message` is `undefined`.
   switches the tiered ones on and the untiered ones *off*, so a zone in which **every** light
   is tiered has no `on` step at all: `mood` and `on` publish the identical scene and the extra
   press does nothing. `kok` and `bad3` were both in that state until 2026-08-27. Whenever you
-  add a tier, check the zone still has at least one plain `.light` / `.switch` left.
+  add a tier, check the zone still has at least one plain `.light` / `.switch` left — **or**
+  that the tiered ones carry a brightness (`[3]`), which separates the two steps by level
+  instead of by membership. `bad3` is the one zone relying on that: its only light is
+  `badrum_3_tak.light.mood.70`, so `mood` is 70% and `on` is 100%.
   The same trap one level down: if the only tiered device in a zone is `.night`, then `night`
   and `mood` are also identical (night counts as mood), which is what `orangeri` did.
+
+- `[3]` **brightness** (optional, and only meaningful with `[2]`) — percent, e.g.
+  `badrum_1_tak.light.mood.70`. Sets `devices[d].level`; makes that light dim to 70% at its
+  step and to 100% at `on`. See `toggle()` in §7 for why `on` has to say 100 out loud.
 
 Examples from the live config:
 `"sang_hoger.switch.mood"`, `"sovrum_1_tak.light"`, `"slinga_mette.light.night"`,
@@ -219,7 +233,7 @@ the order the code tests them:
 
 | Condition | Fields |
 |---|---|
-| `d.type === 'light'` **or `'switch'`** | `onoff` (**boolean**, `d.onoff === 'true'`), `dim`, `night`, `mood` |
+| `d.type === 'light'` **or `'switch'`** | `onoff` (**boolean**, `d.onoff === 'true'`), `dim` (0–255 number or `undefined`, via `brightnessOf()` — HA sends the literal string `"null"` while the lamp is off), `level` (percent from the device string's 4th segment), `night`, `mood` |
 | `d.type === 'occupancy'` | *(empty object — `lastChange` alone carries the signal)* |
 | `d.type === 'sensor'` | `state` |
 | has `onoff` | `onoff` (boolean) |
@@ -288,10 +302,28 @@ filtering (everyone who is `enabled` sees the whole apartment).
 Rejects an unknown zone and an `undefined` value with a log line. Then, for every `light` /
 `switch` in that zone:
 
-- `value === 'night'` → publish `on` to devices flagged `.night`, `off` to the rest
-- `value === 'mood'` → publish `on` to devices with **any** third segment (`.mood` *or*
-  `.night` — the comment says "Night && mood"), `off` to the rest
+- `value === 'night'` → turn on devices flagged `.night`, `off` to the rest
+- `value === 'mood'` → turn on devices with **any** third segment (`.mood` *or* `.night` —
+  the comment says "Night && mood"), `off` to the rest
 - otherwise → publish `value` verbatim to all of them
+
+⚠ **A device may name the brightness it takes at its step** — a *fourth* segment,
+`badrum_1_tak.light.mood.70`. Such a light is **dimmed** at that step rather than merely
+switched on, and at the `on` step `toggle()` drives it to **100 explicitly**. That last part
+is not optional: a plain `turn_on` restores the level the lamp last had, so after a mood press
+`on` would leave it sitting at 70%. Measured on the real dimmer 2026-08-27, not assumed.
+Only `badrum_{1,2,3}_tak` use this today.
+
+⚠ **Brightness leaves on a different topic and needs a second HA automation.**
+`publish()` writes `webapp/switch/<entity>/<property>/set`, which the long-standing HA
+automation **`(mqtt in) Kontrollera enhet`** picks up — and that automation runs
+`homeassistant.turn_{{trigger.payload}}` and **discards the property segment entirely**, so
+that path can only ever carry `on`/`off`. A payload of `70` would call
+`homeassistant.turn_70`. `publishDim()` therefore writes **`webapp/dim/<entity>/set`**, which
+the old trigger pattern (`webapp/switch/+/+/set`) cannot match, and a second automation added
+2026-08-27, **`(mqtt in) Dimma enhet`**, calls `light.turn_on` with `brightness_pct`.
+Both live in `/media/storage/ha/homeassistant/automations.yaml` — **outside this repo**. If
+dimming stops working, check that automation exists and is enabled before touching this code.
 
 The client picks the next value with `getNextStateRoom()` (`web/scripts/home.js` 324):
 `on → off`, `off → night` (if nightable) else `mood` (if moodable) else `on`,
@@ -410,6 +442,14 @@ Record here rather than rediscovering them:
 
 `devices` — the entire in-memory model — is written to **`log/mqtt.log`** (JSON, tab-indented)
 **only inside `exitHandler`** (line 626). There is no periodic flush and no write on change.
+
+⚠ **`init()` restores `devices` from that file and then stamps the config over it — so it must
+DELETE a flag as well as set one.** It did not until 2026-08-27: `mood` / `night` were only
+ever assigned, so a light whose tier had been *removed* from `db/config.json` came back still
+carrying `mood: true` from the last exit. `toggle()` reads the config and would no longer
+publish it as a mood light, but `updateView()` reads the *model* and went on rendering a mood
+step for it — a split brain that survives every restart and cannot be seen in the config.
+Retiering five lights that day is what surfaced it.
 
 Handlers registered (lines 739–753):
 

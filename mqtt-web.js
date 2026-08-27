@@ -55,13 +55,30 @@ function init() {
 			devices[device].zone = zone;
 			devices[device].type = split[1];
 
-			if (split.length === 3) {
+			//db/config.json is authoritative for the tier, but `devices` was just
+			//restored from log/mqtt.log, which still holds whatever the tier was
+			//when the process last exited. Setting without clearing left a light
+			//that had LOST its tier still advertising mood:true to the client, so
+			//the room went on rendering a mood step that toggle() -- which reads
+			//the config, not the model -- no longer publishes.
+			delete devices[device].mood;
+			delete devices[device].night;
+			delete devices[device].level;
+
+			if (split.length > 2) {
 				if (split[2] === 'mood') {
 					devices[device].mood = true;
 				}
 
 				if (split[2] === 'night') {
 					devices[device].night = true;
+				}
+
+				//[3] is the brightness this light takes at its tier's step, in
+				//percent: "badrum_1_tak.light.mood.70". Without it the step is a
+				//plain on/off.
+				if (split[3] !== undefined) {
+					devices[device].level = Number(split[3]);
 				}
 			}
 		});
@@ -366,7 +383,7 @@ client.on('connect', function () {
 client.on('message', function (topic, message) {
 	try {
 		const split = topic.split('/');
-		const valueTypes = ['state', 'current_temperature', 'current_humidity', 'current_pressure'];
+		const valueTypes = ['state', 'brightness', 'current_temperature', 'current_humidity', 'current_pressure'];
 		const valueType = split[3];
 
 		//homeassistant/light/entre/state: on
@@ -403,10 +420,16 @@ client.on('message', function (topic, message) {
 			//		}
 			if (devices.hasOwnProperty(device) && devices[device].hasOwnProperty('zone')) {
 				if (deviceType === 'light' || deviceType === 'switch') {
-					let prev = devices[device]['onoff'];
-					let val = message.toString() === 'on' ? 'true' : 'false';
-					if (prev !== val) {
-						devices[device]['onoff'] = val;
+					//Only `state` says whether the lamp is on. This used to run for
+					//every value type, so once `brightness` was ingested a payload
+					//of "178" read as "not on" and switched onoff to false. The
+					//reducer above has already stored the brightness itself.
+					if (valueType === 'state') {
+						let prev = devices[device]['onoff'];
+						let val = message.toString() === 'on' ? 'true' : 'false';
+						if (prev !== val) {
+							devices[device]['onoff'] = val;
+						}
 					}
 				}
 				// else if (deviceType === 'group') {
@@ -579,12 +602,16 @@ function getDevice(dev) {
 		//declared .mood advertised mood:true in the device.all snapshot and then
 		//lost it on the next per-device update.
 		if (d.type === 'light' || d.type === 'switch') {
-			let dim = d.hasOwnProperty('dim') ? d['dim'] : undefined;
+			//`dim` was read from d['dim'], which nothing ever wrote -- 'brightness'
+			//was not an ingested value type, so it was undefined for every lamp
+			//since the model was introduced.
+			let dim = brightnessOf(d);
 			let mood = d.mood;
 			let night = d.night;
 			r[zone][dev] = {
 				onoff: d['onoff'] === 'true',
 				dim: dim,
+				level: d.level,
 				night: night,
 				mood: mood
 			};
@@ -639,12 +666,13 @@ function getDevice(dev) {
 			if (type === 'light' || type === 'switch') {
 				ret.mood = (split.length > 2 && split[2] === 'mood') ? true : undefined;
 				ret.night = (split.length > 2 && split[2] === 'night') ? true : undefined;
+				ret.level = (split.length > 3) ? Number(split[3]) : undefined;
 			}
 
 			if (device != undefined) {
 				if (type === 'light' || type === 'switch') {
 					ret.onoff = device['onoff'] === 'true';
-					ret.dim = device['dim'];
+					ret.dim = brightnessOf(device);
 				}
 				else if (type === 'occupancy') {
 					ret.lastChange = device['lastChange'];
@@ -681,6 +709,15 @@ function exitHandler(options, exitCode) {
 	}
 }
 
+//HA statestream publishes brightness as 0-255 -- and literally "null" while the
+//lamp is off. Everything downstream wants a number or nothing.
+function brightnessOf(d) {
+	let raw = d === undefined ? undefined : d['brightness'];
+	if (raw === undefined || raw === null || raw === 'null') return undefined;
+	let n = Number(raw);
+	return Number.isFinite(n) ? n : undefined;
+}
+
 function toggle(zone, value) {
 	if (config.zones[zone] === undefined) {
 		log(`Missing zone: ${zone}`);
@@ -692,27 +729,40 @@ function toggle(zone, value) {
 		return;
 	}
 
+	//A device may name the brightness it takes at its tier's step -- the 4th
+	//segment, "badrum_1_tak.light.mood.70". Such a light is DIMMED at that step
+	//rather than merely switched on, and at the `on` step it is driven to 100
+	//explicitly: a plain turn_on restores whatever level the lamp last had, so
+	//after a mood press `on` would otherwise leave it sitting at 70. (Measured
+	//against the real dimmer, not assumed.)
+	var send = (split, on, level) => {
+		var entity = split[1] + '.' + split[0];
+		if (on && level !== undefined) publishDim(entity, level);
+		else publish(entity, 'state', on ? 'on' : 'off');
+	};
+	var levelOf = split => split[3] === undefined ? undefined : Number(split[3]);
+
 	if (value === "night") {
 		config.zones[zone].forEach(device => {
 			var split = device.split('.');
 			if (split[1] !== 'light' && split[1] !== 'switch') return;
-			var toState = split.length > 2 && split[2] === 'night' ? 'on' : 'off';
-			publish(split[1] + '.' + split[0], 'state', toState);
+			var on = split.length > 2 && split[2] === 'night';
+			send(split, on, levelOf(split));
 		});
 	}
 	else if (value === "mood") {
 		config.zones[zone].forEach(device => {
 			var split = device.split('.');
 			if (split[1] !== 'light' && split[1] !== 'switch') return;
-			var toState = split.length > 2 ? 'on' : 'off'; //Night && mood
-			publish(split[1] + '.' + split[0], 'state', toState);
+			var on = split.length > 2; //Night && mood
+			send(split, on, levelOf(split));
 		});
 	}
 	else {
 		config.zones[zone].forEach(device => {
 			var split = device.split('.');
 			if (split[1] !== 'light' && split[1] !== 'switch') return;
-			publish(split[1] + '.' + split[0], 'state', value)
+			send(split, value === 'on', levelOf(split) === undefined ? undefined : 100);
 		});
 	}
 }
@@ -733,6 +783,20 @@ function toggleItem(item, value) {
 	}));
 
 	// publish(split[1] + '.' + split[0], 'state', toState);
+}
+
+//Brightness goes to a topic of its own. The long-standing HA automation
+//"(mqtt in) Kontrollera enhet" triggers on webapp/switch/+/+/set and runs
+//homeassistant.turn_{{payload}}, so that path can only ever carry on/off -- a
+//number there would call homeassistant.turn_70. A second automation added
+//2026-08-27, "(mqtt in) Dimma enhet", listens on webapp/dim/<entity_id>/set and
+//calls light.turn_on with brightness_pct. The old trigger pattern cannot match
+//this topic, so nothing that already worked goes near it.
+function publishDim(device, percent) {
+	if (percent === undefined) return;
+	var topic = `webapp/dim/${device}/set`;
+	log(`${topic}: ${percent}`);
+	client.publish(topic, String(percent));
 }
 
 function publish(device, property, message) {
