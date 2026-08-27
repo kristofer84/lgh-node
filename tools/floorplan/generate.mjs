@@ -152,7 +152,34 @@ function placement(zone, device, index, total) {
 //entry carries `points: [[x,y], ...]` instead of a single cx/cy, and emits one
 //glow+symbol+hit per point inside ONE <g class="item">, so all of them toggle
 //together as the single device they are.
+//A lamp entry may instead name one of the runs outlined on the drawing's "Rum"
+//layer -- Koksbank, Kokshylla, Bank -- and say how many lamps sit along it.
+//Spacing then follows the drawing rather than numbers typed in by hand, and it
+//tracks automatically when the run is redrawn.
+function runPositions(name, count) {
+	const rect = geo.runs?.[name];
+	if (!rect) {
+		note(`lights.json names run "${name}", which is not on the drawing's Rum layer`);
+		return null;
+	}
+	const xs = rect.map(q => q[0]), ys = rect.map(q => q[1]);
+	const x0 = Math.min(...xs), x1 = Math.max(...xs);
+	const y0 = Math.min(...ys), y1 = Math.max(...ys);
+	const vertical = (y1 - y0) >= (x1 - x0);
+	const a = vertical ? y0 : x0;
+	const len = vertical ? y1 - y0 : x1 - x0;
+	const across = vertical ? (x0 + x1) / 2 : (y0 + y1) / 2;
+	//Half a step in from each end, so the lamps sit within the run rather than
+	//on its corners.
+	const step = len / count;
+	return Array.from({ length: count }, (_, i) => {
+		const along = a + step * (i + 0.5);
+		return vertical ? { cx: across, cy: along } : { cx: along, cy: across };
+	});
+}
+
 function positionsOf(p) {
+	if (p.run) return runPositions(p.run, p.count ?? 1) ?? [];
 	return Array.isArray(p.points) ? p.points.map(([cx, cy]) => ({ cx, cy })) : [{ cx: p.cx, cy: p.cy }];
 }
 

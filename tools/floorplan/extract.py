@@ -26,6 +26,8 @@ ZONE = {
     'BAD1': 'bad1', 'BAD2': 'bad2', 'BAD3': 'bad3',
     'KLK1': 'klk1', 'KLK2': 'klk2',
     'ORANGERI': 'orangeri', 'TVÄTT': 'tvatt', 'LOGGIA': 'loggia', 'BALKONG': 'balkong',
+    # the Rum layer spells a couple of them out in full
+    'TVÄTTSTUGA': 'tvatt',
 }
 
 
@@ -130,6 +132,72 @@ def to_units(loop):
     return ded
 
 
+def parse_path(d):
+    """Straight-line subset of SVG path data: M/m L/l H/h V/v Z/z. The Rum layer
+    is drawn with the line tool, so there are no curves to worry about."""
+    toks = re.findall(r'[MmLlHhVvZz]|-?\d*\.?\d+(?:[eE][-+]?\d+)?', d)
+    pts, cur, cmd, i = [], [0.0, 0.0], None, 0
+    while i < len(toks):
+        t = toks[i]
+        if t in 'MmLlHhVvZz':
+            cmd = t; i += 1; continue
+        if cmd in 'Mm':
+            x, y = float(toks[i]), float(toks[i + 1]); i += 2
+            cur = [cur[0] + x, cur[1] + y] if cmd == 'm' else [x, y]
+            pts.append((cur[0], cur[1]))
+            cmd = 'l' if cmd == 'm' else 'L'        # implicit lineto after moveto
+        elif cmd in 'Ll':
+            x, y = float(toks[i]), float(toks[i + 1]); i += 2
+            cur = [cur[0] + x, cur[1] + y] if cmd == 'l' else [x, y]
+            pts.append((cur[0], cur[1]))
+        elif cmd in 'Hh':
+            x = float(toks[i]); i += 1
+            cur = [cur[0] + x, cur[1]] if cmd == 'h' else [x, cur[1]]
+            pts.append((cur[0], cur[1]))
+        elif cmd in 'Vv':
+            y = float(toks[i]); i += 1
+            cur = [cur[0], cur[1] + y] if cmd == 'v' else [cur[0], y]
+            pts.append((cur[0], cur[1]))
+        else:
+            i += 1
+    return pts
+
+
+def read_rum_layer(svg):
+    """Room outlines drawn by hand on the 'Rum' layer, plus the fixture runs.
+
+    These are authoritative: they replaced a flood-fill segmentation that had to
+    guess where a doorway ended and could not tell a wardrobe niche from a room.
+    """
+    i = svg.find('inkscape:label="Rum"')
+    if i < 0:
+        return None, None
+    block = svg[svg.rfind('<g', 0, i):svg.rindex('</svg>')]
+    if re.search(r'transform=', block[:block.index('>')]):
+        sys.exit('ERROR: the Rum layer carries a transform; coordinates would be wrong')
+    shapes = {}
+    for m in re.finditer(r'<(path|rect)\b((?:[^>"]|"[^"]*")*?)/?>', block):
+        tag, attrs = m.group(1), m.group(2)
+        lab = re.search(r'inkscape:label="([^"]*)"', attrs)
+        if not lab:
+            continue
+        if tag == 'path':
+            pts = parse_path(re.search(r'\bd="([^"]*)"', attrs).group(1))
+        else:
+            f = lambda k: float(re.search(r'\b%s="([-\d.]+)"' % k, attrs).group(1))
+            x, y, w, h = f('x'), f('y'), f('width'), f('height')
+            pts = [(x, y), (x + w, y), (x + w, y + h), (x, y + h)]
+        # drop a repeated closing point
+        if len(pts) > 1 and abs(pts[0][0] - pts[-1][0]) < 1e-6 and abs(pts[0][1] - pts[-1][1]) < 1e-6:
+            pts = pts[:-1]
+        shapes[lab.group(1)] = [(round(x, 2), round(y, 2)) for x, y in pts]
+    # Layer labels are mixed case ('Vardagsrum', 'Tvättstuga'); the text labels
+    # they must agree with are upper case.
+    rooms = {ZONE[k.upper()]: v for k, v in shapes.items() if k.upper() in ZONE}
+    runs = {k: v for k, v in shapes.items() if k.upper() not in ZONE}
+    return rooms, runs
+
+
 def make_base(svg):
     """Strip the drawing down to line-work: no text, metadata, inkscape cruft.
 
@@ -138,7 +206,14 @@ def make_base(svg):
     browser drop the clipped element entirely. Surviving ids are prefixed so a
     future drawing cannot collide with a generated one (a room called `kok`...).
     """
-    t = re.sub(r'<text\b.*?</text>', '', svg, flags=re.S)
+    # The Rum layer is annotation, not artwork -- strip it or its outlines are
+    # drawn on the dashboard.
+    i = svg.find('inkscape:label="Rum"')
+    if i >= 0:
+        t = svg[:svg.rfind('<g', 0, i)] + '</svg>'
+    else:
+        t = svg
+    t = re.sub(r'<text\b.*?</text>', '', t, flags=re.S)
     t = re.sub(r'<metadata\b.*?</metadata>', '', t, flags=re.S)
     t = re.sub(r'<sodipodi:namedview\b.*?</sodipodi:namedview>', '', t, flags=re.S)
     t = re.sub(r'<sodipodi:namedview\b[^>]*/>', '', t)
@@ -159,6 +234,29 @@ def make_base(svg):
                                            m.group(1)) + '"', t)
 
 
+def point_in(pts, p):
+    x, y = p
+    w = False
+    for i in range(len(pts)):
+        xi, yi = pts[i]
+        xj, yj = pts[i - 1]
+        if (yi > y) != (yj > y) and x < (xj - xi) * (y - yi) / (yj - yi) + xi:
+            w = not w
+    return w
+
+
+def sample_points(pts, step):
+    xs = [p[0] for p in pts]; ys = [p[1] for p in pts]
+    x = min(xs)
+    while x < max(xs):
+        y = min(ys)
+        while y < max(ys):
+            if point_in(pts, (x, y)):
+                yield (x, y)
+            y += step
+        x += step
+
+
 def main():
     svg = open(SRC, encoding='utf8').read()
     vb = re.search(r'viewBox="([\d.\s-]+)"', svg).group(1).split()
@@ -166,135 +264,57 @@ def main():
     W, H = int(VW * PPU), int(VH * PPU)
 
     labels = read_labels(svg)
-    rooms_in = [(ZONE[t], x, y) for t, x, y in labels if t in ZONE]
+    anchors = {ZONE[t]: (x, y) for t, x, y in labels if t in ZONE}
     marks = [{'text': t, 'x': x, 'y': y} for t, x, y in labels if t not in ZONE]
-    seen = {}
-    for z, _, _ in rooms_in:
-        seen[z] = seen.get(z, 0) + 1
-    dupes = [z for z, c in seen.items() if c > 1]
-    if dupes:
-        sys.exit(f'ERROR: duplicate room labels for {dupes}')
-    print(f'{len(rooms_in)} rooms, {len(marks)} fixture markers')
 
+    rooms_pts, runs = read_rum_layer(svg)
+    if not rooms_pts:
+        sys.exit("ERROR: no 'Rum' layer in the drawing. Room outlines are read from "
+                 "that layer; draw one shape per room and label it with the room name.")
+    print(f'{len(rooms_pts)} room outlines, {len(runs)} fixture runs, {len(marks)} markers')
+
+    missing = [z for z in rooms_pts if z not in anchors]
+    if missing:
+        sys.exit(f'ERROR: no text label inside {missing}; the anchor is needed for readouts')
+
+    # Every room's text label must land inside its own outline -- that is what
+    # ties the two layers together, and it catches a mislabelled shape.
+    rooms = {}
+    for zone, pts in rooms_pts.items():
+        a = anchors[zone]
+        if not point_in(pts, a):
+            # LOGGIA and BALKONG are labelled from the margin, outside the room.
+            # Fall back to a point that is definitely inside, since the anchor
+            # positions the readout and seeds automatic lamp placement.
+            inside_pts = list(sample_points(pts, 0.5))
+            if not inside_pts:
+                sys.exit(f'ERROR: {zone} outline encloses no area')
+            a = min(inside_pts, key=lambda q: (q[0] - a[0]) ** 2 + (q[1] - a[1]) ** 2)
+            print(f'  {zone}: label is outside its outline, anchored at {a[0]:.1f},{a[1]:.1f} instead')
+        rooms[zone] = {'points': pts, 'anchor': [round(a[0], 3), round(a[1], 3)]}
+
+    # Rooms must not overlap. A hand-drawn outline is easy to nudge over a wall.
+    zs = list(rooms)
+    for i, a in enumerate(zs):
+        for b in zs[i + 1:]:
+            hits = sum(1 for p in sample_points(rooms[a]['points'], 0.8) if point_in(rooms[b]['points'], p))
+            if hits:
+                print(f'  WARNING {a} and {b} overlap ({hits} sample points)')
+
+    # The apartment envelope, for the soft border. This is the only thing still
+    # needing a raster: it follows the outside of the walls, which the room
+    # outlines (drawn on the inside faces) do not describe.
     with tempfile.TemporaryDirectory() as tmp:
         png = os.path.join(tmp, 'walls.png')
-        rasterize(re.sub(r'<text\b.*?</text>', '', svg, flags=re.S), W, H, png)
+        rasterize(re.sub(r'<text\b.*?</text>', '', make_base(svg), flags=re.S), W, H, png)
         img = read_gray(png)
-
     free = img > 250
-
-    # Envelope first: complement of the page background. No morphological closing
-    # here -- it eats into the facade and pulls the outline inside the outer wall.
     lab, _ = ndimage.label(free)
     border = set(lab[0, :]) | set(lab[-1, :]) | set(lab[:, 0]) | set(lab[:, -1])
     border.discard(0)
     env = ndimage.binary_fill_holes(~np.isin(lab, list(border)))
     l2, n2 = ndimage.label(env)
     env = ndimage.binary_fill_holes(l2 == int(np.argmax(ndimage.sum(env, l2, range(1, n2 + 1)))) + 1)
-
-    # Rooms may only claim free space INSIDE the building. Without this a room
-    # that is open to the exterior (the balcony, the loggia) leaks into the page
-    # background and the seeds partition the whole sheet between them.
-    inner = free & env
-
-    # A label may sit outside the building -- LOGGIA and BALKONG are annotated
-    # from the margin. Snap any such seed to the nearest pixel inside.
-    # Snap to a *room-sized* region, not merely the nearest interior pixel: the
-    # nearest one is often a sliver between a wall and a railing, and seeding
-    # there yields a room of a few square units.
-    ilab, inum = ndimage.label(inner)
-    isize = ndimage.sum(inner, ilab, range(1, inum + 1))
-    roomy = np.zeros_like(inner)
-    for k, sz in enumerate(isize, start=1):
-        if sz >= 3000:                     # ~47 sq units at 8 px/unit
-            roomy |= (ilab == k)
-    _, (ny, nx) = ndimage.distance_transform_edt(~roomy, return_indices=True)
-
-    # Rooms: multi-source geodesic flood fill. Plain connected components does not
-    # separate rooms -- doorways merge them into one region. Seeding at each label
-    # and letting the fills meet splits rooms at their narrowest connection.
-    from collections import deque
-    owner = np.zeros(img.shape, np.int16)
-    q = deque()
-    names = ['']
-    for i, (zone, x, y) in enumerate(rooms_in, start=1):
-        names.append(zone)
-        px, py = int(x * PPU), int(y * PPU)
-        if not inner[py, px]:
-            sy, sx = int(ny[py, px]), int(nx[py, px])
-            print(f'  {zone}: label is outside the building, snapped '
-                  f'{np.hypot(sy - py, sx - px) / PPU:.1f} units to the nearest interior point')
-            py, px = sy, sx
-        if owner[py, px]:
-            sys.exit(f'ERROR: {zone} seed landed on {names[owner[py, px]]}')
-        owner[py, px] = i
-        q.append((py, px))
-    while q:
-        y, x = q.popleft()
-        o = owner[y, x]
-        for ny2, nx2 in ((y - 1, x), (y + 1, x), (y, x - 1), (y, x + 1)):
-            if 0 <= ny2 < H and 0 <= nx2 < W and inner[ny2, nx2] and owner[ny2, nx2] == 0:
-                owner[ny2, nx2] = o; q.append((ny2, nx2))
-
-    # A fixture drawn inside a room -- a bathtub, a shower tray, a vanity -- is
-    # ink, so the flood fill cannot enter it and the space behind it stays
-    # unclaimed. The room polygon then notches around every fixture, and a lamp
-    # placed over one gets clipped away (measured: 3762 px of the bathroom
-    # lights). Give each pocket to the room around it.
-    unclaimed = env & free & (owner == 0)
-    ulab, unum = ndimage.label(unclaimed)
-    sizes = ndimage.sum(unclaimed, ulab, range(1, unum + 1))
-    boxes = ndimage.find_objects(ulab)
-    filled = 0
-    for k in range(1, unum + 1):
-        size = int(sizes[k - 1])
-        if size < 20 or size > 20000:        # speckle, or a real space
-            continue
-        sl = boxes[k - 1]
-        # Work in a padded window. Dilating every component across the whole
-        # 1680x2376 raster takes minutes; this takes about a second.
-        PAD = 8
-        win = (slice(max(0, sl[0].start - PAD), min(H, sl[0].stop + PAD)),
-               slice(max(0, sl[1].start - PAD), min(W, sl[1].stop + PAD)))
-        comp = ulab[win] == k
-        # Dilate by more than one pixel: a pocket is ringed by the fixture's own
-        # outline, so at 1 px it touches only ink and looks unbordered.
-        near = ndimage.binary_dilation(comp, np.ones((11, 11))) & ~comp
-        ow = owner[win]
-        touching = ow[near & (ow > 0)]
-        if touching.size == 0:
-            continue
-        vals, counts = np.unique(touching, return_counts=True)
-        ow[comp] = vals[counts.argmax()]
-        filled += size
-    if filled:
-        print(f'  absorbed {filled} px of fixture pockets into their rooms')
-
-    rooms = {}
-    for i, zone in enumerate(names):
-        if i == 0:
-            continue
-        # Close hard enough to bridge a fixture outline: a bathtub or shower rim
-        # is ink drawn INSIDE the room, so the space behind it ends up as a
-        # separate connected component of the room's own mask, and trace() keeps
-        # only the largest -- silently cutting the tub out of the bathroom.
-        m = ndimage.binary_closing(owner == i, np.ones((9, 9)))
-        m = ndimage.binary_fill_holes(m)
-        lb, nc = ndimage.label(m)
-        if nc > 1:
-            sizes = ndimage.sum(m, lb, range(1, nc + 1))
-            dropped = sizes.sum() - sizes.max()
-            if dropped / sizes.sum() > 0.02:
-                print(f'  WARNING {zone}: trace drops {dropped / sizes.sum():.0%} of the room '
-                      f'({int(dropped)} px) as a detached component')
-        loop = trace(m)
-        if not loop:
-            sys.exit(f'ERROR: could not trace {zone}')
-        pts = to_units(simplify(loop, 3.0))
-        anchor = next((x, y) for z, x, y in rooms_in if z == zone)
-        rooms[zone] = {'points': pts, 'anchor': list(anchor)}
-        print(f'  {zone:<11} {len(pts):>3} pts')
-
     silhouette = to_units(simplify(trace(ndimage.binary_dilation(env, np.ones((3, 3)), iterations=3)), 3.0))
 
     pts = [p for r in rooms.values() for p in r['points']] + silhouette
@@ -307,10 +327,13 @@ def main():
         'transform': {'origin': [round(ox, 3), round(oy, 3)], 'scale': SCALE, 'viewBox': [0, 0, vw, vh]},
         'silhouette': silhouette,
         'rooms': rooms,
+        'runs': {k: v for k, v in runs.items()},
         'fixtures': marks,
     }
     json.dump(out, open(os.path.join(HERE, 'geometry.json'), 'w'), ensure_ascii=False, indent=1)
     open(os.path.join(HERE, 'base.svg'), 'w', encoding='utf8').write(make_base(svg))
+    for z in sorted(rooms):
+        print(f'  {z:<11} {len(rooms[z]["points"]):>3} pts')
     print(f'\nviewBox 0 0 {vw} {vh}   origin ({ox:.2f}, {oy:.2f})  scale {SCALE}')
     print('wrote geometry.json + base.svg -- now run: node tools/floorplan/generate.mjs')
 

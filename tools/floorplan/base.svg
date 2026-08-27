@@ -7690,7 +7690,7 @@
        stroke="#000000"
        stroke-opacity="1"
        stroke-miterlimit="10"
-       d="m 119.04,195.76 h 4.4 v 2.98 h -4.4 z m 0,0"
+       d="m 119.04,192.59 h 4.4 v 4.89 h -4.4 z m 0,0"
        />
     <path
        fill="none"
@@ -7701,16 +7701,6 @@
        stroke-opacity="1"
        stroke-miterlimit="10"
        d="m 123.45,195.76 z m 0,0"
-       />
-    <path
-       fill="none"
-       stroke-width="0.127"
-       stroke-linecap="round"
-       stroke-linejoin="round"
-       stroke="#000000"
-       stroke-opacity="1"
-       stroke-miterlimit="10"
-       d="m 119.04,199.32 h 4.4 v 2.98 h -4.4 z m 0,0"
        />
     <path
        fill="none"
@@ -7740,17 +7730,7 @@
        stroke="#000000"
        stroke-opacity="1"
        stroke-miterlimit="10"
-       d="m 152.85,182.01 -6.01,0.04 v -5.55"
-       />
-    <path
-       fill="none"
-       stroke-width="0.127"
-       stroke-linecap="round"
-       stroke-linejoin="round"
-       stroke="#000000"
-       stroke-opacity="1"
-       stroke-miterlimit="10"
-       d="m 146.85,182.05 -10.05,0.04 v -5.55"
+       d="m 152.85,182.01 -16.05,0.04 v -5.5"
        />
     <path
        fill="none"
@@ -11710,4 +11690,4 @@
          />
     </g>
   </g>
-</svg>
+  </svg>

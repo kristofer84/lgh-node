@@ -34,9 +34,8 @@ zone, a power sensor with no marker in the plan).
 |---|---|
 | `geometry.json` | room polygons, per-room text anchors, fixture markers, and the source→dashboard transform |
 | `base.svg` | the architectural line-work, drawn over the room tint (`pointer-events: none`) |
-| `rooms-override.json` | hand-drawn replacements for room polygons the flood fill gets wrong. Replaces both the tint and the clip path |
 | `readouts.json` | per-zone nudge for the temperature/humidity readout, in drawing units. Hand-edited; `extract.py` never writes it |
-| `lights.json` | per-device glow positions. Auto-seeded in a ring around the room anchor on first run, then **hand-edit it** — `"auto": true` marks one that has never been placed properly |
+| `lights.json` | per-device glow positions, or `{"run": "Köksbänk", "count": 6}` to space lamps evenly along a run outlined on the `Rum` layer. Auto-seeded in a ring around the room anchor on first run, then **hand-edit it** — `"auto": true` marks one that has never been placed properly |
 | `dashboard.template.html` | everything outside the `<svg>`; `<!--FLOORPLAN-->` is the splice point |
 | `../../db/config.json` | the zones. Decides what is emitted at all |
 | `lgh_rot.svg` | the original Inkscape drawing, kept for re-extraction |
@@ -50,39 +49,39 @@ python3 tools/floorplan/extract.py      # -> geometry.json + base.svg
 node   tools/floorplan/generate.mjs     # -> web/dashboard.html
 ```
 
-`extract.py` derives `geometry.json` and `base.svg` from `lgh_rot.svg`. It needs
-`rsvg-convert` plus python3 with numpy/scipy, and takes about 45 s.
+**Room outlines are read from a layer called `Rum`.** One shape per room, labelled
+with the room name (`inkscape:label`), drawn with the line tool — the parser handles
+`M/L/H/V/Z` and `<rect>`, not curves. Shapes on that layer whose label is *not* a room
+become **fixture runs** (`Köksbänk`, `Kökshylla`, `Bänk`), which a lamp can be spaced
+along; see `lights.json` below.
 
-1. Strip `<text>` from the drawing and rasterize the walls at 8 px/mm.
-2. Seed a **multi-source geodesic flood fill** at each room's text anchor. Plain
-   connected components does *not* work: doorways merge Hall/Kök/Vardagsrum/Entré
-   into one region. Flooding from labelled seeds splits rooms at their narrowest
-   connection, which is the doorway.
-3. Moore-neighbour boundary trace + Douglas–Peucker to get 5–32 point polygons.
-4. The apartment envelope (`#rooms-outline`) is the complement of the page
-   background, filled and slightly dilated. Do **not** add a morphological
-   closing to tidy the door-swing arcs: it eats into the facade and pulls the
-   silhouette inside the outer wall.
+This replaced a multi-source flood fill over a rasterised plan. That worked, but it had
+to infer where one room ended and the next began, and every awkward case needed a
+correction: it split rooms at doorways by guessing, carved bathtubs and vanities out of
+their rooms, handed the kitchen's counter to the corridor, and gave `gang` every wardrobe
+niche it could reach. Hand-drawn outlines are authoritative and the whole class of
+problem is gone, along with `rooms-override.json`, which existed only to patch it up.
+Extraction also dropped from ~45 s to ~7 s.
 
-⚠ **Read room names from the rendered `<text>` content, not from `inkscape:label`.**
-Several labels in `lgh_rot.svg` are stale — the room whose text reads `SOV2`
-carries `inkscape:label="Klk2"`.
+`extract.py` still rasterises once, for the apartment envelope (`#rooms-outline`): that
+follows the *outside* of the walls, which room outlines drawn on the inside faces cannot
+describe.
 
-⚠ **A room label may sit outside the building.** `LOGGIA` and `BALKONG` are annotated
-from the margin, so their label coordinates are in the page background, not in the room.
-`extract.py` snaps such a seed to the nearest *room-sized* interior region — nearest
-interior *pixel* is not enough, as that is often a sliver between a wall and a railing
-and yields a room of a few square units.
+Checks it runs, each of which has caught a real mistake:
 
-⚠ **The room flood fill is confined to the building envelope.** A room open to the
-exterior (the balcony, the loggia) otherwise leaks into the page background, and the
-competing seeds partition the whole sheet between them — `loggia` and `balkong` came out
-at 21 000 units² covering the entire page.
+- every room's **text label must fall inside its own outline** — that is what ties the
+  `Rum` layer to the room names. `LOGGIA` and `BALKONG` are labelled from the margin, so
+  their anchors fall back to the nearest point inside the shape;
+- **rooms must not overlap** — a hand-drawn outline is easy to nudge over a wall;
+- a trace that **drops a detached component** is reported.
 
-⚠ **A new room label must be added to the `ZONE` map in `extract.py`**, and its zone key
-must exist in `db/config.json`. When `HALL` was renamed `GÅNG`, the zone key became
-`gang` — the HA devices are still named `hall_*`, because those are entity ids, not room
-names.
+⚠ **Read room names from the rendered `<text>` content, not from `inkscape:label`** — on
+the *text* elements several labels are stale (the room reading `SOV2` carries
+`inkscape:label="Klk2"`). On the `Rum` layer the labels are the only identifier there is,
+and they are trusted; the label-inside-outline check is what guards them.
+
+⚠ **The `Rum` layer must not reach `base.svg`.** It is annotation, not artwork — left in,
+its outlines are drawn on the dashboard.
 
 ## Coordinate system
 
