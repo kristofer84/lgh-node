@@ -236,11 +236,27 @@ def main():
             if 0 <= ny2 < H and 0 <= nx2 < W and inner[ny2, nx2] and owner[ny2, nx2] == 0:
                 owner[ny2, nx2] = o; q.append((ny2, nx2))
 
+    # NB: a traced boundary can touch itself, making the polygon non-simple.
+    # SVG fills and hit-tests it with the nonzero rule, so such a room still
+    # covers its fixtures correctly -- an even-odd point-in-polygon test will
+    # disagree and wrongly report points inside a bathtub as outside the room.
     rooms = {}
     for i, zone in enumerate(names):
         if i == 0:
             continue
-        m = ndimage.binary_closing(owner == i, np.ones((5, 5)))
+        # Close hard enough to bridge a fixture outline: a bathtub or shower rim
+        # is ink drawn INSIDE the room, so the space behind it ends up as a
+        # separate connected component of the room's own mask, and trace() keeps
+        # only the largest -- silently cutting the tub out of the bathroom.
+        m = ndimage.binary_closing(owner == i, np.ones((9, 9)))
+        m = ndimage.binary_fill_holes(m)
+        lb, nc = ndimage.label(m)
+        if nc > 1:
+            sizes = ndimage.sum(m, lb, range(1, nc + 1))
+            dropped = sizes.sum() - sizes.max()
+            if dropped / sizes.sum() > 0.02:
+                print(f'  WARNING {zone}: trace drops {dropped / sizes.sum():.0%} of the room '
+                      f'({int(dropped)} px) as a detached component')
         loop = trace(m)
         if not loop:
             sys.exit(f'ERROR: could not trace {zone}')
