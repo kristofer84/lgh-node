@@ -389,16 +389,22 @@ Record here rather than rediscovering them:
   `sang_*`, `skapbelysning`, `slinga_mette`, `tvattstuga_bank` — plugs, so table/floor lamps,
   **not** switches; do not read "Fibaro" as one category). `.night` is reserved for the one
   thing you would leave on overnight.
-  Two deliberate exceptions: **`koksbank` and `kok_kokshylla` are `.mood` even though they are
-  FGD-212** — they are counter and shelf accent strips, not the main light; and the two
-  **wardrobe lights stay untiered** — task lights inside a closed closet have no business in a
-  mood scene, and since 2026-08-27 they are visible and tappable without a tier.
+  Three deliberate exceptions: **`koksbank`, `kok_kokshylla` and `garderob_1_skap` are `.mood`
+  even though they are FGD-212** — counter, shelf and wardrobe accent strips, not the main
+  light; and the two **wardrobe lights in `sov2`/`sov3` stay untiered** — task lights inside a
+  closed closet have no business in a mood scene, and since 2026-08-27 they are visible and
+  tappable without a tier.
+  `garderob_1_skap` runs **along `klk1`'s two outer walls** (operator, 2026-08-27) — the
+  sloping facade wall and the right-hand wall — so its `lights.json` entry is five `points`,
+  three following the slope and two down the right wall, not a single `cx`/`cy`.
 - **Glow positions in `tools/floorplan/lights.json` start auto-seeded**, in a ring around the
   room's text anchor, and carry `"auto": true` until placed by hand. Two are still unplaced:
   `bordslampa_orangeri` and `slinga_mette` — both belong to devices that are physically
   disconnected, so nobody has noticed them sitting in the wrong spot. `tvattstuga_bank` is
   placed but **inferred**: no bench is outlined in the drawing, so it sits on the worktop over
-  the washer/dryer (the `TM`/`TT` fixtures at ~110.8, 181/187). Worth confirming.
+  the washer/dryer (the `TM`/`TT` fixtures at ~110.8, 181/187). Worth confirming. Neither it
+  nor `garderob_1_skap` has a run on the drawing's `Rum` layer; if either is redrawn there,
+  switch its entry to `{"run": …, "count": …}` so spacing tracks the drawing.
 
 ## 9. State persistence ⚠
 
