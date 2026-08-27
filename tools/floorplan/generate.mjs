@@ -202,7 +202,9 @@ for (const [zone, room] of Object.entries(geo.rooms)) {
 	const shown = zones[zone].lights.filter(l => isItem(zone, l));
 	shown.forEach((l, i) => {
 		const p = placement(zone, l.device, i, shown.length);
-		if (p) for (const q of positionsOf(p)) allPoints.push({ device: l.device, ...q });
+		//A `tap: false` lamp emits no hit disc, so it is not competing for the
+		//click and must not shrink anyone else's radius.
+		if (p && p.tap !== false) for (const q of positionsOf(p)) allPoints.push({ device: l.device, ...q });
 	});
 }
 
@@ -359,7 +361,13 @@ for (const zone of Object.keys(geo.rooms)) {
 			}
 			//A bigger invisible disc so the symbol is tappable on a phone:
 			//r=6 user units is only about 13 px across there.
-			lightLayer.push(`              <circle class="hit" cx="${tx(q.cx)}" cy="${ty(q.cy)}" r="${hitRadius(l.device, q)}" fill="none" pointer-events="all" />`);
+			//`tap: false` drops it, which makes the lamp display-only: it still
+			//glows to show its state, but the press falls through to the room
+			//behind it. Small rooms whose every lamp is switched together want
+			//this -- a per-lamp target there is just a way to miss the room.
+			if (p.tap !== false) {
+				lightLayer.push(`              <circle class="hit" cx="${tx(q.cx)}" cy="${ty(q.cy)}" r="${hitRadius(l.device, q)}" fill="none" pointer-events="all" />`);
+			}
 		}
 		lightLayer.push(`            </g>`);
 	});
