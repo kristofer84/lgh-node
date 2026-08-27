@@ -221,26 +221,20 @@ body.nightmode #rooms-outline {
   stroke-opacity: 0.4;
 }
 
+/* Only a fully-lit room gets an amber wash, and a light one. The mood/night
+   steps deliberately get NO wash: which lamps are on is already said by their
+   own glows, and washing the whole room on top of that just muddied them. The
+   wash used to be 0.6 for `on` and 0.22 for mood/night; the 0.22 moved up to
+   `on` and the first step lost its fill entirely, falling back to the neutral
+   grey `.room-outline` tint.
+   `.room[light="on"] text { fill: black }` went with it. It dated from when the
+   readouts sat inside the room groups and a 0.6 wash made them unreadable; they
+   have lived outside those groups for a while, so by now it matched nothing. */
 .room[light="on"] .room-outline {
-  fill: #ffcc00;
-  fill-opacity: 0.6;
-}
-
-.room[light="mood"] .room-outline,
-.room[light="night"] .room-outline {
   fill: #ffcc00;
   fill-opacity: 0.22;
 }
-
-body.nightmode .room[light="on"] .room-outline {
-  fill: #ffcc00;
-  fill-opacity: 0.5;
-}
 /* End room outline */
-
-.room[light="on"] text {
-  fill: black;
-}
 
 .glow {
   opacity: 0;
