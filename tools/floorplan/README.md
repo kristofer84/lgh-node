@@ -105,14 +105,20 @@ Each lamp is emitted as a group, and the three circles have distinct jobs:
 </g>
 ```
 
+- **One device can be several physical lamps.** Give its `lights.json` entry
+  `"points": [[x,y], [x,y]]` instead of `cx`/`cy` and it emits a glow, symbol and hit
+  disc per point inside a single `<g class="item">`, so they toggle together as the one
+  device they are. `vardagsrum_vaggar` is a pair flanking the dining table;
+  `vardagsrum_soffa` a pair along the far wall.
 - ⚠ **The glow must not be the click target.** While one circle was both, a lamp's hit
   area was its entire radial gradient — up to `r=60` — so clicking anywhere in vardagsrum
   hit whichever lamp was topmost and the room itself was nearly unclickable.
 - `.point` is the always-visible symbol: outlined when the lamp is off, filled `#ffcc00`
   when on, driven by `state` on the group.
 - `.hit` is an invisible disc giving a tappable area (`r=6` is ~13 px on a phone).
-  ⚠ Its radius is **computed as half the distance to the nearest other lamp**, clamped to
-  7–14, so two hit areas can never overlap and steal each other's clicks. A fixed radius
+  ⚠ Its radius is **computed as half the distance to the nearest point of a *different*
+  device**, clamped to 7–14, so two hit areas can never steal each other's clicks. (Two
+  points of the same device may overlap — they toggle the same thing.) A fixed radius
   broke as soon as two lamps sat close together.
 - ⚠ `state` on the group is set by `home.js` **from the model** (`updateView`). Do not go
   back to the old `getComputedStyle(...).opacity` heuristic — it inferred on/off from

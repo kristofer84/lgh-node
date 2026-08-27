@@ -141,16 +141,36 @@ function placement(zone, device, index, total) {
 //areas can never overlap and steal each other's clicks, clamped to something
 //usable on a phone. A fixed radius broke as soon as two lamps sat close (the
 //vardagsrum shelf LED is 18 units below v1).
-function hitRadius(zone, device) {
-	const here = lights[zone]?.[device];
-	if (!here) return 10;
+//One device can be several physical lamps -- vardagsrum_vaggar is a pair
+//flanking the dining table, vardagsrum_soffa a pair along the far wall. Such an
+//entry carries `points: [[x,y], ...]` instead of a single cx/cy, and emits one
+//glow+symbol+hit per point inside ONE <g class="item">, so all of them toggle
+//together as the single device they are.
+function positionsOf(p) {
+	return Array.isArray(p.points) ? p.points.map(([cx, cy]) => ({ cx, cy })) : [{ cx: p.cx, cy: p.cy }];
+}
+
+//Every emitted lamp point, filled in before anything is written so hit radii
+//can be computed against the full set.
+const allPoints = [];
+for (const [zone, room] of Object.entries(geo.rooms)) {
+	if (!config.zones[zone]) continue;
+	const tiered = zones[zone].lights.filter(l => l.tier);
+	tiered.forEach((l, i) => {
+		const p = placement(zone, l.device, i, tiered.length);
+		if (p) for (const q of positionsOf(p)) allPoints.push({ device: l.device, ...q });
+	});
+}
+
+//Half the distance to the nearest point of a DIFFERENT device, so hit areas
+//never steal each other's clicks. Two points of the same device may overlap --
+//they toggle the same thing.
+function hitRadius(device, here) {
 	let nearest = Infinity;
-	for (const devs of Object.values(lights)) {
-		for (const [d, p] of Object.entries(devs)) {
-			if (p === here) continue;
-			const dist = Math.hypot((p.cx - here.cx) * S, (p.cy - here.cy) * S);
-			if (dist < nearest) nearest = dist;
-		}
+	for (const q of allPoints) {
+		if (q.device === device) continue;
+		const dist = Math.hypot((q.cx - here.cx) * S, (q.cy - here.cy) * S);
+		if (dist < nearest) nearest = dist;
 	}
 	return Math.round(Math.max(7, Math.min(14, nearest / 2 - 1)));
 }
@@ -252,12 +272,13 @@ for (const [zone, room] of Object.entries(geo.rooms)) {
 		//top, and the room itself was almost unclickable. The glow is now
 		//pointer-events:none and the symbol carries the id and the .item class.
 		out.push(`          <g class="item" id="${l.device}">`);
-		out.push(`            <circle class="glow ${l.tier}" cx="${tx(p.cx)}" cy="${ty(p.cy)}" r="${p.r}" fill="url(#pf)" pointer-events="none" />`);
-		out.push(`            <circle class="point" cx="${tx(p.cx)}" cy="${ty(p.cy)}" r="6" pointer-events="none" />`);
-		//A bigger invisible disc so the symbol is tappable on a phone: r=6 user
-		//units is about 13 px across there. Kept under half the smallest gap
-		//between two lamps (v1/v2 are 33 units apart) so hit areas never overlap.
-		out.push(`            <circle class="hit" cx="${tx(p.cx)}" cy="${ty(p.cy)}" r="${hitRadius(zone, l.device)}" fill="none" pointer-events="all" />`);
+		for (const q of positionsOf(p)) {
+			out.push(`            <circle class="glow ${l.tier}" cx="${tx(q.cx)}" cy="${ty(q.cy)}" r="${p.r}" fill="url(#pf)" pointer-events="none" />`);
+			out.push(`            <circle class="point" cx="${tx(q.cx)}" cy="${ty(q.cy)}" r="6" pointer-events="none" />`);
+			//A bigger invisible disc so the symbol is tappable on a phone:
+			//r=6 user units is only about 13 px across there.
+			out.push(`            <circle class="hit" cx="${tx(q.cx)}" cy="${ty(q.cy)}" r="${hitRadius(l.device, q)}" fill="none" pointer-events="all" />`);
+		}
 		out.push(`          </g>`);
 	});
 
