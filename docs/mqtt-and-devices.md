@@ -348,6 +348,16 @@ Record here rather than rediscovering them:
   ⚠ `mikkel_garderob` (`sov2`) and `kai_garderob` (`sov3`) are placed with their owner's
   bedroom by **inference** — they could belong to `klk1`/`klk2` instead. Confirm before relying
   on them.
+- ⚠ **`entre2` uses `light.entre_2_3`, and that is correct — do not "fix" it to
+  `light.entre_2`.** Confirmed by the operator, 2026-08-27. Node 35 is a two-channel
+  dimmer, and the entity naming is counter-intuitive: `light.entre_2` is endpoint 1 and
+  `light.entre_2_3` is **endpoint 0**, the root. Endpoints 1 and 2 report `unavailable`
+  and stay that way across an HA restart; only endpoint 0 is live. A click on the wrong
+  one fails silently as far as the dashboard is concerned — `mqtt-web.js` ignores
+  `unavailable`, so the room simply keeps its last known state, and the refusal appears
+  only in `home-assistant.log`:
+  `Referenced entities light.entre_2 are missing or not currently available`.
+  That log line is the fastest way to diagnose "room X does nothing".
 - **`switch.ytterdorr_1_brytare` / `light.ytterdorr_2` have no area at all** — which of
   `entre1` / `entre2` each belongs to is inference, not fact.
 - **`vinkyl` has a power sensor in `config.zones.devices` but no marker in the drawing**, so it
