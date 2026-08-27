@@ -160,8 +160,8 @@ early if `message` is `undefined`.
   press does nothing. `kok` and `bad3` were both in that state until 2026-08-27. Whenever you
   add a tier, check the zone still has at least one plain `.light` / `.switch` left — **or**
   that the tiered ones carry a brightness (`[3]`), which separates the two steps by level
-  instead of by membership. `bad3` is the one zone relying on that: its only light is
-  `badrum_3_tak.light.mood.70`, so `mood` is 70% and `on` is 100%.
+  instead of by membership. `bad3`, `entre1`, `entre2` and `gang` all rely on that: every
+  light in them carries `.mood.70`, so `mood` is 70% and `on` is 100%.
   The same trap one level down: if the only tiered device in a zone is `.night`, then `night`
   and `mood` are also identical (night counts as mood), which is what `orangeri` did.
 
@@ -312,7 +312,12 @@ Rejects an unknown zone and an `undefined` value with a log line. Then, for ever
 switched on, and at the `on` step `toggle()` drives it to **100 explicitly**. That last part
 is not optional: a plain `turn_on` restores the level the lamp last had, so after a mood press
 `on` would leave it sitting at 70%. Measured on the real dimmer 2026-08-27, not assumed.
-Only `badrum_{1,2,3}_tak` use this today.
+Used today by `badrum_{1,2,3}_tak`, `entre_1`, `entre_2_3`, `hall_sovrum` and
+`hall_tvattstuga` — all Fibaro FGD-212 wall dimmers, all at 70/100.
+⚠ Reaching the 100% step needs the **Max brightness** checkbox (`#cb-mood`, the sun icon):
+`getNextStateRoom()` goes `mood → on` only when it is ticked, otherwise `mood → off`. With it
+off, a room whose lights all carry a level cycles `off → 70% → off` and full brightness is
+unreachable from the floorplan.
 
 ⚠ **Brightness leaves on a different topic and needs a second HA automation.**
 `publish()` writes `webapp/switch/<entity>/<property>/set`, which the long-standing HA

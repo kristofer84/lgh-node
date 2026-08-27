@@ -272,5 +272,39 @@
    "symbol": false,
    "tap": false
   }
+ },
+ "entre1": {
+  "entre_1": {
+   "cx": 82.8,
+   "cy": 182.5,
+   "r": 40,
+   "symbol": false,
+   "tap": false
+  }
+ },
+ "entre2": {
+  "entre_2_3": {
+   "cx": 108.5,
+   "cy": 228.0,
+   "r": 34,
+   "symbol": false,
+   "tap": false
+  }
+ },
+ "gang": {
+  "hall_tvattstuga": {
+   "cx": 102.0,
+   "cy": 169.0,
+   "r": 26,
+   "symbol": false,
+   "tap": false
+  },
+  "hall_sovrum": {
+   "cx": 128.0,
+   "cy": 169.0,
+   "r": 26,
+   "symbol": false,
+   "tap": false
+  }
  }
 }
