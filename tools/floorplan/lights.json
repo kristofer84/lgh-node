@@ -145,8 +145,9 @@
   "skapbelysning": {
    "run": "Bänk",
    "count": 1,
-   "r": 28,
-   "symbol": false
+   "r": 34,
+   "symbol": false,
+   "under": true
   },
   "matbord": {
    "cx": 76,

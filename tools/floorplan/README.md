@@ -35,7 +35,7 @@ zone, a power sensor with no marker in the plan).
 | `geometry.json` | room polygons, per-room text anchors, fixture markers, and the source→dashboard transform |
 | `base.svg` | the architectural line-work, drawn over the room tint (`pointer-events: none`) |
 | `readouts.json` | per-zone nudge for the temperature/humidity readout, in drawing units. Hand-edited; `extract.py` never writes it |
-| `lights.json` | per-device glow positions, or `{"run": "Köksbänk", "count": 6}` to space lamps evenly along a run outlined on the `Rum` layer. `"symbol": false` drops the ring and keeps the glow — strip lighting reads better as a glow than as a row of rings. Auto-seeded in a ring around the room anchor on first run, then **hand-edit it** — `"auto": true` marks one that has never been placed properly |
+| `lights.json` | per-device glow positions, or `{"run": "Köksbänk", "count": 6}` to space lamps evenly along a run outlined on the `Rum` layer. `"symbol": false` drops the ring and keeps the glow — strip lighting reads better as a glow than as a row of rings. `"under": true` (with `run`) means the lamp sits *beneath* that piece of furniture: the furniture is drawn, and the glow is clipped to the room **minus** the furniture, so the light spills out around it instead of through it. The tap target stays at the furniture's centre. Auto-seeded in a ring around the room anchor on first run, then **hand-edit it** — `"auto": true` marks one that has never been placed properly |
 | `dashboard.template.html` | everything outside the `<svg>`; `<!--FLOORPLAN-->` is the splice point |
 | `../../db/config.json` | the zones. Decides what is emitted at all |
 | `lgh_rot.svg` | the original Inkscape drawing, kept for re-extraction |
@@ -200,6 +200,12 @@ Each lamp is emitted as a group, and the three circles have distinct jobs:
   so without it a temperature label swallows clicks meant for the room underneath whenever
   temps are shown. (While the readouts lived *inside* the room groups, clicking a label
   toggled the room; this keeps that behaviour.)
+- ⚠ **`clip-rule` belongs on the clip path's child shape, not on `<clipPath>`.** The
+  "spill" clip for an `under` lamp is the room and the furniture as two subpaths with
+  `clip-rule="evenodd"`; put that attribute on the `<clipPath>` and renderers do not all
+  inherit it, so nothing is punched out. Its `<clipPath>` must also be pushed into `defs`
+  **before** `defs` is flushed into the output, or the glow carries a dangling
+  `clip-path` reference — which can stop it rendering at all.
 - ⚠ **A light-point ring must NOT carry the `mood`/`night` class.** The rings are emitted
   as `class="point point-mood"` (not `point mood`) because `.mood, .night { opacity: 0 }`
   applies until the room is lit — reusing the tier class hides the ring it is meant to

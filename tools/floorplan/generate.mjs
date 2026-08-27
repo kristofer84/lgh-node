@@ -230,6 +230,23 @@ for (const [zone, room] of Object.entries(geo.rooms)) {
 	defs.push(`      <clipPath id="${zone}-clip"><use xlink:href="#${zone}-outline" /></clipPath>`);
 }
 
+//A lamp marked `under` sits beneath a piece of furniture drawn on the Rum
+//layer, so its light spills out AROUND that furniture rather than through it.
+//The clip is the room with the furniture punched out: two subpaths and
+//clip-rule="evenodd".
+const ring = pts => 'M ' + pts.map(([x, y]) => `${tx(x)},${ty(y)}`).join(' L ') + ' Z';
+for (const [zone, devs] of Object.entries(lights)) {
+	if (!config.zones[zone] || !geo.rooms[zone]) continue;
+	for (const [device, p] of Object.entries(devs)) {
+		if (!p.under || !p.run || !geo.runs?.[p.run]) continue;
+		//clip-rule belongs on the path, not the clipPath: it is a property of the
+		//shape being used as the clip, and renderers do not all inherit it.
+		defs.push(`      <clipPath id="${device}-spill">`
+			+ `<path clip-rule="evenodd" d="${ring(shapeOf(zone))} ${ring(geo.runs[p.run])}" /></clipPath>`);
+	}
+}
+
+
 out.push(`      <svg id="image-mapper-svg" viewBox="0 0 ${VB[2]} ${VB[3]}">`);
 out.push(`        <defs>`);
 out.push(...defs);
@@ -306,6 +323,12 @@ for (const zone of Object.keys(geo.rooms)) {
 	const tiered = zones[zone].lights.filter(l => l.tier);
 	if (!tiered.length) continue;
 	lightLayer.push(`          <g clip-path="url(#${zone}-clip)">`);
+	for (const l of tiered) {
+		const p = lights[zone]?.[l.device];
+		if (p?.under && p.run && geo.runs?.[p.run]) {
+			lightLayer.push(`            <polygon class="furniture" points="${poly(geo.runs[p.run])}" pointer-events="none" />`);
+		}
+	}
 	tiered.forEach((l, i) => {
 		const p = placement(zone, l.device, i, tiered.length);
 		if (!p) return;
@@ -315,7 +338,8 @@ for (const zone of Object.keys(geo.rooms)) {
 		//top, and the room itself was almost unclickable.
 		lightLayer.push(`            <g class="item" id="${l.device}">`);
 		for (const q of positionsOf(p)) {
-			lightLayer.push(`              <circle class="glow ${l.tier}" cx="${tx(q.cx)}" cy="${ty(q.cy)}" r="${p.r}" fill="url(#pf)" pointer-events="none" />`);
+			const spill = p.under && p.run && geo.runs?.[p.run] ? ` clip-path="url(#${l.device}-spill)"` : '';
+			lightLayer.push(`              <circle class="glow ${l.tier}" cx="${tx(q.cx)}" cy="${ty(q.cy)}" r="${p.r}" fill="url(#pf)"${spill} pointer-events="none" />`);
 			//A run of strip lighting reads better as its glow alone; a row of
 			//rings along a counter just looks like a row of holes. `symbol: false`
 			//in lights.json drops the ring but keeps the glow and the tap area.

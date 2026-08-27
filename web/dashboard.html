@@ -92,6 +92,7 @@
       <clipPath id="klk2-clip"><use xlink:href="#klk2-outline" /></clipPath>
       <polygon id="balkong-outline" points="321.4,606.9 351.5,606.9 351.5,677.7 321.4,677.7" />
       <clipPath id="balkong-clip"><use xlink:href="#balkong-outline" /></clipPath>
+      <clipPath id="skapbelysning-spill"><path clip-rule="evenodd" d="M 19.6,160.6 L 164.5,91.7 L 164.5,212.1 L 204.9,212.1 L 204.9,248.1 L 125.3,248.1 L 125.3,250.9 L 144.6,250.9 L 144.6,386.7 L 125.8,386.7 L 125.8,388.1 L 85.8,388.1 L 85.8,387.3 L 50.8,387.3 L 50.8,388.3 L 20.9,388.3 L 20.9,387.3 L 19.6,387.3 Z M 21.2,254 L 36.8,254 L 36.8,313.3 L 21.2,313.3 Z" /></clipPath>
         </defs>
         <g class="room" id="vardagsrum" clip-path="url(#vardagsrum-clip)">
           <use class="room-outline" xlink:href="#vardagsrum-outline" />
@@ -11827,6 +11828,7 @@
         </g>
         <g id="lights">
           <g clip-path="url(#vardagsrum-clip)">
+            <polygon class="furniture" points="21.2,254 36.8,254 36.8,313.3 21.2,313.3" pointer-events="none" />
             <g class="item" id="vardagsrum_vaggar">
               <circle class="glow mood" cx="31.5" cy="190.1" r="38" fill="url(#pf)" pointer-events="none" />
               <circle class="point" cx="31.5" cy="190.1" r="6" pointer-events="none" />
@@ -11869,7 +11871,7 @@
               <circle class="hit" cx="29" cy="258.5" r="12" fill="none" pointer-events="all" />
             </g>
             <g class="item" id="skapbelysning">
-              <circle class="glow night" cx="29" cy="283.7" r="28" fill="url(#pf)" pointer-events="none" />
+              <circle class="glow night" cx="29" cy="283.7" r="34" fill="url(#pf)" clip-path="url(#skapbelysning-spill)" pointer-events="none" />
               <circle class="hit" cx="29" cy="283.7" r="12" fill="none" pointer-events="all" />
             </g>
           </g>

@@ -253,6 +253,23 @@ body.nightmode .room[light="on"] .room-outline {
   opacity: 1;
 }
 
+/* Furniture a light sits under -- the vardagsrum bench. Drawn so the shelf LED
+   reads as spilling out from beneath it rather than lighting through it. */
+.furniture {
+  fill: #f4f4f4;
+  fill-opacity: 0.92;
+  stroke: #000;
+  stroke-opacity: 0.45;
+  stroke-width: 0.8;
+}
+
+body.nightmode .furniture {
+  fill: #1a1a1a;
+  fill-opacity: 0.9;
+  stroke: #fff;
+  stroke-opacity: 0.3;
+}
+
 /* The light symbol. Always visible -- it is both the thing you tap and the
    marker for where the lamp is -- and it fills in when that lamp is on. */
 .point {
