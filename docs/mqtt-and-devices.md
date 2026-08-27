@@ -161,12 +161,12 @@ early if `message` is `undefined`.
   add a tier, check the zone still has at least one plain `.light` / `.switch` left — **or**
   that the tiered ones carry a brightness (`[3]`), which separates the two steps by level
   instead of by membership. `bad3`, `entre1`, `entre2` and `gang` all rely on that: every
-  light in them carries `.mood.70`, so `mood` is 70% and `on` is 100%.
+  light in them carries `.mood.20`, so `mood` is 20% and `on` is 100%.
   The same trap one level down: if the only tiered device in a zone is `.night`, then `night`
   and `mood` are also identical (night counts as mood), which is what `orangeri` did.
 
 - `[3]` **brightness** (optional, and only meaningful with `[2]`) — percent, e.g.
-  `badrum_1_tak.light.mood.70`. Sets `devices[d].level`; makes that light dim to 70% at its
+  `badrum_1_tak.light.mood.20`. Sets `devices[d].level`; makes that light dim to 20% at its
   step and to 100% at `on`. See `toggle()` in §7 for why `on` has to say 100 out loud.
 
 Examples from the live config:
@@ -308,15 +308,18 @@ Rejects an unknown zone and an `undefined` value with a log line. Then, for ever
 - otherwise → publish `value` verbatim to all of them
 
 ⚠ **A device may name the brightness it takes at its step** — a *fourth* segment,
-`badrum_1_tak.light.mood.70`. Such a light is **dimmed** at that step rather than merely
+`badrum_1_tak.light.mood.20`. Such a light is **dimmed** at that step rather than merely
 switched on, and at the `on` step `toggle()` drives it to **100 explicitly**. That last part
 is not optional: a plain `turn_on` restores the level the lamp last had, so after a mood press
-`on` would leave it sitting at 70%. Measured on the real dimmer 2026-08-27, not assumed.
+`on` would leave it sitting at the dimmed level. Measured on the real dimmer 2026-08-27,
+not assumed.
 Used today by `badrum_{1,2,3}_tak`, `entre_1`, `entre_2_3`, `hall_sovrum` and
-`hall_tvattstuga` — all Fibaro FGD-212 wall dimmers, all at 70/100.
+`hall_tvattstuga` — all Fibaro FGD-212 wall dimmers, all at **20/100** (70 was tried first
+and was far too bright for the step; 20 verified to strike cleanly on the real dimmer —
+`brightness_pct 20` → Z-Wave `currentValue 20` of 99 → HA 52/255, no drop-out).
 ⚠ Reaching the 100% step needs the **Max brightness** checkbox (`#cb-mood`, the sun icon):
 `getNextStateRoom()` goes `mood → on` only when it is ticked, otherwise `mood → off`. With it
-off, a room whose lights all carry a level cycles `off → 70% → off` and full brightness is
+off, a room whose lights all carry a level cycles `off → 20% → off` and full brightness is
 unreachable from the floorplan.
 
 ⚠ **Brightness leaves on a different topic and needs a second HA automation.**
