@@ -147,6 +147,13 @@ early if `message` is `undefined`.
   `getDevice()`'s output shape.
 - `[2]` **flag** (optional) — `mood` or `night`. Sets `devices[d].mood = true` /
   `devices[d].night = true` at init, and is what makes a room's click cycle include those steps.
+  ⚠ **The untiered devices in a zone are what makes `on` different from `mood`** — `mood`
+  switches the tiered ones on and the untiered ones *off*, so a zone in which **every** light
+  is tiered has no `on` step at all: `mood` and `on` publish the identical scene and the extra
+  press does nothing. `kok` and `bad3` were both in that state until 2026-08-27. Whenever you
+  add a tier, check the zone still has at least one plain `.light` / `.switch` left.
+  The same trap one level down: if the only tiered device in a zone is `.night`, then `night`
+  and `mood` are also identical (night counts as mood), which is what `orangeri` did.
 
 Examples from the live config:
 `"sang_hoger.switch.mood"`, `"sovrum_1_tak.light"`, `"slinga_mette.light.night"`,
@@ -175,10 +182,12 @@ The 22 zones, matching the apartment as of the new plan:
   That is expected, not a bug. Clicking them publishes nothing.
 - `utomhus` and `moja` have sensors but no room in the drawing, so their readings are in the
   socket payload and are never rendered anywhere. `home` drives the "senaste aktivitet" footer.
-- ⚠ Only a light carrying a **`.mood` / `.night` flag** gets its own `class="item"` group
-  in the generated markup (currently 17 `mood` + 3 `night` = 20). A plain `.light` is toggled
-  with the room and has no individual click target — that is by design; adding a flag is what
-  makes an item clickable.
+- ⚠ A light gets its own `class="item"` group when it carries a **`.mood` / `.night` flag**
+  **or** has a hand-placed entry in `tools/floorplan/lights.json` (27 items as of 2026-08-27).
+  The two are deliberately independent: the flag decides whether the lamp joins the room's
+  mood/night scene, the `lights.json` entry decides whether you can see and tap it. A plain
+  `.light` with no entry is toggled with the room and has no individual click target.
+  See `tools/floorplan/README.md` for the full rule.
 - Zone names are still the SVG group ids and device names still the item ids — `toggleItem()`
   matches on the config name. Since the markup is generated, a mismatch can now only be
   introduced by hand-editing `web/dashboard.html`. `node tools/floorplan/generate.mjs --check`
@@ -337,6 +346,13 @@ Record here rather than rediscovering them:
 
 - **`loggia` and `balkong` have no HA entities identified at all.** Both rooms are drawn and
   clickable with empty device lists.
+- **RESOLVED 2026-08-27: `switch.lampa_orangeri` was a duplicate of `light.bordslampa_orangeri`
+  and has been dropped from the zone.** They are the *same* physical Everspring AD147 plug —
+  same `device_id`, unique ids `3611387181.30-37-0` (binary switch, CC 37) and
+  `3611387181.30-38-0` (multilevel switch, CC 38). Keeping both meant every `orangeri` room
+  press published two commands to one plug and the model carried it twice. If you re-derive
+  zones from the HA registry, expect this shape again wherever a Z-Wave plug exposes both
+  command classes.
 - **`orangeri` has entities but no HA area** — they are scattered across `Kök`
   (`light.orangeri_tak`) and `Nattbelysning` (`light.bordslampa_orangeri`). The zone was
   assembled by name.
@@ -366,12 +382,23 @@ Record here rather than rediscovering them:
   is never rendered. The generator prints
   `! power sensor "vinkyl_*" has no marker in the plan` on **every** run — that warning is
   expected until a fixture marker is added to `geometry.json`.
-- **The `.mood` / `.night` tier assignments in the current config are inference**, not verified
-  against how the rooms are actually used. They decide which lamp is an ambience light and
-  therefore what the room's click cycle does; expect the operator to want some moved.
-- **Glow positions in `tools/floorplan/lights.json` are auto-seeded**, in a ring around each
-  room's text anchor — **all 20 currently carry `"auto": true`**, meaning none has been placed
-  by hand yet. Hand-edit that file (and drop the `auto` flag); the generator preserves it.
+- **RESOLVED 2026-08-27 (operator): the tiers follow the hardware.** The `on` step is the
+  room's **main ceiling circuit** — in every room but `orangeri` that is a Fibaro **FGD-212**,
+  a wall dimmer wired behind the light switch. Everything else is `.mood`: IKEA TRÅDFRI bulbs,
+  Plejd dimmers, and the Fibaro **FGWP-102** *wall plugs* (`lampa_mikkel`, `lampa_kai`,
+  `sang_*`, `skapbelysning`, `slinga_mette`, `tvattstuga_bank` — plugs, so table/floor lamps,
+  **not** switches; do not read "Fibaro" as one category). `.night` is reserved for the one
+  thing you would leave on overnight.
+  Two deliberate exceptions: **`koksbank` and `kok_kokshylla` are `.mood` even though they are
+  FGD-212** — they are counter and shelf accent strips, not the main light; and the two
+  **wardrobe lights stay untiered** — task lights inside a closed closet have no business in a
+  mood scene, and since 2026-08-27 they are visible and tappable without a tier.
+- **Glow positions in `tools/floorplan/lights.json` start auto-seeded**, in a ring around the
+  room's text anchor, and carry `"auto": true` until placed by hand. Two are still unplaced:
+  `bordslampa_orangeri` and `slinga_mette` — both belong to devices that are physically
+  disconnected, so nobody has noticed them sitting in the wrong spot. `tvattstuga_bank` is
+  placed but **inferred**: no bench is outlined in the drawing, so it sits on the worktop over
+  the washer/dryer (the `TM`/`TT` fixtures at ~110.8, 181/187). Worth confirming.
 
 ## 9. State persistence ⚠
 
