@@ -35,7 +35,7 @@ zone, a power sensor with no marker in the plan).
 | `geometry.json` | room polygons, per-room text anchors, fixture markers, and the source→dashboard transform |
 | `base.svg` | the architectural line-work, drawn over the room tint (`pointer-events: none`) |
 | `readouts.json` | per-zone nudge for the temperature/humidity readout, in drawing units. Hand-edited; `extract.py` never writes it |
-| `lights.json` | per-device glow positions, or `{"run": "Köksbänk", "count": 6}` to space lamps evenly along a run outlined on the `Rum` layer. `"symbol": false` drops the ring and keeps the glow — strip lighting reads better as a glow than as a row of rings. `"under": true` (with `run`) means the lamp sits *beneath* that piece of furniture: the furniture is drawn, and the glow is clipped to the room **minus** the furniture, so the light spills out around it instead of through it. The tap target stays at the furniture's centre. Auto-seeded in a ring around the room anchor on first run, then **hand-edit it** — `"auto": true` marks one that has never been placed properly |
+| `lights.json` | per-device glow positions, or `{"run": "Köksbänk", "count": 6}` to space lamps evenly along a run outlined on the `Rum` layer. `"symbol": false` drops the ring and keeps the glow — strip lighting reads better as a glow than as a row of rings. `"under": true` (with `run`) means the lamp sits *beneath* that piece of furniture: the furniture is drawn, and the glow is clipped to the room **minus** the furniture, so the light spills out around it instead of through it. The tap target stays at the furniture's centre. Auto-seeded in a ring around the room anchor on first run, then **hand-edit it** — `"auto": true` marks one that has never been placed properly. An entry here is also what makes an *untiered* light an item at all (see the tier/entry note below) |
 | `dashboard.template.html` | everything outside the `<svg>`; `<!--FLOORPLAN-->` is the splice point |
 | `../../db/config.json` | the zones. Decides what is emitted at all |
 | `lgh_rot.svg` | the original Inkscape drawing, kept for re-extraction |
@@ -134,6 +134,18 @@ Each lamp is emitted as a group, and the three circles have distinct jobs:
   correctly — but an even-odd point-in-polygon test disagrees and will wrongly report a
   point inside a bathtub as outside the room. Do not "fix" a room on the strength of such
   a test; render it and look.
+- ⚠ **Two independent things decide what a light gets: the tier and the `lights.json`
+  entry.** A `.mood`/`.night` tier in `db/config.json` says *"this lamp belongs to the
+  room's mood/night scene"* — it comes on when you cycle the room to that state, and its
+  glow previews with the room. A `lights.json` entry says *"this lamp is a thing you can
+  see and tap"* — it gets its own symbol, glow and hit disc, and `[state="on"] .glow`
+  lights that glow exactly when the lamp itself is on. **Either one alone is enough to
+  make a light an item.** `mikkel_garderob` and `kai_garderob` are placed but untiered:
+  visible and tappable, but a wardrobe light has no business joining a mood scene. A light
+  with neither is toggled with the room and draws nothing.
+  The check reads `lights.json` directly and must **not** go through `placement()`, which
+  auto-seeds an entry for whatever it is asked about — routing it that way would turn
+  every plain light in the flat into an item on the next run.
 - **One device can be several physical lamps.** Give its `lights.json` entry
   `"points": [[x,y], [x,y]]` instead of `cx`/`cy` and it emits a glow, symbol and hit
   disc per point inside a single `<g class="item">`, so they toggle together as the one

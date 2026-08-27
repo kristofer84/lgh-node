@@ -183,14 +183,25 @@ function positionsOf(p) {
 	return Array.isArray(p.points) ? p.points.map(([cx, cy]) => ({ cx, cy })) : [{ cx: p.cx, cy: p.cy }];
 }
 
+//A light gets its own symbol when it carries a mood/night tier, OR when it has
+//been given a position in lights.json by hand. The tier says "this lamp is part
+//of the room's mood/night scene"; a hand-placed entry says "this lamp is a thing
+//you can see and tap". A wardrobe light wants the second without the first --
+//it should glow when it is on, but it has no business coming on with a mood
+//scene. Note the check reads lights.json directly rather than calling
+//placement(), which would auto-seed an entry and make every plain light an item.
+function isItem(zone, l) {
+	return Boolean(l.tier || lights[zone]?.[l.device]);
+}
+
 //Every emitted lamp point, filled in before anything is written so hit radii
 //can be computed against the full set.
 const allPoints = [];
 for (const [zone, room] of Object.entries(geo.rooms)) {
 	if (!config.zones[zone]) continue;
-	const tiered = zones[zone].lights.filter(l => l.tier);
-	tiered.forEach((l, i) => {
-		const p = placement(zone, l.device, i, tiered.length);
+	const shown = zones[zone].lights.filter(l => isItem(zone, l));
+	shown.forEach((l, i) => {
+		const p = placement(zone, l.device, i, shown.length);
 		if (p) for (const q of positionsOf(p)) allPoints.push({ device: l.device, ...q });
 	});
 }
@@ -318,19 +329,19 @@ for (const zone of Object.keys(geo.rooms)) {
 const lightLayer = [`        <g id="lights">`];
 for (const zone of Object.keys(geo.rooms)) {
 	if (!config.zones[zone]) continue;
-	//Only lights carrying a mood/night tier get their own symbol; a plain light
-	//is toggled with the room and needs no glow of its own.
-	const tiered = zones[zone].lights.filter(l => l.tier);
-	if (!tiered.length) continue;
+	//See isItem(): a plain light with no position of its own is toggled with the
+	//room and needs no symbol.
+	const shown = zones[zone].lights.filter(l => isItem(zone, l));
+	if (!shown.length) continue;
 	lightLayer.push(`          <g clip-path="url(#${zone}-clip)">`);
-	for (const l of tiered) {
+	for (const l of shown) {
 		const p = lights[zone]?.[l.device];
 		if (p?.under && p.run && geo.runs?.[p.run]) {
 			lightLayer.push(`            <polygon class="furniture" points="${poly(geo.runs[p.run])}" pointer-events="none" />`);
 		}
 	}
-	tiered.forEach((l, i) => {
-		const p = placement(zone, l.device, i, tiered.length);
+	shown.forEach((l, i) => {
+		const p = placement(zone, l.device, i, shown.length);
 		if (!p) return;
 		//The click target is the small symbol, NOT the glow. While one circle did
 		//both, a lamp's hit area was its whole radial gradient (r up to 60), so
@@ -339,7 +350,7 @@ for (const zone of Object.keys(geo.rooms)) {
 		lightLayer.push(`            <g class="item" id="${l.device}">`);
 		for (const q of positionsOf(p)) {
 			const spill = p.under && p.run && geo.runs?.[p.run] ? ` clip-path="url(#${l.device}-spill)"` : '';
-			lightLayer.push(`              <circle class="glow ${l.tier}" cx="${tx(q.cx)}" cy="${ty(q.cy)}" r="${p.r}" fill="url(#pf)"${spill} pointer-events="none" />`);
+			lightLayer.push(`              <circle class="${['glow', l.tier].filter(Boolean).join(' ')}" cx="${tx(q.cx)}" cy="${ty(q.cy)}" r="${p.r}" fill="url(#pf)"${spill} pointer-events="none" />`);
 			//A run of strip lighting reads better as its glow alone; a row of
 			//rings along a counter just looks like a row of holes. `symbol: false`
 			//in lights.json drops the ring but keeps the glow and the tap area.
@@ -425,7 +436,7 @@ if (check) {
 	writeFileSync(P.out, html);
 	if (seeded) writeFileSync(P.lights, JSON.stringify(lights, null, 1));
 	const rooms = Object.keys(geo.rooms).filter(z => config.zones[z]).length;
-	const items = Object.values(zones).reduce((a, z) => a + z.lights.filter(l => l.tier).length, 0);
+	const items = Object.entries(zones).reduce((a, [z, zn]) => a + zn.lights.filter(l => isItem(z, l)).length, 0);
 	console.log(`wrote web/dashboard.html  viewBox 0 0 ${VB[2]} ${VB[3]}`);
 	console.log(`  ${rooms} rooms, ${items} clickable lights, ${used.size} appliance markers`);
 	console.log(`  rewrote ${inlined} style="" attribute(s) as presentation attributes (CSP: no 'unsafe-inline')${dropped ? `, dropped ${dropped} non-presentation decl(s)` : ''}`);

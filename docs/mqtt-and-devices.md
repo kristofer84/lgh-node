@@ -345,9 +345,11 @@ Record here rather than rediscovering them:
   ambiguity (its *device* area said `Nytt kök`, its `switch.` *entity* area said `Sovrum MK`):
   it is **Mikkel's room, `sov2`**, and the HA device area is simply wrong — one more reason not
   to trust that registry. `lampa_kai` → `sov3` and `lampa_mette` → `sov4` follow the same rule.
-  ⚠ `mikkel_garderob` (`sov2`) and `kai_garderob` (`sov3`) are placed with their owner's
-  bedroom by **inference** — they could belong to `klk1`/`klk2` instead. Confirm before relying
-  on them.
+  **CONFIRMED 2026-08-27 (operator):** `mikkel_garderob` is the wardrobe in `sov2` (the
+  **upper** of that room's two wardrobes — the run along the top wall, not the one on the left
+  wall), and `kai_garderob` is the wardrobe in `sov3`. Both are placed in `lights.json` and are
+  now their own tappable symbols; neither carries a mood/night tier, so they glow only when
+  they themselves are on and never join the room's mood scene.
 - ⚠ **`entre2` uses `light.entre_2_3`, and that is correct — do not "fix" it to
   `light.entre_2`.** Confirmed by the operator, 2026-08-27. Node 35 is a two-channel
   dimmer, and the entity naming is counter-intuitive: `light.entre_2` is endpoint 1 and
