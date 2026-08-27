@@ -114,9 +114,15 @@ Each lamp is emitted as a group, and the three circles have distinct jobs:
 - ⚠ **Absorbing fixtures can also hand a room space that is not really its own.**
   `gang` collected every wardrobe niche it could reach plus an arm along the top of the
   kitchen, ending up at 1517 units² for what is really a corridor. It is overridden in
-  `rooms-override.json` as a plain rectangle (844 units²) covering the corridor and the
-  kitchen entry. Keep a room's text anchor inside any override — readouts and automatic
-  lamp placement both use it.
+  `rooms-override.json` as a plain rectangle. `vardagsrum`, `entre1` and `kok` are
+  overridden alongside it so the four tile cleanly: vardagsrum's ragged diagonal bottom
+  and entre1's top both become the corridor's top line, and the kitchen takes the strip
+  gang vacated above it plus the counter run down its left side.
+
+  Two things to check after editing an override, both of which caught real mistakes here:
+  keep the room's **text anchor inside the shape** (readouts and automatic lamp placement
+  use it), and **sample for overlaps against every other room** — a rectangle drawn by eye
+  ran into `tvatt`, `sov3` and `bad3` before the numbers were checked.
 - ⚠ **Fixtures drawn inside a room are absorbed back into it** (`extract.py`). A bathtub,
   shower tray or vanity is ink, so the flood fill cannot enter it and the room polygon
   notches around every fixture — measured at 3762 px of the bathroom lamps being clipped
