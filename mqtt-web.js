@@ -27,6 +27,10 @@ import bodyParser from 'body-parser';
 
 import { Server } from 'socket.io';
 import { registerWebnMethods } from './server-webn.js';
+//The zone/device grammar and the step semantics. The same file is served to the
+//browser at /scripts/zones.js and imported by tools/floorplan/generate.mjs, so
+//all three agree by construction instead of by hand. See its header.
+import { parseEntry, sceneFor } from './web/scripts/zones.js';
 
 process.stdin.resume();
 
@@ -34,6 +38,30 @@ process.stdin.resume();
 var devices;
 var config;
 
+
+//Everything init() stamps onto a device from db/config.json. These describe what
+//the device IS, not what it is doing, so they must never be persisted: the
+//config is their only source, on every boot.
+const SCHEMA_KEYS = ['zone', 'type', 'mood', 'night', 'level'];
+
+//Every value type this process ingests, and what it means. Anything HA publishes
+//that is not listed is dropped on the floor -- and with `publish_attributes:
+//true` in mqtt_statestream it publishes a great deal. Adding an attribute
+//client-side starts here.
+//
+//`derives: true` means the typed pass runs for it -- onoff for a light/switch,
+//state for anything else -- on top of the raw `devices[d][valueType]` the
+//reducer stores for every entry here. `derives: false` is raw-only.
+//⚠ That distinction is load-bearing. The typed pass used to run for every value
+//type, so the moment `brightness` was ingested a payload of "178" read as "not
+//on" and flipped onoff to false. Only `state` may say whether a lamp is lit.
+const VALUE_TYPES = {
+	state: { derives: true },
+	brightness: { derives: false },
+	current_temperature: { derives: true },
+	current_humidity: { derives: true },
+	current_pressure: { derives: true },
+};
 
 function init() {
 	let buffer = readFileSync('./log/mqtt.log');
@@ -48,39 +76,25 @@ function init() {
 		let values = config.zones[zone];
 
 		values.forEach(light => {
-			let split = light.split('.');
-			let device = split[0];
+			const e = parseEntry(light);
+			const device = e.device;
 
 			if (!devices.hasOwnProperty(device)) devices[device] = {};
+
+			//SCHEMA_KEYS are stamped here from db/config.json and nowhere else.
+			//They are deliberately cleared first: `devices` was just restored from
+			//log/mqtt.log, and setting without clearing left a light that had LOST
+			//its tier still advertising mood:true to the client, so the room went
+			//on rendering a mood step that toggle() -- which reads the config, not
+			//the model -- no longer publishes. exitHandler() now strips these keys
+			//on the way out too, so the file cannot carry them back at all.
+			for (const k of SCHEMA_KEYS) delete devices[device][k];
+
 			devices[device].zone = zone;
-			devices[device].type = split[1];
-
-			//db/config.json is authoritative for the tier, but `devices` was just
-			//restored from log/mqtt.log, which still holds whatever the tier was
-			//when the process last exited. Setting without clearing left a light
-			//that had LOST its tier still advertising mood:true to the client, so
-			//the room went on rendering a mood step that toggle() -- which reads
-			//the config, not the model -- no longer publishes.
-			delete devices[device].mood;
-			delete devices[device].night;
-			delete devices[device].level;
-
-			if (split.length > 2) {
-				if (split[2] === 'mood') {
-					devices[device].mood = true;
-				}
-
-				if (split[2] === 'night') {
-					devices[device].night = true;
-				}
-
-				//[3] is the brightness this light takes at its tier's step, in
-				//percent: "badrum_1_tak.light.mood.70". Without it the step is a
-				//plain on/off.
-				if (split[3] !== undefined) {
-					devices[device].level = Number(split[3]);
-				}
-			}
+			devices[device].type = e.type;
+			if (e.tier === 'mood') devices[device].mood = true;
+			if (e.tier === 'night') devices[device].night = true;
+			if (e.level !== undefined) devices[device].level = e.level;
 		});
 	});
 }
@@ -383,11 +397,10 @@ client.on('connect', function () {
 client.on('message', function (topic, message) {
 	try {
 		const split = topic.split('/');
-		const valueTypes = ['state', 'brightness', 'current_temperature', 'current_humidity', 'current_pressure'];
 		const valueType = split[3];
 
 		//homeassistant/light/entre/state: on
-		if (split[0] === 'homeassistant' && valueTypes.includes(valueType) && message.toString() !== 'unavailable' && message.toString() !== 'unknown') {
+		if (split[0] === 'homeassistant' && Object.hasOwn(VALUE_TYPES, valueType) && message.toString() !== 'unavailable' && message.toString() !== 'unknown') {
 			let deviceType = split[1];
 			let device = split[2];
 			let values = split.slice(2);
@@ -418,18 +431,18 @@ client.on('message', function (topic, message) {
 			//				devices[device]['dim'] = '0';
 			//			}
 			//		}
-			if (devices.hasOwnProperty(device) && devices[device].hasOwnProperty('zone')) {
+			//Only a value type declared `derives: true` produces the extra field
+			//below; the rest are raw-only and the reducer above has already stored
+			//them. That table is what stops a repeat of the brightness bug, where
+			//this block ran for EVERY value type and a payload of "178" read as
+			//"not on" and switched onoff to false.
+			if (VALUE_TYPES[valueType].derives
+				&& devices.hasOwnProperty(device) && devices[device].hasOwnProperty('zone')) {
 				if (deviceType === 'light' || deviceType === 'switch') {
-					//Only `state` says whether the lamp is on. This used to run for
-					//every value type, so once `brightness` was ingested a payload
-					//of "178" read as "not on" and switched onoff to false. The
-					//reducer above has already stored the brightness itself.
-					if (valueType === 'state') {
-						let prev = devices[device]['onoff'];
-						let val = message.toString() === 'on' ? 'true' : 'false';
-						if (prev !== val) {
-							devices[device]['onoff'] = val;
-						}
+					let prev = devices[device]['onoff'];
+					let val = message.toString() === 'on' ? 'true' : 'false';
+					if (prev !== val) {
+						devices[device]['onoff'] = val;
 					}
 				}
 				// else if (deviceType === 'group') {
@@ -587,107 +600,73 @@ function clientConnected(user, client) {
 //	return retObj;
 //}
 
-function getDevice(dev) {
-	let retObj = {}
+//The ONE place a device's socket payload is built. getDevice() had two callers
+//with two separate copies of this -- the per-device path read the tier off the
+//model, the snapshot path re-parsed it off the config string -- so every field
+//had to be added twice and the two could disagree. They did: a `switch` declared
+//.mood advertised mood:true in the snapshot and then lost it on the next
+//per-device update, because only one copy had learned that a switch is a light.
+//
+//`d` is the device's model entry, or undefined if MQTT has never mentioned it.
+//`meta` is {type, mood, night, level} -- from the model on one path, from the
+//config entry on the other; init() guarantees those agree.
+function shapeOf(d, meta) {
+	const seen = d !== undefined;
 
-	if (dev) {
-		let d = devices[dev];
-		let r = {};
-
-		let zone = d.zone === undefined ? 'nozone' : d.zone;
-		r[zone] = {};
-
-		//'switch' belongs here with 'light'. Without it a switch fell through to
-		//the generic onoff branch below, which drops mood/night -- so a switch
-		//declared .mood advertised mood:true in the device.all snapshot and then
-		//lost it on the next per-device update.
-		if (d.type === 'light' || d.type === 'switch') {
-			//`dim` was read from d['dim'], which nothing ever wrote -- 'brightness'
+	if (meta.type === 'light' || meta.type === 'switch') {
+		const ret = { mood: meta.mood, night: meta.night, level: meta.level };
+		if (seen) {
+			ret.onoff = d['onoff'] === 'true';
+			//`dim` was read from d['dim'], a key nothing ever wrote: 'brightness'
 			//was not an ingested value type, so it was undefined for every lamp
-			//since the model was introduced.
-			let dim = brightnessOf(d);
-			let mood = d.mood;
-			let night = d.night;
-			r[zone][dev] = {
-				onoff: d['onoff'] === 'true',
-				dim: dim,
-				level: d.level,
-				night: night,
-				mood: mood
-			};
+			//for as long as the model has existed.
+			ret.dim = brightnessOf(d);
+		}
+		return ret;
+	}
+	if (meta.type === 'occupancy') return seen ? { lastChange: d['lastChange'] } : {};
+	if (meta.type === 'sensor') return seen ? { state: d['state'] } : {};
+	if (!seen) return undefined;
 
-		}
-		else if (d.type === 'occupancy') {
-			r[zone][dev] = {
-				// lastChange: d['lastChange']
-			}
-		}
-		else if (d.type === 'sensor') {
-			r[zone][dev] = {
-				state: d['state']
-			}
-		}
-		else if (d.hasOwnProperty('onoff')) {
-			r[zone][dev] = {
-				onoff: d['onoff'] === 'true'
-			}
-		}
-		else if (d.hasOwnProperty('alarm-contact')) {
-			r[zone][dev] = {
-				onoff: d['alarm-contact'] === 'true'
-			}
-		}
-		else if (d.hasOwnProperty('alarm-motion')) {
-			r[zone][dev] = {
-				onoff: d['alarm-motion'] === 'true'
-			}
-		}
-		else {
-			return {};
-		}
+	//No declared type: only the per-device path reaches these, for devices that
+	//arrived over MQTT without being in db/config.json.
+	if (d.hasOwnProperty('onoff')) return { onoff: d['onoff'] === 'true' };
+	if (d.hasOwnProperty('alarm-contact')) return { onoff: d['alarm-contact'] === 'true' };
+	if (d.hasOwnProperty('alarm-motion')) return { onoff: d['alarm-motion'] === 'true' };
+	return undefined;
+}
 
-		r[zone][dev].lastChange = d.lastChange;
+function getDevice(dev) {
+	//One device -> {zone: {device: shape}}, for the `device` event.
+	if (dev) {
+		const d = devices[dev];
+		const shape = shapeOf(d, d);
+		if (shape === undefined) return {};
 
-		return r;
+		//⚠ The per-device payload carries lastChange and the snapshot does not.
+		//That asymmetry is original behaviour and the client relies on the
+		//per-device one for "senaste aktivitet"; it is not worth changing blind.
+		shape.lastChange = d.lastChange;
+		return { [d.zone === undefined ? 'nozone' : d.zone]: { [dev]: shape } };
 	}
 
+	//Everything -> {zone: {device: shape, ...}, ...}, for the `device.all` event.
+	//Driven by the config rather than the model, so a device that is configured
+	//but has never been heard from still appears.
+	const retObj = {};
 	Object.keys(config.zones).forEach(zone => {
 		const zoneDevices = {};
-		let values = config.zones[zone];
-
-		values.forEach(light => {
-			let split = light.split('.');
-
-			if (dev && dev !== split[0]) return;
-
-			let ret = {};
-			let type = split[1];
-			let device = devices[split[0]];
-			if (type === 'light' || type === 'switch') {
-				ret.mood = (split.length > 2 && split[2] === 'mood') ? true : undefined;
-				ret.night = (split.length > 2 && split[2] === 'night') ? true : undefined;
-				ret.level = (split.length > 3) ? Number(split[3]) : undefined;
-			}
-
-			if (device != undefined) {
-				if (type === 'light' || type === 'switch') {
-					ret.onoff = device['onoff'] === 'true';
-					ret.dim = brightnessOf(device);
-				}
-				else if (type === 'occupancy') {
-					ret.lastChange = device['lastChange'];
-				}
-				else {
-					ret.state = device['state'];
-				}
-			}
-
-			zoneDevices[split[0]] = ret;
+		config.zones[zone].forEach(entry => {
+			const e = parseEntry(entry);
+			zoneDevices[e.device] = shapeOf(devices[e.device], {
+				type: e.type,
+				mood: e.tier === 'mood' ? true : undefined,
+				night: e.tier === 'night' ? true : undefined,
+				level: e.level,
+			}) ?? {};
 		});
 
-		if (Object.keys(zoneDevices).length > 0) {
-			retObj[zone] = zoneDevices;
-		}
+		if (Object.keys(zoneDevices).length > 0) retObj[zone] = zoneDevices;
 	});
 
 	return retObj;
@@ -698,7 +677,21 @@ function exitHandler(options, exitCode) {
 	//Close MQTT
 	client.end();
 
-	let str = JSON.stringify(devices, null, '\t');
+	//Persist what was OBSERVED, never what the config says. log/mqtt.log seeds
+	//`devices` on the next boot, so anything schema-shaped written here comes
+	//back as a fact that outlives the config that produced it -- which is how a
+	//light that had lost its tier kept advertising mood:true across restarts.
+	//init() also clears these on the way in; stripping them here as well means
+	//the file simply cannot carry them.
+	const observed = {};
+	for (const [name, d] of Object.entries(devices)) {
+		if (d === null || typeof d !== 'object') continue;
+		const keep = {};
+		for (const [k, v] of Object.entries(d)) if (!SCHEMA_KEYS.includes(k)) keep[k] = v;
+		observed[name] = keep;
+	}
+
+	let str = JSON.stringify(observed, null, '\t');
 	if (str) {
 		writeFileSync('./log/mqtt.log', str);
 	}
@@ -729,44 +722,13 @@ function toggle(zone, value) {
 		return;
 	}
 
-	//A device may name the brightness it takes at its tier's step -- the 4th
-	//segment, "badrum_1_tak.light.mood.70". Such a light is DIMMED at that step
-	//rather than merely switched on, and at the `on` step it is driven to 100
-	//explicitly: a plain turn_on restores whatever level the lamp last had, so
-	//after a mood press `on` would otherwise leave it sitting at 70. (Measured
-	//against the real dimmer, not assumed.)
-	var send = (split, on, level) => {
-		var entity = split[1] + '.' + split[0];
-		if (on && level !== undefined) publishDim(entity, level);
-		else publish(entity, 'state', on ? 'on' : 'off');
-	};
-	var levelOf = split => split[3] === undefined ? undefined : Number(split[3]);
-
-	if (value === "night") {
-		config.zones[zone].forEach(device => {
-			var split = device.split('.');
-			if (split[1] !== 'light' && split[1] !== 'switch') return;
-			var on = split.length > 2 && split[2] === 'night';
-			send(split, on, levelOf(split));
-		});
-	}
-	else if (value === "mood") {
-		config.zones[zone].forEach(device => {
-			var split = device.split('.');
-			if (split[1] !== 'light' && split[1] !== 'switch') return;
-			var on = split.length > 2; //Night && mood
-			send(split, on, levelOf(split));
-		});
-	}
-	else {
-		config.zones[zone].forEach(device => {
-			var split = device.split('.');
-			if (split[1] !== 'light' && split[1] !== 'switch') return;
-			send(split, value === 'on', levelOf(split) === undefined ? undefined : 100);
-		});
+	//What the step means lives in web/scripts/zones.js, shared with the client
+	//and the floorplan builder. All this does is put the result on the wire.
+	for (const action of sceneFor(config.zones[zone], value)) {
+		if (action.level !== undefined) publishDim(action.entity, action.level);
+		else publish(action.entity, 'state', action.state);
 	}
 }
-
 
 function toggleItem(item, value) {
 	if (value === undefined) {
@@ -774,24 +736,17 @@ function toggleItem(item, value) {
 		return;
 	}
 
-	Object.values(config.zones).forEach(zone => zone.forEach(device => {
-		var split = device.split('.');
-		if (split[0] !== item) return;
-		console.log(split)
-		if (split[1] !== 'light' && split[1] !== 'switch') return;
-		publish(split[1] + '.' + split[0], 'state', value)
+	//A single lamp, from a tap on its own symbol. Deliberately a plain on/off:
+	//a device's step brightness belongs to the ROOM's step, not to poking one
+	//lamp. The same device can appear in more than one zone, hence the sweep.
+	Object.values(config.zones).forEach(zone => zone.forEach(entry => {
+		const e = parseEntry(entry);
+		if (e.device !== item) return;
+		if (e.type !== 'light' && e.type !== 'switch') return;
+		publish(e.entity, 'state', value);
 	}));
-
-	// publish(split[1] + '.' + split[0], 'state', toState);
 }
 
-//Brightness goes to a topic of its own. The long-standing HA automation
-//"(mqtt in) Kontrollera enhet" triggers on webapp/switch/+/+/set and runs
-//homeassistant.turn_{{payload}}, so that path can only ever carry on/off -- a
-//number there would call homeassistant.turn_70. A second automation added
-//2026-08-27, "(mqtt in) Dimma enhet", listens on webapp/dim/<entity_id>/set and
-//calls light.turn_on with brightness_pct. The old trigger pattern cannot match
-//this topic, so nothing that already worked goes near it.
 function publishDim(device, percent) {
 	if (percent === undefined) return;
 	var topic = `webapp/dim/${device}/set`;

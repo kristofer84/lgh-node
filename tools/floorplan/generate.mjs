@@ -16,6 +16,7 @@
 // without writing, exiting non-zero if it would change.
 
 import { readFileSync, writeFileSync, existsSync } from 'fs';
+import { parseEntry } from '../../web/scripts/zones.js';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
 
@@ -55,11 +56,8 @@ const warn = [];
 const note = m => warn.push(m);
 
 //---------------------------------------------------------------- parse config
-// "<device>.<domain>[.mood|.night]"
-function parseEntry(entry) {
-	const p = entry.split('.');
-	return { device: p[0], type: p[1], tier: p[2] };
-}
+//The grammar lives in web/scripts/zones.js, shared with the server and the
+//browser, so this builder cannot drift from what actually gets published.
 
 const zones = {};
 for (const [zone, entries] of Object.entries(config.zones)) {

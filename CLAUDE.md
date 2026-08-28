@@ -3,7 +3,8 @@
 Home-automation web app for one apartment. An MQTT broker (Home Assistant topic tree) feeds a
 Node/Express process that holds all device state **in memory**, pushes it over socket.io to an
 SVG floorplan dashboard, and publishes toggle commands back to MQTT. Stack: plain **JavaScript
-ESM** (no TypeScript, no build step, no tests, no lint) + **Express 4** + **socket.io 4** +
+ESM** (no TypeScript, no build step, no lint; tests are `npm test`, zero-dependency
+`node --test`) + **Express 4** + **socket.io 4** +
 **mqtt.js** + two auth paths (**Microsoft MSAL / passport-azure-ad** and **WebAuthn passkeys /
 @simplewebauthn**). ~1,700 lines of real code; served at `https://home.xcds.net`.
 
@@ -15,9 +16,10 @@ ESM** (no TypeScript, no build step, no tests, no lint) + **Express 4** + **sock
 
 - **Entry point is `mqtt-web.js`.** `server.js` is dead — every line is commented out. (A
   `node server.js` process is running in production and does nothing at all. Do not "fix" it.)
-- `package.json` has **no `start` script** and no devDependencies. The actual production
-  invocation, in tmux session `pi` window `nodeweb#`, cwd = repo root:
-  `node --trace-warnings mqtt-web.js`
+- `package.json` still has **no devDependencies** — the scripts it does have wrap the plain
+  commands and add nothing: `npm start` is exactly the production invocation, in tmux session
+  `pi` window `nodeweb#`, cwd = repo root: `node --trace-warnings mqtt-web.js`.
+  `npm run dev` is the same under `node --watch`. `npm test`, `npm run floorplan[:check]`.
 - **Requires `.env`.** `mqtt-web.js` calls `loadEnv()` from `env.js` before anything else and
   **exits 1 if `COOKIE_SECRET` is unset**. Copy `.env.example` → `.env` (gitignored) and fill in
   `COOKIE_SECRET` + the three `VAPID_*` vars. Changing `COOKIE_SECRET` invalidates all sessions.
@@ -81,6 +83,8 @@ records a landmine (a confirmed bug, or a load-bearing discipline).
 | Client login UI | `web/login.html`, `web/public/login/{login,login-msal,login-webn}.js` |
 | MQTT ingest + device state | `client.on('message')` in `mqtt-web.js` (~line 363); ⚠ **what HA publishes at all** is `mqtt_statestream:` in `/media/storage/ha/homeassistant/configuration.yaml`, outside this repo |
 | Zone/device config ⚠ | `db/config.json` (gitignored) — `config.zones`, dotted device strings; **source of truth for the floorplan** |
+| Zone grammar + step semantics ⚠ | `web/scripts/zones.js` — **shared by the server, the floorplan builder and the browser**. Parses `device.type[.tier[.level]]`, decides what a step publishes (`sceneFor`) and which step a room is in (`stepOf`). Under `web/` because that is the only place all three can import it without a build step |
+| Tests | `test/` — `npm test`. `helpers.mjs` documents the source-extraction harness |
 | Floorplan generator ⚠ | `tools/floorplan/` — `generate.mjs`, `geometry.json`, `lights.json`, `base.svg`, its own `README.md` |
 | Device state persistence ⚠ | `exitHandler` in `mqtt-web.js` → `log/mqtt.log`, **written only on exit** |
 | socket.io wiring + auth bridge | `middlewareTransform` + `io.use(...)` in `mqtt-web.js` (~line 302) |
@@ -111,6 +115,11 @@ records a landmine (a confirmed bug, or a load-bearing discipline).
 - Device/zone names and UI strings are **Swedish** (`vardagsrum`, `kok`, `tvatt`, `klk1`) — keys,
   not prose. The apartment changed; the old `sovrum` / `kontor` / `dusch` / `garderob` / `entre`
   names are gone. Current zone list: `docs/mqtt-and-devices.md` §5.
-- There is no test suite and no CI. Verification means reading the code and restarting the
+- **`npm test` — 19 tests, no dependencies, ~0.4 s.** Still no CI, and the tests cover the
+  device/zone logic only, not the express pipeline or auth. They run against the *real*
+  `db/config.json`, so a bad config edit fails them. Several encode a bug that actually
+  happened and are marked ⚠; every one has been checked by reintroducing its bug and watching
+  it fail. `test/helpers.mjs` explains why they evaluate `mqtt-web.js`'s source text rather
+  than importing it. Beyond that, verification still means reading the code and restarting the
   process by hand. **Edits are not live until that restart.**
 - Commit messages end with: `Co-Authored-By: Claude Opus 5 (1M context) <noreply@anthropic.com>`.

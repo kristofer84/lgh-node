@@ -1,0 +1,196 @@
+//The parts still living inside mqtt-web.js, exercised against the REAL
+//db/config.json and log/mqtt.log via the source-extraction harness. See
+//helpers.mjs for why it works that way.
+//
+//Several of these encode a bug that actually happened. Those are marked ⚠.
+
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+import { load, source, grabCallback, preamble, ROOT } from './helpers.mjs';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
+import { parseEntry, sceneFor } from '../web/scripts/zones.js';
+
+const boot = body => load(['init', 'brightnessOf', 'shapeOf', 'getDevice', 'toggle'], `init();\n${body}`, { parseEntry, sceneFor });
+
+test('init() stamps zone, type and tier from the config', () => {
+	const { result } = boot('return { devices, config };');
+	const { devices, config } = result;
+	for (const [zone, entries] of Object.entries(config.zones)) {
+		for (const entry of entries) {
+			const e = parseEntry(entry);
+			const d = devices[e.device];
+			assert.ok(d, `${e.device} missing from the model`);
+			assert.equal(d.zone, zone, `${e.device} zone`);
+			assert.equal(d.type, e.type, `${e.device} type`);
+			assert.equal(d.mood, e.tier === 'mood' ? true : undefined, `${e.device} mood`);
+			assert.equal(d.night, e.tier === 'night' ? true : undefined, `${e.device} night`);
+			assert.equal(d.level, e.level, `${e.device} level`);
+		}
+	}
+});
+
+test('⚠ init() CLEARS a tier the config no longer declares', () => {
+	//The bug: `devices` is restored from log/mqtt.log, and mood/night were only
+	//ever set, never deleted. A light that lost its tier came back still
+	//advertising mood:true, so toggle() (config) and updateView() (model)
+	//disagreed permanently, across every restart.
+	//
+	//The stale flag has to come from the FILE, not from a mutation after boot:
+	//init() reassigns `devices` wholesale from log/mqtt.log, so anything set
+	//in memory beforehand is discarded and the test would prove nothing.
+	const real = readFileSync(join(ROOT, 'db/config.json'), 'utf8');
+	const config = JSON.parse(real);
+	const victim = Object.values(config.zones).flat()
+		.map(parseEntry).find(e => !e.tier && (e.type === 'light' || e.type === 'switch'));
+	assert.ok(victim, 'no untiered light in the config to test with');
+
+	const doctored = { [victim.device]: { mood: true, night: true, level: 99, onoff: 'true' } };
+	const { result } = load(['init', 'brightnessOf', 'shapeOf', 'getDevice', 'toggle'],
+		'init(); return devices;',
+		{
+			parseEntry, sceneFor,
+			readFileSync: p => String(p).includes('mqtt.log') ? Buffer.from(JSON.stringify(doctored)) : Buffer.from(real),
+		});
+
+	assert.equal(result[victim.device].mood, undefined, `${victim.device} kept a stale mood flag`);
+	assert.equal(result[victim.device].night, undefined, `${victim.device} kept a stale night flag`);
+	assert.equal(result[victim.device].level, undefined, `${victim.device} kept a stale level`);
+	//...while the observations from the file survive.
+	assert.equal(result[victim.device].onoff, 'true');
+});
+
+test('⚠ the snapshot and the per-device payload agree', () => {
+	//The bug: the two paths built the payload separately, so a `switch` declared
+	//.mood advertised mood:true in device.all and then lost it on the next
+	//per-device update. They are one function now; this holds them to it.
+	const { result } = boot(`
+		const out = {};
+		const all = getDevice(null);
+		for (const zone of Object.keys(config.zones))
+			for (const entry of config.zones[zone]) {
+				const name = entry.split('.')[0];
+				const one = getDevice(name);
+				out[name] = [all[zone]?.[name], one[Object.keys(one)[0]]?.[name]];
+			}
+		return out;`);
+	for (const [name, [fromAll, fromOne]] of Object.entries(result)) {
+		if (!fromAll || !fromOne) continue;
+		for (const k of ['mood', 'night', 'level', 'onoff', 'dim', 'state']) {
+			assert.deepEqual(fromAll[k], fromOne[k], `${name}.${k}: snapshot ${JSON.stringify(fromAll[k])} vs per-device ${JSON.stringify(fromOne[k])}`);
+		}
+	}
+});
+
+test('toggle() publishes what sceneFor says, for every zone and step', () => {
+	for (const step of ['off', 'night', 'mood', 'on']) {
+		const { result, published } = load(
+			['init', 'brightnessOf', 'shapeOf', 'getDevice', 'toggle'],
+			`init(); const zones = Object.keys(config.zones);
+			 for (const z of zones) toggle(z, ${JSON.stringify(step)});
+			 return config;`,
+			{ parseEntry, sceneFor });
+		const want = Object.keys(result.zones).flatMap(z => sceneFor(result.zones[z], step))
+			.map(a => a.level !== undefined ? { entity: a.entity, dim: a.level } : { entity: a.entity, state: a.state });
+		assert.deepEqual(published, want, `step ${step}`);
+	}
+});
+
+test('toggle() rejects an unknown zone and a missing value without publishing', () => {
+	const { published } = load(['init', 'brightnessOf', 'shapeOf', 'getDevice', 'toggle'],
+		`init(); toggle('no_such_zone', 'on'); toggle(Object.keys(config.zones)[0], undefined); return null;`,
+		{ parseEntry, sceneFor });
+	assert.deepEqual(published, []);
+});
+
+test('every zone has steps that differ from one another', () => {
+	//⚠ The untiered devices are what makes `on` differ from `mood`. kok and bad3
+	//once had every light tiered, so the two steps published an identical scene
+	//and the extra press did nothing. orangeri had the same at night-vs-mood.
+	const { result } = boot('return config;');
+	for (const [zone, entries] of Object.entries(result.zones)) {
+		const scenes = {};
+		for (const step of ['night', 'mood', 'on']) scenes[step] = JSON.stringify(sceneFor(entries, step));
+		if (!JSON.parse(scenes.on).length) continue;
+		assert.notEqual(scenes.mood, scenes.on, `${zone}: mood and on publish the same scene`);
+		const tiers = entries.map(parseEntry).filter(e => e.tier);
+		if (tiers.some(e => e.tier === 'night') && tiers.some(e => e.tier === 'mood'))
+			assert.notEqual(scenes.night, scenes.mood, `${zone}: night and mood publish the same scene`);
+	}
+});
+
+test('⚠ a brightness message must not change onoff', () => {
+	//The bug: the typed pass ran for EVERY value type, so once brightness was
+	//ingested a payload of "178" read as "not on" and flipped onoff to false.
+	const src = source();
+	const handler = grabCallback("client.on('message'", src);
+	const run = (devices, topic, payload) => {
+		const fn = new Function('devices', 'lgMqtt', 'log', 'queueSend', 'console',
+			`${preamble(src)}\nconst h = ${handler}; h(${JSON.stringify(topic)}, Buffer.from(${JSON.stringify(payload)}));`);
+		fn(devices, () => {}, () => {}, () => {}, { log() {} });
+		return devices;
+	};
+	const d = { badrum_1_tak: { zone: 'bad1', type: 'light', onoff: 'true' } };
+	run(d, 'homeassistant/light/badrum_1_tak/brightness', '178');
+	assert.equal(d.badrum_1_tak.onoff, 'true', 'brightness clobbered onoff');
+	assert.equal(d.badrum_1_tak.brightness, '178', 'brightness was not stored');
+
+	run(d, 'homeassistant/light/badrum_1_tak/state', 'off');
+	assert.equal(d.badrum_1_tak.onoff, 'false', 'state did not update onoff');
+});
+
+test('⚠ dim reaches the payload (brightness is an ingested value type)', () => {
+	//The bug: getDevice returned device['dim'], a key nothing ever wrote, so
+	//every lamp reported dim: undefined for as long as the model existed.
+	const { result } = boot(`
+		const name = Object.keys(config.zones).flatMap(z => config.zones[z])
+			.map(e => e.split('.')).find(p => p[1] === 'light')[0];
+		devices[name].brightness = '178';
+		devices[name].onoff = 'true';
+		const one = getDevice(name);
+		return one[Object.keys(one)[0]][name];`);
+	assert.equal(result.dim, 178);
+	assert.equal(result.onoff, true);
+});
+
+test('the payload carries the tier and the level for a levelled light', () => {
+	//Not covered by the snapshot-vs-per-device test: both callers share shapeOf
+	//now, so dropping a field there loses it from both and they still agree.
+	const { result } = boot(`
+		const out = {};
+		for (const zone of Object.keys(config.zones))
+			for (const entry of config.zones[zone]) {
+				const e = entry.split('.');
+				if (e.length < 4) continue;
+				const one = getDevice(e[0]);
+				out[e[0]] = [Number(e[3]), one[Object.keys(one)[0]][e[0]], getDevice(null)[zone][e[0]]];
+			}
+		return out;`);
+	assert.ok(Object.keys(result).length, 'no levelled light in the config to test with');
+	for (const [name, [want, one, all]] of Object.entries(result)) {
+		assert.equal(one.level, want, `${name} per-device level`);
+		assert.equal(all.level, want, `${name} snapshot level`);
+		assert.equal(one.mood, true, `${name} per-device mood`);
+		assert.equal(all.mood, true, `${name} snapshot mood`);
+	}
+});
+
+test('brightnessOf survives HA sending the string "null"', () => {
+	const { result } = boot(`return [brightnessOf({brightness:'178'}), brightnessOf({brightness:'null'}),
+		brightnessOf({}), brightnessOf(undefined), brightnessOf({brightness:'nonsense'})];`);
+	assert.deepEqual(result, [178, undefined, undefined, undefined, undefined]);
+});
+
+test('⚠ exitHandler persists observations, never schema', () => {
+	//The bug this closes for good: log/mqtt.log seeds `devices` on the next boot,
+	//so anything schema-shaped written here comes back as a fact that outlives
+	//the config that produced it.
+	const src = source();
+	let written = null;
+	const fn = new Function('devices', 'client', 'log', 'writeFileSync', 'process',
+		`${preamble(src)}\n${src.slice(src.indexOf('function exitHandler('), src.indexOf('function brightnessOf('))}
+		 exitHandler({}, 0);`);
+	fn({ lampa: { zone: 'sov1', type: 'light', mood: true, level: 20, onoff: 'true', brightness: '52', lastChange: 1 } },
+		{ end() {} }, () => {}, (_p, s) => { written = JSON.parse(s); }, { exit() {} });
+	assert.deepEqual(written, { lampa: { onoff: 'true', brightness: '52', lastChange: 1 } });
+});

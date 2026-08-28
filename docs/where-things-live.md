@@ -374,6 +374,42 @@ Landmines carried by the new plan (each recorded in full in `tools/floorplan/REA
 - Screen wake lock: `lock()`/`unlock()` via `navigator.wakeLock`, tied to window focus/blur.
   Blur also **disconnects the socket**; focus reconnects and re-fetches `/refresh-key`.
 
+### Zone grammar + step semantics ⚠ — `web/scripts/zones.js` (shared)
+
+**The ONE definition** of the zone entry grammar `device.type[.tier[.level]]`, of what each
+light step publishes (`sceneFor`), of which step a room is currently in (`stepOf`, the inverse)
+and of what a press moves it to (`nextStep`). Imported by all three consumers:
+`mqtt-web.js`, `tools/floorplan/generate.mjs`, and — in the browser — `web/scripts/home.js`.
+
+⚠ **It has to live under `web/`.** There is no build step and no bundler; `express.static('./web')`
+serves it at `/scripts/zones.js` and `dashboard.html` loads `home.js` with `type="module"`, so
+that directory is the only path all three can import from. Keep it free of imports and of
+anything Node- or DOM-specific, or the browser copy stops loading.
+
+⚠ **Why it exists.** The grammar was re-implemented in **seven** places (`mqtt-web.js` ×6 +
+`generate.mjs`) and the meaning of a step in three — `toggle()` decided what a step publishes,
+`getNextStateRoom()` which step came next, `updateView()` which step a room was in. Nothing
+held them in agreement and they were not: a `switch` declared `.mood` advertised `mood: true`
+in the `device.all` snapshot and lost it on the next per-device update; `updateView()` could
+not tell a lamp at its mood brightness from one at full; and adding the `level` segment meant
+editing five call sites, where missing one would have failed silently.
+
+### Tests — `test/`, `npm test`
+
+19 tests, zero dependencies, `node --test`, well under a second. **Not** a general safety net:
+they cover the device/zone logic and nothing of the express pipeline, auth or sockets.
+
+- `test/zones.test.mjs` imports the shared module directly — the payoff for extracting it.
+- `test/server.test.mjs` runs against the **real** `db/config.json` and `log/mqtt.log`, so a
+  bad config edit fails the suite. One test asserts no zone has two steps that publish the
+  same scene, which is the bug `kok`, `bad3` and `orangeri` all had.
+- `test/helpers.mjs` explains the harness: `mqtt-web.js` connects to MQTT and starts listening
+  on import, so tests pull a function's **source text** out of the file and evaluate it with
+  stubs. Fragile in one specific way — rename a function and its test stops finding it, loudly.
+- Tests marked ⚠ encode a bug that actually happened. Each was checked by reintroducing its
+  bug and confirming the test fails; do the same for any you add, or you have written a test
+  that cannot fail.
+
 ### MQTT ingest + the in-memory device model — `mqtt-web.js` 352–457
 
 See **`docs/mqtt-and-devices.md`** for the topic convention, config format and output shapes.
@@ -403,6 +439,14 @@ through `device_id`. Full detail and the open gaps: `docs/mqtt-and-devices.md` �
   instead of exiting. That removes the class of remote-kill bugs, but it also means a crashed
   request no longer flushes state — and that a wedged process will keep running. Watch the log.
 
+
+⚠ **It persists observations only.** `exitHandler` used to dump the whole `devices` object,
+schema included — and since that file *seeds* `devices` on the next boot, a `mood: true` from a
+tier since removed from `db/config.json` came back as a fact that outlived the config which
+produced it. `toggle()` reads the config and `updateView()` reads the model, so the two
+disagreed permanently, across every restart, with nothing visible in the config to explain it.
+`SCHEMA_KEYS` (`zone`, `type`, `mood`, `night`, `level`) are now stripped on the way out and
+cleared on the way in, so the file cannot carry them at all.
 ### Logging — `log.js`
 
 `log()` is the only function that prints. `mqtt()` has its body commented out (so per-message

@@ -1,5 +1,13 @@
 {
   "type": "module",
+  "scripts": {
+    "start": "node --trace-warnings mqtt-web.js",
+    "dev": "node --watch --trace-warnings mqtt-web.js",
+    "test": "node --test test/*.test.mjs",
+    "test:watch": "node --test --watch test/*.test.mjs",
+    "floorplan": "node tools/floorplan/generate.mjs",
+    "floorplan:check": "node tools/floorplan/generate.mjs --check"
+  },
   "dependencies": {
     "@azure/msal-node": "^1.18.4",
     "@microsoft/microsoft-graph-client": "^3.0.7",

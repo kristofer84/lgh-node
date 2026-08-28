@@ -1,3 +1,7 @@
+//The step semantics live in zones.js, the same file the server and the
+//floorplan builder import, so all three cannot drift apart.
+import { stepOf, nextStep } from './zones.js';
+
 //import Auth from './auth.js';
 
 // START socket.io
@@ -267,9 +271,10 @@ function updateMap(data) {
 //Update view from model
 function updateView() {
 	Object.keys(model).forEach(zone => {
-		let lights = Object.keys(model[zone]).filter(light => model[zone][light].hasOwnProperty('onoff'));
-		let moodable = lights.some(light => model[zone][light].mood);
-		let nightable = lights.some(light => model[zone][light].night);
+		//Which step this zone is displaying, and whether it has the lamps to
+		//offer a mood/night step at all. Shared with the server, which uses the
+		//inverse (sceneFor) to decide what a step publishes.
+		const { step: value, moodable, nightable, lights } = stepOf(model[zone]);
 
 		let ar = document.getElementById(zone);
 		//Zones without a room drawn for them (home, utomhus, moja, devices) are
@@ -278,33 +283,6 @@ function updateView() {
 		if (!ar) return;
 		if (moodable && !ar.hasAttribute("moodable")) ar.setAttribute("moodable", "moodable");
 		if (nightable && !ar.hasAttribute("nightable")) ar.setAttribute("nightable", "nightable");
-
-		//A light that declares a step brightness ("badrum_1_tak.light.mood.70") is
-		//on at BOTH the mood and the on step -- only its brightness differs -- so
-		//every(onoff) alone reported the room fully on the moment the mood step
-		//lit it, and the room could never show its mood state. Compare where the
-		//lamp actually sits: nearer its declared level than full means the room
-		//is still at the mood step. `dim` is 0-255, straight from HA.
-		let atStepLevel = light => {
-			let m = model[zone][light];
-			if (!m.onoff || m.level === undefined || m.dim === undefined) return false;
-			let target = m.level / 100 * 255;
-			return Math.abs(m.dim - target) < Math.abs(m.dim - 255);
-		};
-
-		let value = "on";
-		if (lights.every(light => !model[zone][light].onoff)) {
-			value = "off";
-		}
-		else if (lights.every(light => model[zone][light].onoff) && !lights.some(atStepLevel)) {
-			value = "on";
-		}
-		else if (moodable && lights.some(light => model[zone][light].onoff && model[zone][light].mood)) {
-			value = "mood";
-		}
-		else if (nightable && lights.some(light => model[zone][light].onoff && model[zone][light].night)) {
-			value = "night";
-		}
 
 		updateArea(ar, value);
 
@@ -343,24 +321,13 @@ function get() {
 }*/
 
 function getNextStateRoom(element) {
-	var current = element.getAttribute("light");
-	var moodable = element.getAttribute("moodable");
-	var nightable = element.getAttribute("nightable");
-	var allowMax = $("#cb-mood").is(':checked');
-
-	switch (current) {
-		case "on":
-			return "off";
-		case "off":
-			if (nightable) return "night";
-			if (moodable) return "mood";
-			return "on";
-		case "mood":
-			return allowMax ? "on" : "off";
-		case "night":
-			if (moodable) return "mood";
-			return allowMax ? "on" : "off";
-	}
+	return nextStep(element.getAttribute("light"), {
+		moodable: element.getAttribute("moodable"),
+		nightable: element.getAttribute("nightable"),
+		//The "Max brightness" checkbox, the sun icon. Without it a room never
+		//reaches the `on` step.
+		allowMax: $("#cb-mood").is(':checked'),
+	});
 }
 
 function getNextStateItem(element) {

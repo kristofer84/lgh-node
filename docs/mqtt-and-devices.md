@@ -297,6 +297,20 @@ Both server→client payloads are **strings**, not objects — the client does
 identical re-emit. `io.emit` broadcasts to **all** connected clients; there is no per-user
 filtering (everyone who is `enabled` sees the whole apartment).
 
+### ⚠ The grammar and the step semantics live in `web/scripts/zones.js`
+
+Everything in this section — how a device string is read, what each step publishes, and which
+step a room is currently displaying — is **one shared module**, `web/scripts/zones.js`,
+imported by `mqtt-web.js`, `tools/floorplan/generate.mjs` and (in the browser)
+`web/scripts/home.js`. It lives under `web/` because `express.static('./web')` serves it and
+`dashboard.html` loads `home.js` with `type="module"`, so that is the only path all three can
+reach without a build step. Keep it import-free and free of Node/DOM specifics.
+
+It exists because the grammar used to be re-implemented in **seven** places and the meaning of
+a step in three, with nothing holding them in agreement — and they did not agree. `sceneFor()`
+(what a step publishes) and `stepOf()` (which step a room is in) are inverses of each other;
+`npm test` checks them against the real `db/config.json`.
+
 ### `toggle(zone, value)` — room-level
 
 Rejects an unknown zone and an `undefined` value with a log line. Then, for every `light` /
@@ -323,7 +337,8 @@ off, a room whose lights all carry a level cycles `off → 20% → off` and full
 unreachable from the floorplan.
 
 ⚠ **Brightness leaves on a different topic and needs a second HA automation.**
-`publish()` writes `webapp/switch/<entity>/<property>/set`, which the long-standing HA
+`toggle()` itself is now four lines — it asks `sceneFor()` what the step means and puts the
+answer on the wire. `publish()` writes `webapp/switch/<entity>/<property>/set`, which the long-standing HA
 automation **`(mqtt in) Kontrollera enhet`** picks up — and that automation runs
 `homeassistant.turn_{{trigger.payload}}` and **discards the property segment entirely**, so
 that path can only ever carry `on`/`off`. A payload of `70` would call
