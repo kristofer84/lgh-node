@@ -544,7 +544,20 @@ client.on('message', function (topic, message) {
 			//them. That table is what stops a repeat of the brightness bug, where
 			//this block ran for EVERY value type and a payload of "178" read as
 			//"not on" and switched onoff to false.
-			if (VALUE_TYPES[valueType].derives
+			//⚠ The reducer above keys the model by DEVICE NAME, not by entity, so
+			//`light.slinga_mette` and `switch.slinga_mette` -- one Z-Wave plug
+			//exposing both command classes -- write into the same entry and
+			//clobber each other. The dead `light.` half published
+			//supported_color_modes: ["brightness"], which made a binary plug look
+			//dimmable. Only accept a light/switch message for a device the config
+			//says is that domain. Sensors and occupancy are left alone: an
+			//`occupancy` entry legitimately arrives on a `group/` topic.
+			const domain = devices[device]?.type;
+			const crossed = (deviceType === 'light' || deviceType === 'switch')
+				&& (domain === 'light' || domain === 'switch')
+				&& deviceType !== domain;
+
+			if (!crossed && VALUE_TYPES[valueType].derives
 				&& devices.hasOwnProperty(device) && devices[device].hasOwnProperty('zone')) {
 				if (deviceType === 'light' || deviceType === 'switch') {
 					let prev = devices[device]['onoff'];
@@ -855,6 +868,10 @@ function exitHandler(options, exitCode) {
 //A device takes a percentage when HA says it has a colour mode other than
 //`onoff`. A `switch` publishes no colour modes at all, so it is never dimmable.
 function dimmableFrom(d) {
+	//A `switch` has no brightness, full stop. Checking the type rather than only
+	//the attribute makes this immune to a stale supported_color_modes left in
+	//log/mqtt.log by a same-named `light.` entity that no longer exists.
+	if (d?.type === 'switch') return false;
 	const raw = d === undefined ? undefined : d['supported_color_modes'];
 	if (!raw) return false;
 	try {

@@ -516,6 +516,26 @@ Record here rather than rediscovering them:
   wall), and `kai_garderob` is the wardrobe in `sov3`. Both are placed in `lights.json` and are
   now their own tappable symbols; neither carries a mood/night tier, so they glow only when
   they themselves are on and never join the room's mood scene.
+- ⚠ **A Z-Wave plug or dimmer often exposes MORE THAN ONE entity, and only one of them
+  works.** This has now bitten three times, so check it first whenever a button does nothing:
+  the node presents command class **37** (binary switch) as `switch.<name>` and **38**
+  (multilevel switch) as `light.<name>`, and HA keeps a registry entry for whichever it once
+  saw even after the device stops providing it — showing `state: unavailable` with
+  `restored: true`. Publishing to that one is silently inert.
+  **`slinga_mette` (fixed 2026-08-28)**: node 34 is a binary plug with only CC 37, so
+  `light.slinga_mette` was a dead leftover and the config now says `"type": "switch"`.
+  Confirmed by publishing to both: the `switch.` topic toggles the lamp, the `light.` topic
+  does nothing at all.
+  To diagnose: `zwave/<Node_Name>/37/0/currentValue` vs `zwave/<Node_Name>/38/0/currentValue`
+  tells you which command classes actually exist, and `restored: true` in HA marks the dead
+  entity.
+  ⚠ **The two entities share a device name, and the ingest keys the model by device name**, so
+  they wrote into the same entry and clobbered each other — the dead `light.` half published
+  `supported_color_modes: ["brightness"]`, which made a binary plug look dimmable and offered a
+  percentage box for it. The ingest now refuses a `light` message for a device the config calls
+  a `switch` and vice versa, and `dimmableFrom()` answers `false` for a switch outright, so a
+  stale attribute in `log/mqtt.log` cannot resurrect the problem. Sensors and occupancy are
+  deliberately outside that guard: an `occupancy` entry legitimately arrives on a `group/` topic.
 - ⚠ **`entre2` uses `light.entre_2_3`, and that is correct — do not "fix" it to
   `light.entre_2`.** Confirmed by the operator, 2026-08-27. Node 35 is a two-channel
   dimmer, and the entity naming is counter-intuitive: `light.entre_2` is endpoint 1 and

@@ -140,6 +140,45 @@ test('⚠ a brightness message must not change onoff', () => {
 	assert.equal(d.badrum_1_tak.onoff, 'false', 'state did not update onoff');
 });
 
+test('⚠ a light message cannot land on a same-named switch', () => {
+	//The reducer keys the model by DEVICE NAME, not by entity, so one Z-Wave plug
+	//exposing both command classes -- light.slinga_mette and switch.slinga_mette
+	//-- wrote into the same entry. The dead `light.` half published
+	//supported_color_modes: ["brightness"], which made a binary plug look
+	//dimmable and offered a percentage box for it on the config page.
+	const src = source();
+	const handler = grabCallback("client.on('message'", src);
+	const run = (devices, topic, payload) => {
+		const fn = new Function('devices', 'lgMqtt', 'log', 'queueSend', 'console',
+			`${preamble(src)}\nconst h = ${handler}; h(${JSON.stringify(topic)}, Buffer.from(${JSON.stringify(payload)}));`);
+		fn(devices, () => {}, () => {}, () => {}, { log() {} });
+		return devices;
+	};
+	const d = { slinga_mette: { zone: 'sov4', type: 'switch', onoff: 'true' } };
+	run(d, 'homeassistant/switch/slinga_mette/state', 'off');
+	assert.equal(d.slinga_mette.onoff, 'false', 'the switch domain must be accepted');
+
+	run(d, 'homeassistant/light/slinga_mette/state', 'on');
+	assert.equal(d.slinga_mette.onoff, 'false', 'a light message must NOT touch a switch device');
+
+	//A sensor/occupancy entry legitimately arrives on another domain's topic, so
+	//the guard must not reach those.
+	const g = { sensorer_alla: { zone: 'home', type: 'occupancy' } };
+	run(g, 'homeassistant/group/sensorer_alla/state', 'on');
+	assert.equal(g.sensorer_alla.onoff, undefined);
+	assert.equal(g.sensorer_alla.state, 'on', 'occupancy still ingests from its own domain');
+});
+
+test('a switch is never dimmable, whatever attributes linger', () => {
+	const { result } = boot(`return [
+		dimmableFrom({ type: 'switch', supported_color_modes: '["brightness"]' }),
+		dimmableFrom({ type: 'light',  supported_color_modes: '["brightness"]' }),
+		dimmableFrom({ type: 'light',  supported_color_modes: '["onoff"]' }),
+		dimmableFrom({ type: 'light' }),
+	];`);
+	assert.deepEqual(result, [false, true, false, false]);
+});
+
 test('⚠ dim reaches the payload (brightness is an ingested value type)', () => {
 	//The bug: getDevice returned device['dim'], a key nothing ever wrote, so
 	//every lamp reported dim: undefined for as long as the model existed.
