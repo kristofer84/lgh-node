@@ -88,6 +88,31 @@ test('stepOf ignores entries with no onoff (sensors)', () => {
 	assert.equal(s.step, 'on');
 });
 
+test('⚠ a room with only untiered lights on reads as partial, not on', () => {
+	//The bug: this chain started at `let step = 'on'` and FELL THROUGH to it, so
+	//one wardrobe light reported the whole room on -- full amber wash, and the
+	//per-lamp glows hidden by `.zone-lights[light="on"] .glow`, so the lamp you
+	//had just switched on became invisible. Adding a mood lamp then moved the
+	//room backwards from `on` to `mood`. Reachable only once untiered lights got
+	//their own tap targets.
+	const sov2 = on => ({
+		sovrum_2_tak: { onoff: on.includes('tak') },
+		lampa_mikkel: { onoff: on.includes('lampa'), mood: true },
+		mikkel_garderob: { onoff: on.includes('garderob') },
+	});
+	assert.equal(stepOf(sov2([])).step, 'off');
+	assert.equal(stepOf(sov2(['garderob'])).step, 'partial');
+	assert.equal(stepOf(sov2(['garderob', 'lampa'])).step, 'mood');
+	assert.equal(stepOf(sov2(['garderob', 'lampa', 'tak'])).step, 'on');
+	//Same shape in a bathroom: mirror untiered, ceiling mood.
+	assert.equal(stepOf({
+		badrum_1_spegel: { onoff: true },
+		badrum_1_tak: { onoff: false, mood: true, level: 20 },
+	}).step, 'partial');
+	//`on` still means every light, and nothing produces `partial` as a command.
+	assert.ok(!sceneFor(['a.light', 'b.light.mood'], 'partial').some(x => x.state === 'on'));
+});
+
 test('nextStep walks the cycle', () => {
 	const both = { moodable: true, nightable: true, allowMax: true };
 	assert.equal(nextStep('off', both), 'night');
@@ -101,4 +126,8 @@ test('nextStep walks the cycle', () => {
 	//whose lights all carry a level means full brightness is too.
 	assert.equal(nextStep('mood', { moodable: true, allowMax: false }), 'off');
 	assert.equal(nextStep('mood', { moodable: true, allowMax: true }), 'on');
+	//A partially-lit room presses to off, which is what it did while it was
+	//mislabelled as `on`.
+	assert.equal(nextStep('partial', { moodable: true, allowMax: true }), 'off');
+	assert.equal(nextStep('partial', {}), 'off');
 });

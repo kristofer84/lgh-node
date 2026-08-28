@@ -57,7 +57,13 @@
 
 /** @typedef {Record<string, DeviceState>} ZoneModel */
 
-/** @typedef {'off'|'night'|'mood'|'on'} Step */
+/**
+ * `partial` is a DISPLAY-only step: some lights in the room are on, but not all
+ * of them, and none of the ones that are on belongs to a mood/night scene. No
+ * press produces it -- sceneFor() never sees it -- it only describes what the
+ * room currently looks like.
+ * @typedef {'off'|'night'|'mood'|'on'|'partial'} Step
+ */
 
 //----------------------------------------------------------------- grammar
 
@@ -178,7 +184,15 @@ export function stepOf(zoneModel) {
 	};
 
 	/** @type {Step} */
-	let step = 'on';
+	//⚠ The last branch is not decoration. This chain used to start at `let step =
+	//'on'` and fall through to it, so a room with SOME lights on and none of them
+	//tiered reported itself fully on: switching on one wardrobe light washed the
+	//whole room amber and -- since `.zone-lights[light="on"] .glow` hides the
+	//per-lamp glows -- hid the very lamp that had just been lit. Adding a second,
+	//mood-tiered lamp then moved the room BACKWARDS from `on` to `mood`.
+	//It only became reachable when untiered lights got their own tap targets.
+	/** @type {Step} */
+	let step = 'partial';
 	if (lights.every(n => !lit(n))) step = 'off';
 	else if (lights.every(lit) && !lights.some(atStepLevel)) step = 'on';
 	else if (moodable && lights.some(n => lit(n) && zoneModel[n].mood)) step = 'mood';
@@ -203,6 +217,9 @@ export function stepOf(zoneModel) {
 export function nextStep(current, { moodable, nightable, allowMax } = {}) {
 	switch (current) {
 		case 'on': return 'off';
+		//A partially-lit room presses to off, which is what it did while it was
+		//mislabelled as `on`. Pressing a room with something on should turn it off.
+		case 'partial': return 'off';
 		case 'off': return nightable ? 'night' : moodable ? 'mood' : 'on';
 		case 'mood': return allowMax ? 'on' : 'off';
 		case 'night': return moodable ? 'mood' : allowMax ? 'on' : 'off';

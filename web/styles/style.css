@@ -232,6 +232,14 @@ body.nightmode #rooms-outline {
   fill-opacity: 0.22;
 }
 
+/* Some lights on, but not all, and none of them part of a scene -- one wardrobe
+   light, say. Deliberately fainter than mood: the room is lit, but it is not
+   displaying a scene, and the lamp's own glow is what says which one is on. */
+.room[light="partial"] .room-outline {
+  fill: #ffcc00;
+  fill-opacity: 0.12;
+}
+
 body.nightmode .room[light="on"] .room-outline {
   fill: #ffcc00;
   fill-opacity: 0.5;

@@ -311,6 +311,17 @@ a step in three, with nothing holding them in agreement — and they did not agr
 (what a step publishes) and `stepOf()` (which step a room is in) are inverses of each other;
 `npm test` checks them against the real `db/config.json`.
 
+⚠ **`stepOf()` can return a fifth value, `partial`, that no press ever produces.** It means
+some lights in the room are on, not all of them are, and none of the lit ones belongs to a
+mood/night scene — one wardrobe light, or a bathroom mirror. Until 2026-08-28 that case fell
+through to `on`, because the chain was written as `let step = 'on'` followed by four `if`s
+that could all miss. The room then washed full amber **and** hid its own per-lamp glows
+(`.zone-lights[light="on"] .glow`), so the lamp you had just switched on disappeared; adding a
+second, mood-tiered lamp moved the room *backwards* from `on` to `mood`. The case only became
+reachable when untiered lights got their own tap targets. `partial` renders a fainter wash
+(0.12 against mood's 0.22) and keeps the glows, and presses to `off` — which is what it did
+while it was mislabelled.
+
 ### `toggle(zone, value)` — room-level
 
 Rejects an unknown zone and an `undefined` value with a log line. Then, for every `light` /
