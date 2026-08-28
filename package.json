@@ -11,18 +11,12 @@
     "floorplan:check": "node tools/floorplan/generate.mjs --check"
   },
   "dependencies": {
-    "@azure/msal-node": "^1.18.4",
-    "@microsoft/microsoft-graph-client": "^3.0.7",
-    "@simplewebauthn/server": "^10.0.0",
-    "body-parser": "^1.20.2",
-    "concat-stream": "^2.0.0",
-    "cookie-parser": "^1.4.6",
-    "express": "^4.19.2",
-    "isomorphic-fetch": "^3.0.0",
-    "mqtt": "^4.3.8",
-    "passport": "^0.6.0",
-    "passport-azure-ad": "^4.3.5",
-    "socket.io": "^4.7.5",
+    "@simplewebauthn/server": "^13.3.3",
+    "cookie-parser": "^1.4.7",
+    "express": "^5.2.1",
+    "jose": "^6.1.0",
+    "mqtt": "^5.15.2",
+    "socket.io": "^4.8.3",
     "web-push": "^3.6.7"
   }
 }

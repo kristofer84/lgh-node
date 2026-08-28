@@ -4,10 +4,14 @@
 import { loadEnv } from './env.js';
 loadEnv();
 
-// import { BearerStrategy } from 'passport-azure-ad'
-import passportAzureAd from 'passport-azure-ad';
-const { BearerStrategy } = passportAzureAd;
-import passport from 'passport';
+//Entra bearer tokens are verified with `jose` -- see requireEntraToken() below.
+//This used to be passport + passport-azure-ad. Microsoft DEPRECATED that package
+//("no longer supported"), it had no release left to take, and it pulled in
+//jsonwebtoken/jws/lodash versions carrying signature-validation-bypass
+//advisories (GHSA-qwph-4952-7xr6, GHSA-hjrf-2m68-5959, GHSA-869p-cjfg-cm3x) --
+//on the token-verification path, of all places. jose is zero-dependency and
+//maintained, and does JWKS fetching, caching and rotation itself.
+import { createRemoteJWKSet, jwtVerify } from 'jose';
 import express from 'express';
 import cookieParser from 'cookie-parser';
 
@@ -16,14 +20,12 @@ import { promises as fs } from 'fs';
 import { readFileSync, writeFileSync } from 'fs';
 import { createServer } from 'http';
 // const https = require('https');
-// const concat = require('concat-stream');
 // const qs = require('querystring');
 // const url = require('url');
 import { log, mqtt as lgMqtt } from './log.js';
 import { validate, validateKey, setCookie } from './user.js';
 import { getSubscriptions, saveSubscription } from './subscription.js'
 import { sendNotifications } from './notifications.js';
-import bodyParser from 'body-parser';
 
 import { Server } from 'socket.io';
 import { registerWebnMethods } from './server-webn.js';
@@ -150,7 +152,6 @@ csp.push("form-action 'self'");
 csp.push("base-uri 'none'");
 csp.push("frame-ancestors 'none'");
 
-app.use(bodyParser.json());
 app.use(logMiddleware);
 app.use(function (req, res, next) {
 	res.header('content-security-policy', csp.join('; '))
@@ -185,14 +186,17 @@ if (!cookieSecret) {
 
 app.use(cookieParser(cookieSecret));
 registerWebnMethods(app);
-app.use(passport.initialize());
 app.use(express.json());
 app.use(cookieMiddleware);
 const server = createServer(app);
 
 
 //Parameters were the wrong way round here, and the response was never ended
-app.options('*', (req, res) => {
+//Express 5 renamed the wildcard: a bare '*' is now a parse error at startup
+//("Missing parameter name at index 1"), and the splat has to be named.
+//'/{*splat}' is the Express 5 spelling of Express 4's '*' -- it matches every
+//path INCLUDING '/', which the unbraced '/*splat' does not.
+app.options('/{*splat}', (req, res) => {
 	res.statusCode = 204;
 	res.end();
 });
@@ -204,7 +208,7 @@ app.get('/favicon.ico', (req, res) => {
 });
 */
 
-app.get('/key-msal', passport.authenticate('oauth-bearer', { session: false }), wrap(async (req, res) => {
+app.get('/key-msal', wrap(requireEntraToken), wrap(async (req, res) => {
 	const key = await validate(req.user.oid, req.user.preferred_username);
 	//setCookie answers 403 when the account exists but is not enabled
 	setCookie(key, res);
@@ -288,48 +292,67 @@ app.use((err, req, res, next) => {
 	res.end(JSON.stringify({ error: status === 500 ? 'internal error' : err.message }));
 });
 
-var options = {
-	//identityMetadata: 'https://login.microsoftonline.com/common/v2.0/.well-known/openid-configuration',
-	identityMetadata: 'https://login.microsoftonline.com/consumers/v2.0/.well-known/openid-configuration',
-	clientID: 'bcb616b9-0f38-47ee-aeed-68dcffa68d67',
-	// validateIssuer: config.creds.validateIssuer,
-	issuer: 'https://login.microsoftonline.com/9188040d-6c67-4c5b-b112-36a304b66dad/v2.0',
-	//	issuer: 'https://login.microsoftonline.com/consumers/v2.0',
-	// passReqToCallback: config.creds.passReqToCallback,
-	// isB2C: config.creds.isB2C,
-	// policyName: config.creds.policyName,
-	// allowMultiAudiencesInToken: config.creds.allowMultiAudiencesInToken,
-	// audience: 'https://graph.windows.net/',
-	// loggingLevel: 'debug',
-	loggingLevel: 'warn',
-	//loggingNoPII: 'false',
-	// clockSkew: config.creds.clockSkew,
-	// scope: ['/user_impersonation']
-};
+//Entra ID (personal Microsoft accounts) token verification.
+//
+//`consumers` is the personal-account tenant; 9188040d-... is its fixed tenant
+//id, which is what appears as the `iss` claim. Both values were carried over
+//from the passport-azure-ad options this replaced.
+const ENTRA_ISSUER = 'https://login.microsoftonline.com/9188040d-6c67-4c5b-b112-36a304b66dad/v2.0';
+const ENTRA_CLIENT_ID = 'bcb616b9-0f38-47ee-aeed-68dcffa68d67';
 
-var bearerStrategy = new BearerStrategy(options,
-	async function (token, done) {
-		log('Token verified');
-		//console.log(token, 'was the token retreived');
-		if (!token.oid) {
-			log('error on login', token, new Error('oid is not found in token'));
-			return done(null, false);
-		}
-
-		const gk = await validate(token.oid, token.preferred_username);
-		if (!gk) {
-			const msg = `User ${token.preferred_username} has not been granted access`;
-			log(msg);
-			return done(null, false);
-		}
-
-		// lg.log('oid', token.oid);
-		// lg.log('preferred_username', token.preferred_username)
-		return done(null, token);
-	}
+//createRemoteJWKSet fetches the signing keys on demand and caches them, and
+//re-fetches when it sees a `kid` it does not know -- so key rotation needs no
+//code here.
+const entraJWKS = createRemoteJWKSet(
+	new URL('https://login.microsoftonline.com/consumers/discovery/v2.0/keys')
 );
 
-passport.use(bearerStrategy);
+//Replaces passport.authenticate('oauth-bearer'). Verifies the signature, the
+//issuer and the audience, then applies the same two checks the old strategy
+//callback did: the token must carry an oid, and that oid must belong to an
+//account validate() will hand a key to.
+async function requireEntraToken(req, res, next) {
+	const header = req.headers.authorization ?? '';
+	const token = header.startsWith('Bearer ') ? header.slice(7) : undefined;
+	if (!token) {
+		res.statusCode = 401;
+		return res.end(JSON.stringify({ error: 'missing bearer token' }));
+	}
+
+	let claims;
+	try {
+		//jose verifies the algorithm against the JWKS key rather than trusting
+		//the token's own `alg` header, which is the class of bug the advisories
+		//against the old jsonwebtoken were about.
+		({ payload: claims } = await jwtVerify(token, entraJWKS, {
+			issuer: ENTRA_ISSUER,
+			audience: ENTRA_CLIENT_ID,
+		}));
+	} catch (err) {
+		log('Entra token rejected', err instanceof Error ? err.message : err);
+		res.statusCode = 401;
+		return res.end(JSON.stringify({ error: 'invalid token' }));
+	}
+
+	if (!claims.oid) {
+		log('error on login', claims, new Error('oid is not found in token'));
+		res.statusCode = 401;
+		return res.end(JSON.stringify({ error: 'invalid token' }));
+	}
+
+	const gk = await validate(claims.oid, claims.preferred_username);
+	if (!gk) {
+		log(`User ${claims.preferred_username} has not been granted access`);
+		res.statusCode = 403;
+		return res.end(JSON.stringify({ error: 'not granted access' }));
+	}
+
+	log('Token verified');
+	req.user = claims;
+	next();
+}
+
+
 const connections = new Map();
 
 //[socket, next] to [req, res, next]
@@ -781,5 +804,7 @@ process.on('unhandledRejection', (reason) => {
 	log(`Unhandled rejection: ${reason instanceof Error ? reason.stack : reason}`);
 });
 
-const port = 8080;
+//8080 unless overridden. The override exists so the app can be booted for a
+//smoke test without fighting the running production process for the port.
+const port = Number(process.env.PORT) || 8080;
 server.listen(port, () => log(`Server started on port ${port}`));

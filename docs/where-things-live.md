@@ -394,6 +394,45 @@ in the `device.all` snapshot and lost it on the next per-device update; `updateV
 not tell a lamp at its mood brightness from one at full; and adding the `level` segment meant
 editing five call sites, where missing one would have failed silently.
 
+### Dependencies ⚠ — rebuilt 2026-08-28
+
+`npm audit`: **0 vulnerabilities** (was 23, 14 high). 13 dependencies → 7. `pnpm-lock.yaml`
+deleted; `package-lock.json` is authoritative.
+
+⚠ **`passport` + `passport-azure-ad` were removed, not upgraded.** Microsoft deprecated the
+package outright and there is no version left to move to, and it dragged in `jsonwebtoken`
+≤8.5.1, `jws` <3.2.3 and `lodash` — carrying GHSA-qwph-4952-7xr6 (*signature validation bypass
+via insecure default algorithm in `jwt.verify()`*), GHSA-hjrf-2m68-5959 (*forgeable tokens, RSA
+to HMAC*) and GHSA-869p-cjfg-cm3x. On the path that decides who gets a session.
+`requireEntraToken()` in `mqtt-web.js` replaces it with **`jose`**: same two checks the old
+strategy callback made (token carries an `oid`; `validate()` grants that oid a key), plus
+signature/issuer/audience verified against the JWKS, with the algorithm taken from the *key*
+rather than the token's own header — which is precisely the bug class those advisories describe.
+⚠ **Do not "restore" `@azure/msal-node` for this.** MSAL Node *acquires* tokens; it has no
+resource-server validation API. The browser already uses `msal-browser` (CDN, `login.html`) to
+acquire, which is the correct half of MSAL to use here.
+
+Removed as dead weight: `@azure/msal-node`, `@microsoft/microsoft-graph-client`,
+`isomorphic-fetch` and `concat-stream` had **zero imports**; `body-parser` was redundant with
+the `express.json()` registered ten lines below it.
+
+Major bumps and what they cost:
+
+| package | | what broke |
+|---|---|---|
+| `express` | 4 → 5 | ⚠ `app.options('*')` is a **startup crash** in Express 5 (`PathError: Missing parameter name at index 1`). It is `'/{*splat}'` now — braced, because the unbraced `/*splat` does not match `/`. That was the only wildcard; every other route is a literal path. |
+| `@simplewebauthn/server` | 10 → 13 | v11 moved the credential into a nested `credential: {id, publicKey, counter, transports}`. **`webauthn.json` keeps the old flat shape on purpose** — it holds real working passkeys and a bad format migration locks the operator out of their own home. `toCredential()` / `fromRegistration()` in `server-webn.js` convert at the two API boundaries instead, so nothing on disk changed. |
+| `mqtt` | 4 → 5 | nothing. Verified by booting and watching it ingest 434 devices. |
+| `socket.io`, `cookie-parser` | minor | nothing. |
+
+How it was verified, since there is no CI and this is the production host: the whole upgrade
+was done in a **copy** of the repo so `node_modules/` was never left broken; the app was booted
+there on a spare port and every route's status code compared against the running production
+instance (identical); `/login/start` was driven against the real stored passkeys and returned
+correct `allowCredentials`; `npm run typecheck` passes against @simplewebauthn's **real v13
+type definitions**, and reverting the call to the v10 argument name makes it fail, so that
+check is live. The previous `node_modules/` was parked rather than deleted.
+
 ### Type checking ⚠ — `tsconfig.json`, `types/globals.d.ts`, `tools/typecheck/`
 
 `npm run typecheck` / `npm run typecheck:watch`. **0 errors; keep it there.**

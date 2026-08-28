@@ -112,6 +112,42 @@ for (const [username, user] of Object.entries(users)) {
     }
 }
 
+//@simplewebauthn v11 moved the credential out of registrationInfo's top level
+//into a nested `credential: {id, publicKey, counter, transports}`, and the v13
+//API both returns and expects that shape. The FILE keeps the old flat shape on
+//purpose: webauthn.json holds real, working passkeys, and a format migration
+//that goes wrong locks the operator out of their own home. So the conversion
+//happens at the two API boundaries instead, and nothing on disk changes.
+//
+//  toCredential()   flat, as stored  ->  what verifyAuthenticationResponse wants
+//  fromRegistration() what verifyRegistrationResponse returns  ->  flat, as stored
+
+/** @param {any} registrationInfo */
+function toCredential(registrationInfo) {
+    return {
+        id: registrationInfo.credentialID,
+        publicKey: registrationInfo.credentialPublicKey,
+        counter: registrationInfo.counter ?? 0,
+        transports: registrationInfo.transports,
+    };
+}
+
+/** @param {any} registrationInfo */
+function fromRegistration(registrationInfo) {
+    //v13 nests it; tolerate the flat shape too so this cannot break if the
+    //library is ever pinned back.
+    const cred = registrationInfo.credential;
+    if (!cred) return { ...registrationInfo, counter: registrationInfo.counter ?? 0 };
+    const { credential, ...rest } = registrationInfo;
+    return {
+        ...rest,
+        credentialID: cred.id,
+        credentialPublicKey: cred.publicKey,
+        counter: cred.counter ?? 0,
+        ...(cred.transports ? { transports: cred.transports } : {}),
+    };
+}
+
 //Serialize without mutating the live objects. The old setUser() encoded every
 //user in place, wrote the file, then decoded them again -- so a throw between
 //those two loops left every public key in memory as a string.
@@ -262,8 +298,7 @@ export function registerWebnMethods(app) {
             return res.status(400).send({ error: 'Registration could not be verified' });
         }
 
-        registrationInfo.counter ??= 0;
-        await setUser(username, { registrationInfo, options });
+        await setUser(username, { registrationInfo: fromRegistration(registrationInfo), options });
 
         //Make sure the account exists in db/users.json so it can be enabled by
         //hand. New accounts are created disabled -- that is the access gate.
@@ -333,7 +368,7 @@ export function registerWebnMethods(app) {
             verification = await verifyAuthenticationResponse({
                 expectedChallenge: options.challenge,
                 response: data,
-                authenticator,
+                credential: toCredential(authenticator),
                 expectedRPID: rpID,
                 expectedOrigin
             });

@@ -31,7 +31,8 @@ ESM**, type-checked in place — JSDoc types + `npm run typecheck`, **still no b
 - **Requires `.env`.** `mqtt-web.js` calls `loadEnv()` from `env.js` before anything else and
   **exits 1 if `COOKIE_SECRET` is unset**. Copy `.env.example` → `.env` (gitignored) and fill in
   `COOKIE_SECRET` + the three `VAPID_*` vars. Changing `COOKIE_SECRET` invalidates all sessions.
-- Listens on **`http://127.0.0.1:8080`**, plain HTTP. TLS + WebSocket upgrade are terminated by
+- Listens on **`http://127.0.0.1:8080`**, plain HTTP — or `$PORT` if set, which exists so the
+  app can be smoke-tested without fighting the running process for the port. TLS + WebSocket upgrade are terminated by
   host nginx (`/etc/nginx/sites-available/xcds.net`, `#HOME 443` block → `base_config_443.conf`)
   at `home.xcds.net`. There is no TLS in this process; the commented-out `https.createServer`
   and `config.config.certFolder` are historical.
@@ -47,8 +48,20 @@ ESM**, type-checked in place — JSDoc types + `npm run typecheck`, **still no b
   missing/malformed file is a startup crash. Both are gitignored, so a fresh clone will not boot
   until you create them, and the floorplan cannot be regenerated without `db/config.json`
   either (see `docs/mqtt-and-devices.md`).
-- No dependency manifest agreement: `package-lock.json`, `pnpm-lock.yaml` and `node_modules/`
-  all disagree in age. `node_modules/` is committed-adjacent reality — prefer not to reinstall.
+- **Dependencies were rebuilt 2026-08-28** — `package-lock.json` is now authoritative and
+  `pnpm-lock.yaml` is gone (it was two years out of step). `npm audit`: **0 vulnerabilities**,
+  down from 23 (14 high). 13 dependencies → **7**: `@simplewebauthn/server` 13, `cookie-parser`,
+  `express` **5**, `jose`, `mqtt` **5**, `socket.io`, `web-push`.
+  ⚠ **`passport` and `passport-azure-ad` are gone.** Microsoft deprecated the latter ("no longer
+  supported", no release left to take) and it pulled in `jsonwebtoken`/`jws`/`lodash` carrying
+  *signature-validation-bypass* advisories — on the token-verification path. Entra tokens are
+  now verified by `requireEntraToken()` in `mqtt-web.js` using **`jose`** (zero-dependency,
+  does JWKS fetch/cache/rotation itself). Do not reach for `@azure/msal-node` here: MSAL Node
+  *acquires* tokens and has no resource-server validation API. The browser side is unchanged —
+  `login.html` still loads `msal-browser` from the CDN to get the token.
+  ⚠ Also removed as **entirely unused**: `@azure/msal-node`, `@microsoft/microsoft-graph-client`,
+  `isomorphic-fetch`, `concat-stream` (only ever in a commented-out line), and `body-parser`
+  (redundant — `express.json()` was already registered ten lines later).
 
 ## Hard rules
 
