@@ -409,18 +409,30 @@ Record here rather than rediscovering them:
   zones from the HA registry, expect this shape again wherever a Z-Wave plug exposes both
   command classes.
 - **2026-08-28: `v1` and `v2` are driven as one device through the zigbee2mqtt group
-  `light.z_lampor_v`.** The operator created the group ("z lampor v", HA friendly name
-  **"Lampor MK"** — the names disagree, do not let that confuse you) so the two bench lamps
-  switch together. `db/config.json` carries `z_lampor_v.light.mood` instead of the two
+  `light.z_lampor_v`** (z2m group **5**). The operator created the group so the two bench
+  lamps switch together. `db/config.json` carries `z_lampor_v.light.mood` instead of the two
   entries, and `lights.json` gives it `points: [[55.18,135.57],[55.18,118.78]]` — the old v1
   and v2 positions — so it draws as **two dots inside one `<g class="item">`** and both toggle
   the group. `light.v1` and `light.v2` still exist in HA and still publish their own state;
   they are simply no longer on the floorplan.
   ⚠ **A freshly created z2m group publishes `state: unknown` until something commands it**,
   and the ingest drops `unknown` along with `unavailable` — so a brand-new group reads as
-  permanently off on the dashboard until its first press. Commanding it once fixes that.
-  z2m retains nothing on `zigbee2mqtt/<group>`, so if HA ever restores the entity as `unknown`
-  after a restart, expect the same until the next command.
+  permanently off on the dashboard until its first press. Commanding it once fixes that, and the
+  woken state survives the entity being renamed — it belongs to the z2m group, not to the HA
+  entity. z2m retains nothing on `zigbee2mqtt/<group>`, so if HA ever restores the entity as
+  `unknown` after a restart, expect the same until the next command.
+  ⚠ **A z2m group entity's `unique_id` is its group NUMBER** (`5_light_zigbee2mqtt`), not its
+  name — so renaming a group does not move the entity, and a replacement created under a name
+  that is already taken lands as `light.<name>_2`. That happened here: "z lampor v" had been
+  reused on an old **group 1**, which still held `light.z_lampor_v`, so the new group 5 arrived
+  as `light.z_lampor_v_2` — and group 1, by then containing only `light.v1`, was the entity
+  that *looked* right while driving half the pair. Deleting group 1 freed the id.
+  **If a group entity seems to drive the wrong lamps, check `group_entities` and the
+  `unique_id` before you trust the name.**
+  Deleting an entity leaves its `homeassistant/light/<name>/*` topics **retained on the broker**
+  (15 of them in this case). `mqtt-web.js` subscribes to `#` and its reducer stores every
+  matching topic, so that debris accumulates in the model and in `log/mqtt.log` on every boot —
+  clear it with `mosquitto_pub -t <topic> -r -n` per topic.
 - **`orangeri` has entities but no HA area** — they are scattered across `Kök`
   (`light.orangeri_tak`) and `Nattbelysning` (`light.bordslampa_orangeri`). The zone was
   assembled by name.
