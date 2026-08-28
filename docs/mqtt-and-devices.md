@@ -165,6 +165,20 @@ early if `message` is `undefined`.
   The same trap one level down: if the only tiered device in a zone is `.night`, then `night`
   and `mood` are also identical (night counts as mood), which is what `orangeri` did.
 
+> ⚠ **The string form above is the LEGACY one.** Since 2026-08-28 a switchable entry is an
+> **object**, which is what the config page reads and writes:
+> ```json
+> { "device": "badrum_1_tak", "type": "light", "steps": { "mood": 20, "on": 100 } }
+> ```
+> A step key that is **absent means off at that step**; `true` means on; a number means on at
+> that brightness in percent. The `off` step is implicit. Sensor and occupancy entries keep the
+> plain string form — they have no steps and the page never touches them.
+> `parseEntry()` still reads the string form and translates a tier into the steps it used to
+> imply, so an old config keeps working. That translation is where the old model was least
+> obvious: **`night` also lit at `mood`**, and **`on` lit everything regardless of tier**.
+> ⚠ The step values are now authoritative and independent, which is the point: a device can be
+> lit at `night` but not `mood`, or left out of `on` entirely. Neither was expressible before.
+
 - `[3]` **brightness** (optional, and only meaningful with `[2]`) — percent, e.g.
   `badrum_1_tak.light.mood.20`. Sets `devices[d].level`; makes that light dim to 20% at its
   step and to 100% at `on`. See `toggle()` in §7 for why `on` has to say 100 out loud.
@@ -321,6 +335,39 @@ second, mood-tiered lamp moved the room *backwards* from `on` to `mood`. The cas
 reachable when untiered lights got their own tap targets. `partial` renders a fainter wash
 (0.12 against mood's 0.22) and keeps the glows, and presses to `off` — which is what it did
 while it was mislabelled.
+
+### The config page — `web/config.html`, `/config/zones`
+
+Pick a room, tick which lights each step turns on, type a percentage where the hardware takes
+one. It edits `steps` and nothing else: which devices are in a zone, **their order**, and the
+sensor entries are all preserved. Order matters — the floorplan generator uses it to place a
+lamp that has no position of its own yet.
+
+- `GET /config/zones` → one row per switchable device per zone: `steps`, the HA friendly name,
+  and `dimmable`.
+- `POST /config/zones` with `{zone: {device: steps}}` → validates, backs up, writes, reloads
+  in-process and broadcasts a fresh `device.all` so open dashboards follow immediately.
+
+⚠ **Both routes are registered below `cookieMiddleware`, and must stay there** — in this file
+the registration order *is* the authorization model, and above the gate these would let anyone
+rewrite what every light in the flat does.
+
+⚠ **`dimmable` comes from HA, not from a model list.** `supported_color_modes` is ingested for
+exactly this; anything whose only mode is `onoff` gets no percentage box. Guessing from the
+device model is wrong — it misses that the garderob drivers dim and that `lampa_mikkel`,
+`lampa_kai`, `sang_*` and `tvattstuga_bank` do not.
+
+⚠ **A dimmable device is stored as a NUMBER at every step it is on at, never `true`.** A plain
+`turn_on` restores whatever level the lamp last had, so a dimmable light recorded as `true` at
+`on` would come back at whatever the dimmed step set it to.
+
+⚠ **`reloadConfig()` exists because `init()` cannot be reused for this.** init() starts by
+reading `log/mqtt.log` over `devices`, which would discard every state MQTT has reported since
+boot. reloadConfig() re-stamps only the `SCHEMA_KEYS` and leaves observations alone; a test
+covers it, and reverting it to call `init()` makes that test fail.
+
+Writes go through `saveConfig()`: timestamped backup, temp file, atomic rename. `db/config.json`
+is read unguarded at boot, so a half-written file is a startup crash later.
 
 ### `toggle(zone, value)` — room-level
 

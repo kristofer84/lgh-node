@@ -54,6 +54,7 @@
 		"server-webn.js",
 		"web/scripts/zones.js",
 		"web/scripts/home.js",
+		"web/scripts/config.js",
 		"tools/floorplan/generate.mjs",
 		"test/**/*.mjs"
 	],

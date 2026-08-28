@@ -32,7 +32,7 @@ import { registerWebnMethods } from './server-webn.js';
 //The zone/device grammar and the step semantics. The same file is served to the
 //browser at /scripts/zones.js and imported by tools/floorplan/generate.mjs, so
 //all three agree by construction instead of by hand. See its header.
-import { parseEntry, sceneFor } from './web/scripts/zones.js';
+import { parseEntry, parseZone, isSwitchable, sceneFor } from './web/scripts/zones.js';
 
 process.stdin.resume();
 
@@ -44,7 +44,10 @@ var config;
 //Everything init() stamps onto a device from db/config.json. These describe what
 //the device IS, not what it is doing, so they must never be persisted: the
 //config is their only source, on every boot.
-const SCHEMA_KEYS = ['zone', 'type', 'mood', 'night', 'level'];
+//`mood`, `night` and `level` are the pre-2026-08-28 names. They are kept in this
+//list purely so a log/mqtt.log written by the old code has them stripped on the
+//way in, rather than carrying a tier the config no longer expresses.
+const SCHEMA_KEYS = ['zone', 'type', 'steps', 'mood', 'night', 'level'];
 
 //Every value type this process ingests, and what it means. Anything HA publishes
 //that is not listed is dropped on the floor -- and with `publish_attributes:
@@ -60,6 +63,13 @@ const SCHEMA_KEYS = ['zone', 'type', 'mood', 'night', 'level'];
 const VALUE_TYPES = {
 	state: { derives: true },
 	brightness: { derives: false },
+	//Not used for switching -- it is what tells the config page whether a device
+	//can take a percentage at all. HA publishes e.g. ["brightness"],
+	//["color_temp"] or ["onoff"]; only the last means not dimmable.
+	supported_color_modes: { derives: false },
+	//Also raw-only: the config page shows it so a row reads "Lampa Mikkel"
+	//rather than `lampa_mikkel`. HA publishes it JSON-quoted.
+	friendly_name: { derives: false },
 	current_temperature: { derives: true },
 	current_humidity: { derives: true },
 	current_pressure: { derives: true },
@@ -94,9 +104,9 @@ function init() {
 
 			devices[device].zone = zone;
 			devices[device].type = e.type;
-			if (e.tier === 'mood') devices[device].mood = true;
-			if (e.tier === 'night') devices[device].night = true;
-			if (e.level !== undefined) devices[device].level = e.level;
+			//parseEntry() normalises both config forms to `steps`, so this does not
+			//care which one the file is written in.
+			devices[device].steps = e.steps;
 		});
 	});
 }
@@ -275,6 +285,78 @@ async function cookieMiddleware(req, res, next) {
 	res.statusCode = 401;
 	res.end();
 }
+
+//---- the config page's two routes -------------------------------------------
+//⚠ Registered HERE, below cookieMiddleware, on purpose: in this file the
+//registration order IS the authorization model. Moving either of these above
+//the gate would let anyone rewrite what every light in the flat does.
+
+//What the page renders: one row per switchable device, per zone.
+app.get('/config/zones', wrap(async (req, res) => {
+	const out = {};
+	for (const [zone, entries] of Object.entries(config.zones)) {
+		const rows = parseZone(entries).filter(isSwitchable).map(e => ({
+			device: e.device,
+			type: e.type,
+			steps: e.steps ?? {},
+			//Whether a percentage is meaningful, straight from HA's
+			//supported_color_modes rather than from a hardcoded model list.
+			dimmable: dimmableFrom(devices[e.device]),
+			name: friendlyName(devices[e.device]),
+		}));
+		if (rows.length) out[zone] = rows;
+	}
+	res.end(JSON.stringify(out));
+}));
+
+//Save. Replaces the `steps` of the devices named in the body and touches
+//nothing else -- sensors, occupancy entries and device ORDER are preserved,
+//because order is what the floorplan generator uses to place unplaced lamps.
+app.post('/config/zones', wrap(async (req, res) => {
+	const body = req.body;
+	if (!body || typeof body !== 'object' || Array.isArray(body)) {
+		res.statusCode = 400;
+		return res.end(JSON.stringify({ error: 'expected {zone: {device: steps}}' }));
+	}
+
+	const changed = [];
+	for (const [zone, devs] of Object.entries(body)) {
+		const entries = config.zones[zone];
+		if (!entries) {
+			res.statusCode = 400;
+			return res.end(JSON.stringify({ error: `unknown zone ${zone}` }));
+		}
+		if (!devs || typeof devs !== 'object') continue;
+
+		for (const [device, steps] of Object.entries(devs)) {
+			const bad = validateSteps(steps);
+			if (bad) {
+				res.statusCode = 400;
+				return res.end(JSON.stringify({ error: `${zone}/${device}: ${bad}` }));
+			}
+			const i = entries.findIndex(e => parseEntry(e).device === device);
+			if (i < 0) {
+				res.statusCode = 400;
+				return res.end(JSON.stringify({ error: `${device} is not in ${zone}` }));
+			}
+			const e = parseEntry(entries[i]);
+			if (!isSwitchable(e)) {
+				res.statusCode = 400;
+				return res.end(JSON.stringify({ error: `${device} is a ${e.type}, not switchable` }));
+			}
+			//Always written in the object form, so a saved config stops depending
+			//on the legacy string parsing.
+			entries[i] = { device: e.device, type: e.type, steps };
+			changed.push(`${zone}/${device}`);
+		}
+	}
+
+	await saveConfig();
+	reloadConfig();
+	io.emit('device.all', JSON.stringify(getDevice(null), null, 2));
+	log(`config saved by ${req.user?.preferred_username ?? 'unknown'}: ${changed.length} device(s)`);
+	res.end(JSON.stringify({ status: 'ok', changed }));
+}));
 
 app.use(express.static('./web', { index: false, extensions: ['html'] }));
 
@@ -640,7 +722,7 @@ function shapeOf(d, meta) {
 	const seen = d !== undefined;
 
 	if (meta.type === 'light' || meta.type === 'switch') {
-		const ret = { mood: meta.mood, night: meta.night, level: meta.level };
+		const ret = { steps: meta.steps ?? {}, dimmable: dimmableFrom(d) };
 		if (seen) {
 			ret.onoff = d['onoff'] === 'true';
 			//`dim` was read from d['dim'], a key nothing ever wrote: 'brightness'
@@ -684,18 +766,58 @@ function getDevice(dev) {
 		const zoneDevices = {};
 		config.zones[zone].forEach(entry => {
 			const e = parseEntry(entry);
-			zoneDevices[e.device] = shapeOf(devices[e.device], {
-				type: e.type,
-				mood: e.tier === 'mood' ? true : undefined,
-				night: e.tier === 'night' ? true : undefined,
-				level: e.level,
-			}) ?? {};
+			zoneDevices[e.device] = shapeOf(devices[e.device], { type: e.type, steps: e.steps }) ?? {};
 		});
 
 		if (Object.keys(zoneDevices).length > 0) retObj[zone] = zoneDevices;
 	});
 
 	return retObj;
+}
+
+//A step value is `true` (on), a whole percent 1-100, or absent (off at that
+//step). Anything else is refused rather than written -- db/config.json is read
+//unguarded at boot, so a bad value written here is a startup crash later.
+function validateSteps(steps) {
+	if (steps === null || typeof steps !== 'object' || Array.isArray(steps)) return 'steps must be an object';
+	for (const [k, v] of Object.entries(steps)) {
+		if (!['night', 'mood', 'on'].includes(k)) return `unknown step ${k}`;
+		if (v === true) continue;
+		if (typeof v === 'number' && Number.isInteger(v) && v >= 1 && v <= 100) continue;
+		return `${k} must be true or a whole percent 1-100`;
+	}
+	return undefined;
+}
+
+//Write db/config.json without ever leaving a half-written file where the next
+//boot would read it: a timestamped backup first, then a temp file, then an
+//atomic rename over the original.
+async function saveConfig() {
+	const json = JSON.stringify(config, null, 2) + '\n';
+	const stamp = new Date().toISOString().replace(/[-:]/g, '').slice(0, 15);
+	await fs.copyFile('./db/config.json', `./db/config.json.bak-${stamp}`);
+	await fs.writeFile('./db/config.json.tmp', json);
+	await fs.rename('./db/config.json.tmp', './db/config.json');
+}
+
+//Re-stamp the model from the config WITHOUT init()'s other half, which reloads
+//log/mqtt.log over `devices` and would throw away every observed state since
+//boot. Only the SCHEMA_KEYS are touched; everything MQTT has told us is left
+//exactly as it is.
+function reloadConfig() {
+	for (const d of Object.values(devices)) {
+		if (d === null || typeof d !== 'object') continue;
+		for (const k of SCHEMA_KEYS) delete d[k];
+	}
+	Object.keys(config.zones).forEach(zone => {
+		config.zones[zone].forEach(entry => {
+			const e = parseEntry(entry);
+			if (!devices.hasOwnProperty(e.device)) devices[e.device] = {};
+			devices[e.device].zone = zone;
+			devices[e.device].type = e.type;
+			devices[e.device].steps = e.steps;
+		});
+	});
 }
 
 //Save all on exit
@@ -730,6 +852,26 @@ function exitHandler(options, exitCode) {
 
 //HA statestream publishes brightness as 0-255 -- and literally "null" while the
 //lamp is off. Everything downstream wants a number or nothing.
+//A device takes a percentage when HA says it has a colour mode other than
+//`onoff`. A `switch` publishes no colour modes at all, so it is never dimmable.
+function dimmableFrom(d) {
+	const raw = d === undefined ? undefined : d['supported_color_modes'];
+	if (!raw) return false;
+	try {
+		const modes = JSON.parse(raw);
+		return Array.isArray(modes) && modes.some(m => m !== 'onoff');
+	} catch {
+		return false;
+	}
+}
+
+//HA publishes friendly_name JSON-quoted, e.g. `"Mikkel garderob"`.
+function friendlyName(d) {
+	const raw = d === undefined ? undefined : d['friendly_name'];
+	if (typeof raw !== 'string') return undefined;
+	try { const v = JSON.parse(raw); return typeof v === 'string' ? v : undefined; } catch { return raw; }
+}
+
 function brightnessOf(d) {
 	let raw = d === undefined ? undefined : d['brightness'];
 	if (raw === undefined || raw === null || raw === 'null') return undefined;

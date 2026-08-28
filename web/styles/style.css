@@ -54,6 +54,13 @@ body.nightmode #readouts text {
   stroke-linejoin: round;
 }
 
+/* The menu's one link rather than checkbox -- it has to pick up the same colour
+   as the icons around it in both modes, which those get from `body`. */
+#settings-link {
+  color: inherit;
+  text-decoration: none;
+}
+
 .removed {
   display: none;
 }

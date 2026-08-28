@@ -11,7 +11,7 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { parseEntry, sceneFor } from '../web/scripts/zones.js';
 
-const boot = body => load(['init', 'brightnessOf', 'shapeOf', 'getDevice', 'toggle'], `init();\n${body}`, { parseEntry, sceneFor });
+const boot = body => load(['init', 'brightnessOf', 'dimmableFrom', 'friendlyName', 'shapeOf', 'getDevice', 'toggle'], `init();\n${body}`, { parseEntry, sceneFor });
 
 test('init() stamps zone, type and tier from the config', () => {
 	const { result } = boot('return { devices, config };');
@@ -23,9 +23,7 @@ test('init() stamps zone, type and tier from the config', () => {
 			assert.ok(d, `${e.device} missing from the model`);
 			assert.equal(d.zone, zone, `${e.device} zone`);
 			assert.equal(d.type, e.type, `${e.device} type`);
-			assert.equal(d.mood, e.tier === 'mood' ? true : undefined, `${e.device} mood`);
-			assert.equal(d.night, e.tier === 'night' ? true : undefined, `${e.device} night`);
-			assert.equal(d.level, e.level, `${e.device} level`);
+			assert.deepEqual(d.steps, e.steps, `${e.device} steps`);
 		}
 	}
 });
@@ -45,8 +43,10 @@ test('⚠ init() CLEARS a tier the config no longer declares', () => {
 		.map(parseEntry).find(e => !e.tier && (e.type === 'light' || e.type === 'switch'));
 	assert.ok(victim, 'no untiered light in the config to test with');
 
-	const doctored = { [victim.device]: { mood: true, night: true, level: 99, onoff: 'true' } };
-	const { result } = load(['init', 'brightnessOf', 'shapeOf', 'getDevice', 'toggle'],
+	//The stale keys include the pre-2026-08-28 names, which is exactly what an
+	//old log/mqtt.log contains.
+	const doctored = { [victim.device]: { mood: true, night: true, level: 99, steps: { night: true }, onoff: 'true' } };
+	const { result } = load(['init', 'brightnessOf', 'dimmableFrom', 'friendlyName', 'shapeOf', 'getDevice', 'toggle'],
 		'init(); return devices;',
 		{
 			parseEntry, sceneFor,
@@ -56,6 +56,7 @@ test('⚠ init() CLEARS a tier the config no longer declares', () => {
 	assert.equal(result[victim.device].mood, undefined, `${victim.device} kept a stale mood flag`);
 	assert.equal(result[victim.device].night, undefined, `${victim.device} kept a stale night flag`);
 	assert.equal(result[victim.device].level, undefined, `${victim.device} kept a stale level`);
+	assert.deepEqual(result[victim.device].steps, victim.steps, `${victim.device} steps came from the config`);
 	//...while the observations from the file survive.
 	assert.equal(result[victim.device].onoff, 'true');
 });
@@ -69,14 +70,14 @@ test('⚠ the snapshot and the per-device payload agree', () => {
 		const all = getDevice(null);
 		for (const zone of Object.keys(config.zones))
 			for (const entry of config.zones[zone]) {
-				const name = entry.split('.')[0];
+				const name = parseEntry(entry).device;
 				const one = getDevice(name);
 				out[name] = [all[zone]?.[name], one[Object.keys(one)[0]]?.[name]];
 			}
 		return out;`);
 	for (const [name, [fromAll, fromOne]] of Object.entries(result)) {
 		if (!fromAll || !fromOne) continue;
-		for (const k of ['mood', 'night', 'level', 'onoff', 'dim', 'state']) {
+		for (const k of ['steps', 'onoff', 'dim', 'state', 'dimmable']) {
 			assert.deepEqual(fromAll[k], fromOne[k], `${name}.${k}: snapshot ${JSON.stringify(fromAll[k])} vs per-device ${JSON.stringify(fromOne[k])}`);
 		}
 	}
@@ -85,7 +86,7 @@ test('⚠ the snapshot and the per-device payload agree', () => {
 test('toggle() publishes what sceneFor says, for every zone and step', () => {
 	for (const step of ['off', 'night', 'mood', 'on']) {
 		const { result, published } = load(
-			['init', 'brightnessOf', 'shapeOf', 'getDevice', 'toggle'],
+			['init', 'brightnessOf', 'dimmableFrom', 'friendlyName', 'shapeOf', 'getDevice', 'toggle'],
 			`init(); const zones = Object.keys(config.zones);
 			 for (const z of zones) toggle(z, ${JSON.stringify(step)});
 			 return config;`,
@@ -97,7 +98,7 @@ test('toggle() publishes what sceneFor says, for every zone and step', () => {
 });
 
 test('toggle() rejects an unknown zone and a missing value without publishing', () => {
-	const { published } = load(['init', 'brightnessOf', 'shapeOf', 'getDevice', 'toggle'],
+	const { published } = load(['init', 'brightnessOf', 'dimmableFrom', 'friendlyName', 'shapeOf', 'getDevice', 'toggle'],
 		`init(); toggle('no_such_zone', 'on'); toggle(Object.keys(config.zones)[0], undefined); return null;`,
 		{ parseEntry, sceneFor });
 	assert.deepEqual(published, []);
@@ -144,7 +145,7 @@ test('⚠ dim reaches the payload (brightness is an ingested value type)', () =>
 	//every lamp reported dim: undefined for as long as the model existed.
 	const { result } = boot(`
 		const name = Object.keys(config.zones).flatMap(z => config.zones[z])
-			.map(e => e.split('.')).find(p => p[1] === 'light')[0];
+			.map(parseEntry).find(e => e.type === 'light').device;
 		devices[name].brightness = '178';
 		devices[name].onoff = 'true';
 		const one = getDevice(name);
@@ -153,25 +154,23 @@ test('⚠ dim reaches the payload (brightness is an ingested value type)', () =>
 	assert.equal(result.onoff, true);
 });
 
-test('the payload carries the tier and the level for a levelled light', () => {
+test('the payload carries the steps for a levelled light', () => {
 	//Not covered by the snapshot-vs-per-device test: both callers share shapeOf
 	//now, so dropping a field there loses it from both and they still agree.
 	const { result } = boot(`
 		const out = {};
 		for (const zone of Object.keys(config.zones))
 			for (const entry of config.zones[zone]) {
-				const e = entry.split('.');
-				if (e.length < 4) continue;
-				const one = getDevice(e[0]);
-				out[e[0]] = [Number(e[3]), one[Object.keys(one)[0]][e[0]], getDevice(null)[zone][e[0]]];
+				const e = parseEntry(entry);
+				if (!Object.values(e.steps ?? {}).some(v => typeof v === 'number')) continue;
+				const one = getDevice(e.device);
+				out[e.device] = [e.steps, one[Object.keys(one)[0]][e.device], getDevice(null)[zone][e.device]];
 			}
 		return out;`);
 	assert.ok(Object.keys(result).length, 'no levelled light in the config to test with');
 	for (const [name, [want, one, all]] of Object.entries(result)) {
-		assert.equal(one.level, want, `${name} per-device level`);
-		assert.equal(all.level, want, `${name} snapshot level`);
-		assert.equal(one.mood, true, `${name} per-device mood`);
-		assert.equal(all.mood, true, `${name} snapshot mood`);
+		assert.deepEqual(one.steps, want, `${name} per-device steps`);
+		assert.deepEqual(all.steps, want, `${name} snapshot steps`);
 	}
 });
 
@@ -179,6 +178,32 @@ test('brightnessOf survives HA sending the string "null"', () => {
 	const { result } = boot(`return [brightnessOf({brightness:'178'}), brightnessOf({brightness:'null'}),
 		brightnessOf({}), brightnessOf(undefined), brightnessOf({brightness:'nonsense'})];`);
 	assert.deepEqual(result, [178, undefined, undefined, undefined, undefined]);
+});
+
+test('⚠ reloadConfig() re-stamps the config without discarding observed state', () => {
+	//The config page saves and then reloads in-process. init() cannot be reused
+	//for that: its first act is to read log/mqtt.log over `devices`, which would
+	//throw away every state MQTT has reported since boot -- the whole model would
+	//blank until each device next published.
+	const { result } = load(
+		['init', 'brightnessOf', 'dimmableFrom', 'friendlyName', 'shapeOf', 'getDevice', 'toggle', 'reloadConfig'],
+		`init();
+		 const name = Object.keys(config.zones).flatMap(z => config.zones[z])
+			.map(parseEntry).find(e => e.type === 'light').device;
+		 devices[name].onoff = 'true';
+		 devices[name].brightness = '178';
+		 devices[name].lastChange = 12345;
+		 devices[name].steps = { mood: 99 };            // stale, as if the file changed
+		 reloadConfig();
+		 return { name, d: devices[name], cfg: config.zones[devices[name].zone] };`,
+		{ parseEntry, sceneFor });
+
+	const { name, d, cfg } = result;
+	const want = parseEntry(cfg.find(e => parseEntry(e).device === name)).steps;
+	assert.deepEqual(d.steps, want, `${name} steps re-stamped from the config`);
+	assert.equal(d.onoff, 'true', 'observed onoff survived');
+	assert.equal(d.brightness, '178', 'observed brightness survived');
+	assert.equal(d.lastChange, 12345, 'lastChange survived');
 });
 
 test('⚠ exitHandler persists observations, never schema', () => {
