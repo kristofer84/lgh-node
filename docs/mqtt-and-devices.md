@@ -338,8 +338,8 @@ switched on, and at the `on` step `toggle()` drives it to **100 explicitly**. Th
 is not optional: a plain `turn_on` restores the level the lamp last had, so after a mood press
 `on` would leave it sitting at the dimmed level. Measured on the real dimmer 2026-08-27,
 not assumed.
-Used today by `badrum_{1,2,3}_tak`, `entre_1`, `entre_2_3`, `hall_sovrum` and
-`hall_tvattstuga` — all Fibaro FGD-212 wall dimmers, all at **20/100** (70 was tried first
+Used today by `badrum_{1,2,3}_tak`, `entre_1`, `entre_2_3` and `hall_tvattstuga` — all
+Fibaro FGD-212 wall dimmers, all at **20/100** (70 was tried first
 and was far too bright for the step; 20 verified to strike cleanly on the real dimmer —
 `brightness_pct 20` → Z-Wave `currentValue 20` of 99 → HA 52/255, no drop-out).
 ⚠ Reaching the 100% step needs the **Max brightness** checkbox (`#cb-mood`, the sun icon):
@@ -444,6 +444,18 @@ Record here rather than rediscovering them:
   (15 of them in this case). `mqtt-web.js` subscribes to `#` and its reducer stores every
   matching topic, so that debris accumulates in the model and in `log/mqtt.log` on every boot —
   clear it with `mosquitto_pub -t <topic> -r -n` per topic.
+- **2026-08-28: `hall_sovrum` moved from `gang` to `vardagsrum`, untiered.** It is *not* a
+  corridor light — the operator confirms it lights the small square landing just outside
+  `sov1` and `sov2`, which the room extraction assigns to the **vardagsrum** polygon. That
+  matters beyond tidiness: `#lights` is clipped per zone (`clip-path="url(#<zone>-clip)"`), so
+  a lamp positioned outside its own zone's polygon is **clipped away and renders nothing at
+  all** — silently. If a lamp you have placed does not appear, check which room's polygon
+  actually contains the point before touching anything else.
+  It is untiered and carries a `lights.json` entry, which makes it an individually tappable
+  light (symbol + tap target) without joining the living room's mood scene — a landing light
+  has no business coming on with the sofa lamps. `gang` is left with `hall_tvattstuga` alone,
+  a row of three across the corridor; its two steps stay distinct because the level separates
+  them (20% vs 100%), not because an untiered device does.
 - **`orangeri` has entities but no HA area** — they are scattered across `Kök`
   (`light.orangeri_tak`) and `Nattbelysning` (`light.bordslampa_orangeri`). The zone was
   assembled by name.
