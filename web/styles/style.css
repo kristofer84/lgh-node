@@ -306,6 +306,17 @@ body.nightmode [state="on"] .point {
   opacity: 1 !important;
 }
 
+/* A room at the `on` step is washed amber already -- every lamp in it is lit, so
+   the individual glows add nothing and only muddy the wash. Drop them there and
+   keep the symbols, which still say where the lamps are. Higher specificity than
+   the [state="on"] rule above, so it wins between the two !important rules.
+   `.zone-lights` is the zone's group inside #lights; updateArea() mirrors the
+   room's `light` value onto it, because the lamps are not descendants of the
+   room group and no selector can walk from one to the other. */
+.zone-lights[light="on"] .glow {
+  opacity: 0 !important;
+}
+
 /*
 .room:hover {
 	fill: rgb(102, 102, 102);

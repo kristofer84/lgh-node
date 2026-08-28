@@ -380,6 +380,12 @@ function getNextStateItem(element) {
 
 function updateArea(element, value) {
 	element?.setAttribute("light", value);
+	//Mirror it onto the zone's lamp group. The lamps live in the #lights layer,
+	//not inside the room group, so this attribute is the only way style.css can
+	//say anything about "the lamps of a room in state X" -- it is what lets the
+	//`on` step drop the individual glows. Doing it here rather than in
+	//updateView() means the optimistic update on a room press gets it too.
+	if (element?.id) document.getElementById("lights-" + element.id)?.setAttribute("light", value);
 }
 
 function updateItem(element, value) {

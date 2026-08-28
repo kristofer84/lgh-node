@@ -335,7 +335,11 @@ for (const zone of Object.keys(geo.rooms)) {
 	//room and needs no symbol.
 	const shown = zones[zone].lights.filter(l => isItem(zone, l));
 	if (!shown.length) continue;
-	lightLayer.push(`          <g clip-path="url(#${zone}-clip)">`);
+	//The zone's lamps carry the room's own `light` state, mirrored onto this group
+	//by updateArea(). They are not descendants of the <g class="room">, so CSS
+	//cannot reach them from the room -- this group is what gives style.css a
+	//handle on "every lamp in a room that is fully on".
+	lightLayer.push(`          <g id="lights-${zone}" class="zone-lights" clip-path="url(#${zone}-clip)">`);
 	for (const l of shown) {
 		const p = lights[zone]?.[l.device];
 		if (p?.under && p.run && geo.runs?.[p.run]) {

@@ -110,6 +110,12 @@ Each lamp is emitted as a group, and the three circles have distinct jobs:
   and toilet outlines. The layer is still clipped per room so a glow cannot cross a wall.
   Because the lamps are no longer descendants of the room group, `home.js`'s room click
   clears their `state` **by name from the model**, not with `$(ar).find('*')`.
+  For the same reason no CSS selector can walk from a room to its lamps, so each zone's lamps
+  sit in `<g id="lights-<zone>" class="zone-lights">` and `updateArea()` **mirrors the room's
+  `light` value onto that group**. That is what lets `style.css` say "every lamp in a room
+  that is fully on" — which it uses to drop the individual glows at the `on` step, where the
+  room is washed amber anyway and the glows only muddy it. Mirroring in `updateArea()` rather
+  than `updateView()` means the optimistic update on a room press gets it too.
 - ⚠ **Absorbing fixtures can also hand a room space that is not really its own.**
   `gang` collected every wardrobe niche it could reach plus an arm along the top of the
   kitchen, ending up at 1517 units² for what is really a corridor. It is overridden in
