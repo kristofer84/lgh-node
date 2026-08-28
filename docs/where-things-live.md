@@ -374,6 +374,28 @@ Landmines carried by the new plan (each recorded in full in `tools/floorplan/REA
 - Screen wake lock: `lock()`/`unlock()` via `navigator.wakeLock`, tied to window focus/blur.
   Blur also **disconnects the socket**; focus reconnects and re-fetches `/refresh-key`.
 
+
+⚠ **Dark mode is `body.nightmode`, and it needs its own values for almost everything —
+the light-mode ones do not merely look worse, they disappear.** Fixed 2026-08-28:
+
+- **The plan was invisible.** `#base-plan` is 1137 elements stroked `#000000` with
+  `fill: none`, plus 24 walls filled `#808080`. Black line-work on the `#222` page meant every
+  wall, door, fixture and furniture outline vanished and only the grey walls survived. CSS beats
+  presentation attributes, so `body.nightmode #base-plan [stroke="#000000"] { stroke: #8c8c8c }`
+  reaches all of it without touching the generator or the drawing — **keep those selectors in
+  step with what `extract.py` emits** if the drawing's palette ever changes.
+- **Unlit rooms were holes.** `.room-outline` is `fill: #000` at 0.45, i.e. *darker* than the
+  page, so a dark room read as a void rather than a surface. In nightmode it is now white at
+  0.05 — a shade lighter than the page.
+- **Only `[light="on"]` had a nightmode value**, so `mood`, `night` and `partial` silently used
+  the daylight opacities. All four are defined now, and much fainter than in daylight: in the
+  dark the *lamp glows* say a room is lit and the wash only has to rank the steps.
+- **The wash is `#ffd966` here, not the `#ffcc00` used in daylight.** Pure amber has no blue in
+  it, so over a dark ground it lands on olive at every opacity — which is exactly what the
+  reported "muddy" look was. Lifting it toward white keeps the meaning without the mud.
+- **Readouts get a halo** (`paint-order: stroke` in the page colour), because yellow text over a
+  lit room's wash was the worst pairing on the page.
+
 ### Zone grammar + step semantics ⚠ — `web/scripts/zones.js` (shared)
 
 **The ONE definition** of the zone entry grammar `device.type[.tier[.level]]`, of what each
