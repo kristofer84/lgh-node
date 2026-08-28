@@ -100,7 +100,10 @@ function init() {
 }
 
 init();
-const client = connect(config.config.mqttAddress);
+//`config` and `devices` are assigned by init(), which tsc cannot see running
+//before this line -- hence the assertions. If init() has not run the process is
+//dead anyway: it reads db/config.json synchronously and unguarded.
+const client = connect(/** @type {any} */ (config).config.mqttAddress);
 // const certFolder = config.config.certFolder;
 // END Init
 
@@ -771,11 +774,11 @@ process.on('SIGTERM', exitHandler.bind(null, { devices: devices, exit: true }));
 //the /login/finish route was enough. Log and keep serving instead; state is
 //still flushed by the 'exit' handler on a real shutdown.
 process.on('uncaughtException', (err, origin) => {
-	log(`Uncaught exception (${origin}): ${err?.stack ?? err}`);
+	log(`Uncaught exception (${origin}): ${err instanceof Error ? err.stack : err}`);
 });
 
 process.on('unhandledRejection', (reason) => {
-	log(`Unhandled rejection: ${reason?.stack ?? reason}`);
+	log(`Unhandled rejection: ${reason instanceof Error ? reason.stack : reason}`);
 });
 
 const port = 8080;

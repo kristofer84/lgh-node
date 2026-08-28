@@ -31,6 +31,9 @@ function bufferToBase64Url(buffer) {
 //exposes it behind --experimental-global-webcrypto. Without this every call
 //fails with "An instance of the Crypto API could not be located", i.e. passkey
 //login is broken outright on Node 18. Node >= 19 already has it.
+//@ts-expect-error -- node:crypto's webcrypto is structurally the same object the
+//DOM lib calls Crypto, but the two declarations disagree on generateKey's
+//overloads (the DOM one gained Ed25519). Assigning it is exactly the point.
 if (!globalThis.crypto) globalThis.crypto = webcrypto;
 
 const rpName = 'Home map';
@@ -272,6 +275,10 @@ export function registerWebnMethods(app) {
     app.post('/login/start', wrap(async (req, res) => {
         const username = req.body?.username;
 
+        //The literal type matters: generateAuthenticationOptions takes the
+        //UserVerificationRequirement union, and an inferred `string` is not
+        //assignable to it.
+        /** @type {import('@simplewebauthn/server').GenerateAuthenticationOptionsOpts} */
         const authReq = { rpID, userVerification: 'required' };
 
         if (username) {

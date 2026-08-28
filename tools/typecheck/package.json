@@ -1,0 +1,9 @@
+{
+  "name": "lgh-typecheck",
+  "private": true,
+  "description": "TypeScript lives HERE, not in the root package.json, and this is deliberate. `npm install --save-dev typescript` at the root wants to add 225 packages and CHANGE 13 -- express 4.19.2 -> 4.22.2, socket.io 4.7.5 -> 4.8.3, body-parser 1.20.2 -> 1.20.6 -- because package-lock.json is from 2022, pnpm-lock.yaml from 2024 and node_modules/ agrees with neither. That is a production host. Installing a type checker must not reinstall the app.",
+  "devDependencies": {
+    "typescript": "^5.9.0",
+    "@types/node": "^22.0.0"
+  }
+}

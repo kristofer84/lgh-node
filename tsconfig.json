@@ -1,0 +1,68 @@
+{
+	// Type CHECKING only -- there is no build step and there must not be one.
+	// `noEmit` is the whole point: tsc never writes a file, the .js on disk is
+	// what runs, the browser keeps loading web/scripts/*.js directly, and
+	// `npm start` is unchanged. Types are expressed in JSDoc comments in the .js
+	// files themselves.
+	//
+	// Run: npm run typecheck        (once)
+	//      npm run typecheck:watch  (on save)
+	//
+	// TypeScript itself lives in tools/typecheck/, NOT in the root
+	// package.json -- see the note in tools/typecheck/package.json for why
+	// installing it at the root is not safe on this host.
+	"compilerOptions": {
+		"noEmit": true,
+		"allowJs": true,
+		"checkJs": true,
+
+		"target": "ES2022",
+		"module": "NodeNext",
+		"moduleResolution": "NodeNext",
+		"lib": ["ES2023", "DOM", "DOM.Iterable"],
+
+		// Deliberately lenient. This is checkJs bolted onto a codebase that was
+		// never written with types, and most of its dependencies ship none --
+		// express, passport-azure-ad and body-parser have no bundled .d.ts and
+		// @types/* for them cannot be installed without dragging in the 225
+		// packages described in tools/typecheck/package.json. With
+		// `noImplicitAny` on, every one of those imports is an error and the
+		// signal drowns. Off, they are `any` and TS still catches what actually
+		// bites here: typos in property names, wrong argument counts, calling
+		// something that is not a function, reading a property off a value that
+		// can be undefined, and dead branches.
+		"strict": false,
+		"noImplicitAny": false,
+		"skipLibCheck": true,
+
+		// These two are the ones worth having on.
+		"noImplicitReturns": true,
+		"noFallthroughCasesInSwitch": true,
+
+		"forceConsistentCasingInFileNames": true,
+		"resolveJsonModule": true,
+		"typeRoots": ["./tools/typecheck/node_modules/@types"]
+	},
+	"include": [
+		"types/**/*.d.ts",
+		"mqtt-web.js",
+		"env.js",
+		"log.js",
+		"user.js",
+		"subscription.js",
+		"notifications.js",
+		"server-webn.js",
+		"web/scripts/zones.js",
+		"web/scripts/home.js",
+		"tools/floorplan/generate.mjs",
+		"test/**/*.mjs"
+	],
+	"exclude": [
+		"node_modules",
+		"tools/typecheck",
+		// Dead code, all four documented as such in CLAUDE.md.
+		"server.js",
+		"user.js.old",
+		"web/script.js"
+	]
+}

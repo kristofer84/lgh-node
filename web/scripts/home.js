@@ -340,9 +340,12 @@ function getNextStateItem(element) {
 			return "on";
 	}
 
+	//Fallback for an element with no `state` attribute yet. getPropertyValue
+	//returns a string, so this was `opacity == 0` -- loose equality, which does
+	//coerce and does work. Number() says the same thing without the coercion.
 	const cssObj = window.getComputedStyle(element, null);
 	let opacity = cssObj.getPropertyValue("opacity");
-	return opacity == 0 ? 'on' : 'off';
+	return Number(opacity) === 0 ? 'on' : 'off';
 }
 
 function updateArea(element, value) {

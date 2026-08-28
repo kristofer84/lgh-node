@@ -5,6 +5,8 @@
     "dev": "node --watch --trace-warnings mqtt-web.js",
     "test": "node --test test/*.test.mjs",
     "test:watch": "node --test --watch test/*.test.mjs",
+    "typecheck": "node tools/typecheck/node_modules/typescript/bin/tsc -p tsconfig.json",
+    "typecheck:watch": "node tools/typecheck/node_modules/typescript/bin/tsc -p tsconfig.json --watch",
     "floorplan": "node tools/floorplan/generate.mjs",
     "floorplan:check": "node tools/floorplan/generate.mjs --check"
   },

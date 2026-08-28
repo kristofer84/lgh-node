@@ -25,6 +25,40 @@
 //  - updateView() could not tell a lamp at its mood brightness from one at full,
 //    so a room whose lights all carry a level never showed its mood step.
 
+//----------------------------------------------------------------- types
+
+/**
+ * One parsed zone entry.
+ * @typedef {object} Entry
+ * @property {string} entry   the raw dotted string, as it appears in db/config.json
+ * @property {string} device  [0] -- matches split[2] of the MQTT topic
+ * @property {string} type    [1] -- light | switch | sensor | occupancy
+ * @property {'mood'|'night'|undefined} tier   [2]
+ * @property {number|undefined} level          [3], brightness percent
+ * @property {string} entity  the HA entity_id, `type.device`
+ */
+
+/**
+ * One thing to publish: a plain on/off, or a brightness.
+ * @typedef {{entity: string, state: string, level?: undefined}
+ *         | {entity: string, level: number, state?: undefined}} Action
+ */
+
+/**
+ * A device as the socket sends it. Sensors carry `state` and no `onoff`.
+ * @typedef {object} DeviceState
+ * @property {boolean} [onoff]
+ * @property {number}  [dim]    0-255, straight from HA
+ * @property {number}  [level]  the brightness this device takes at its step
+ * @property {boolean} [mood]
+ * @property {boolean} [night]
+ * @property {string}  [state]  sensors only -- the raw payload
+ */
+
+/** @typedef {Record<string, DeviceState>} ZoneModel */
+
+/** @typedef {'off'|'night'|'mood'|'on'} Step */
+
 //----------------------------------------------------------------- grammar
 
 //A zone entry is a dotted string: `device.type[.tier[.level]]`.
@@ -38,6 +72,10 @@
 //
 //Examples: `sovrum_1_tak.light`, `sang_hoger.switch.mood`,
 //`slinga_mette.light.night`, `badrum_1_tak.light.mood.20`.
+/**
+ * @param {string} entry
+ * @returns {Entry}
+ */
 export function parseEntry(entry) {
 	const p = String(entry).split('.');
 	const level = p[3] === undefined ? undefined : Number(p[3]);
@@ -45,7 +83,10 @@ export function parseEntry(entry) {
 		entry,
 		device: p[0],
 		type: p[1],
-		tier: p[2],
+		//db/config.json is hand-edited and unvalidated, so this is an assertion,
+		//not a guarantee. A typo like `.moood` parses to a tier nothing matches,
+		//which reads as untiered -- the device then only comes on at `on`.
+		tier: /** @type {'mood'|'night'|undefined} */ (p[2]),
 		level: Number.isFinite(level) ? level : undefined,
 		//The HA entity_id, which is what every outbound topic is keyed by.
 		entity: `${p[1]}.${p[0]}`,
@@ -54,10 +95,18 @@ export function parseEntry(entry) {
 
 //Only these two are switchable; a sensor or occupancy entry is never published
 //to and never counts towards a room's step.
+/**
+ * @param {Entry} parsed
+ * @returns {boolean}
+ */
 export function isSwitchable(parsed) {
 	return parsed.type === 'light' || parsed.type === 'switch';
 }
 
+/**
+ * @param {readonly string[] | undefined} entries
+ * @returns {Entry[]}
+ */
 export function parseZone(entries) {
 	return (entries ?? []).map(parseEntry);
 }
@@ -72,6 +121,11 @@ export function parseZone(entries) {
 //`mood` switches the tiered ones on and the untiered ones OFF. A zone in which
 //every light is tiered therefore has no `on` step at all unless the tiered ones
 //carry a level, which separates the two by brightness instead of by membership.
+/**
+ * @param {readonly string[] | undefined} entries  the zone's raw config entries
+ * @param {string} step  off | night | mood | on -- anything else is passed through as the state
+ * @returns {Action[]}
+ */
 export function sceneFor(entries, step) {
 	return parseZone(entries).filter(isSwitchable).map(e => {
 		//`night` lights the .night tier only; `mood` lights anything tiered at
@@ -101,6 +155,10 @@ export function sceneFor(entries, step) {
 //The inverse of sceneFor: read a zone's slice of the client model and say which
 //step it is displaying. `zoneModel` is `{ device: {onoff, dim, level, mood,
 //night}, ... }` -- exactly what the socket sends.
+/**
+ * @param {ZoneModel} zoneModel
+ * @returns {{step: Step, moodable: boolean, nightable: boolean, lights: string[]}}
+ */
 export function stepOf(zoneModel) {
 	const lights = Object.keys(zoneModel).filter(n => Object.hasOwn(zoneModel[n], 'onoff'));
 	const moodable = lights.some(n => zoneModel[n].mood);
@@ -119,6 +177,7 @@ export function stepOf(zoneModel) {
 		return Math.abs(m.dim - target) < Math.abs(m.dim - 255);
 	};
 
+	/** @type {Step} */
 	let step = 'on';
 	if (lights.every(n => !lit(n))) step = 'off';
 	else if (lights.every(lit) && !lights.some(atStepLevel)) step = 'on';
@@ -134,6 +193,13 @@ export function stepOf(zoneModel) {
 //(#cb-mood, the sun icon): without it a room never reaches the `on` step, which
 //for a room whose lights all carry a level means full brightness is unreachable
 //from the floorplan.
+/**
+ * @param {string|null} current  the room's present step
+ * @param {{moodable?: unknown, nightable?: unknown, allowMax?: unknown}} [opts]
+ *   Truthiness is all that matters: home.js passes DOM attribute values, which
+ *   are strings or null, not booleans.
+ * @returns {Step|undefined} undefined when `current` is not a known step
+ */
 export function nextStep(current, { moodable, nightable, allowMax } = {}) {
 	switch (current) {
 		case 'on': return 'off';

@@ -394,6 +394,39 @@ in the `device.all` snapshot and lost it on the next per-device update; `updateV
 not tell a lamp at its mood brightness from one at full; and adding the `level` segment meant
 editing five call sites, where missing one would have failed silently.
 
+### Type checking ⚠ — `tsconfig.json`, `types/globals.d.ts`, `tools/typecheck/`
+
+`npm run typecheck` / `npm run typecheck:watch`. **0 errors; keep it there.**
+
+`checkJs` + `noEmit`: TypeScript reads the `.js` files, reports, and writes nothing. There is
+no build step and there must not be one — `npm start` is unchanged and the browser still loads
+`web/scripts/*.js` directly, which is also why `web/scripts/zones.js` can be shared with it.
+Types are JSDoc comments in the source; `zones.js` is fully annotated, the rest is checked
+without being annotated.
+
+⚠ **TypeScript is installed under `tools/typecheck/`, not in the root `package.json`, and that
+is not tidiness.** `npm install --save-dev typescript` at the root reports *"added 225
+packages, and changed 13"* — including express 4.19.2→4.22.2, socket.io 4.7.5→4.8.3 and
+body-parser 1.20.2→1.20.6 — because `package-lock.json` (2022), `pnpm-lock.yaml` (2024) and
+`node_modules/` all disagree, so npm reconciles the whole tree. This is the production host.
+A fresh clone runs `npm install --prefix tools/typecheck` once. `npx tsc` from the repo root
+will not find it.
+
+The settings are deliberately lenient — `strict: false`, `noImplicitAny: false` — because
+express, passport-azure-ad and body-parser ship no types and `@types/*` for them cannot be
+added without that same 225-package reconciliation. With `noImplicitAny` on, every such import
+is an error and the real findings are lost in the noise.
+
+`types/globals.d.ts` declares what exists at runtime but has no import to follow: `$` and `io`
+(script tags in `dashboard.html`), `Number.prototype.pad` (home.js extends the prototype at
+line ~91) and `Date.prototype.toGMTString` (dropped from TS's DOM lib, still implemented
+everywhere).
+
+**It found a real bug on its first run.** `log()` in `log.js` took a single argument, so
+`log('error on login', token, new Error('oid is not found in token'))` in `mqtt-web.js` logged
+those four words and dropped the rest: an MSAL token arriving without an `oid` left no
+diagnostic at all. `log()` is variadic now, and formats a one-argument call exactly as before.
+
 ### Tests — `test/`, `npm test`
 
 19 tests, zero dependencies, `node --test`, well under a second. **Not** a general safety net:

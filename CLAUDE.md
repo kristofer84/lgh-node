@@ -3,8 +3,8 @@
 Home-automation web app for one apartment. An MQTT broker (Home Assistant topic tree) feeds a
 Node/Express process that holds all device state **in memory**, pushes it over socket.io to an
 SVG floorplan dashboard, and publishes toggle commands back to MQTT. Stack: plain **JavaScript
-ESM** (no TypeScript, no build step, no lint; tests are `npm test`, zero-dependency
-`node --test`) + **Express 4** + **socket.io 4** +
+ESM**, type-checked in place — JSDoc types + `npm run typecheck`, **still no build step and no
+`.ts` files**; tests are `npm test`, zero-dependency `node --test` — + **Express 4** + **socket.io 4** +
 **mqtt.js** + two auth paths (**Microsoft MSAL / passport-azure-ad** and **WebAuthn passkeys /
 @simplewebauthn**). ~1,700 lines of real code; served at `https://home.xcds.net`.
 
@@ -19,7 +19,15 @@ ESM** (no TypeScript, no build step, no lint; tests are `npm test`, zero-depende
 - `package.json` still has **no devDependencies** — the scripts it does have wrap the plain
   commands and add nothing: `npm start` is exactly the production invocation, in tmux session
   `pi` window `nodeweb#`, cwd = repo root: `node --trace-warnings mqtt-web.js`.
-  `npm run dev` is the same under `node --watch`. `npm test`, `npm run floorplan[:check]`.
+  `npm run dev` is the same under `node --watch`. `npm test`, `npm run typecheck[:watch]`,
+  `npm run floorplan[:check]`.
+- ⚠ **TypeScript is installed in `tools/typecheck/`, deliberately outside the app's tree.**
+  `npm install --save-dev typescript` at the root wants to add **225 packages and change 13** —
+  express 4.19.2→4.22.2, socket.io 4.7.5→4.8.3, body-parser 1.20.2→1.20.6 — because
+  `package-lock.json` is from 2022, `pnpm-lock.yaml` from 2024 and `node_modules/` agrees with
+  neither. Do not install it at the root. A fresh clone runs
+  `npm install --prefix tools/typecheck` once. `npx tsc` will NOT find it; use
+  `npm run typecheck:watch`.
 - **Requires `.env`.** `mqtt-web.js` calls `loadEnv()` from `env.js` before anything else and
   **exits 1 if `COOKIE_SECRET` is unset**. Copy `.env.example` → `.env` (gitignored) and fill in
   `COOKIE_SECRET` + the three `VAPID_*` vars. Changing `COOKIE_SECRET` invalidates all sessions.
@@ -85,6 +93,7 @@ records a landmine (a confirmed bug, or a load-bearing discipline).
 | Zone/device config ⚠ | `db/config.json` (gitignored) — `config.zones`, dotted device strings; **source of truth for the floorplan** |
 | Zone grammar + step semantics ⚠ | `web/scripts/zones.js` — **shared by the server, the floorplan builder and the browser**. Parses `device.type[.tier[.level]]`, decides what a step publishes (`sceneFor`) and which step a room is in (`stepOf`). Under `web/` because that is the only place all three can import it without a build step |
 | Tests | `test/` — `npm test`. `helpers.mjs` documents the source-extraction harness |
+| Type checking ⚠ | `tsconfig.json` (`checkJs` + `noEmit`) + `types/globals.d.ts` + `tools/typecheck/` (isolated install). Types live in JSDoc comments in the `.js` files; nothing is compiled and nothing is emitted |
 | Floorplan generator ⚠ | `tools/floorplan/` — `generate.mjs`, `geometry.json`, `lights.json`, `base.svg`, its own `README.md` |
 | Device state persistence ⚠ | `exitHandler` in `mqtt-web.js` → `log/mqtt.log`, **written only on exit** |
 | socket.io wiring + auth bridge | `middlewareTransform` + `io.use(...)` in `mqtt-web.js` (~line 302) |
@@ -115,6 +124,12 @@ records a landmine (a confirmed bug, or a load-bearing discipline).
 - Device/zone names and UI strings are **Swedish** (`vardagsrum`, `kok`, `tvatt`, `klk1`) — keys,
   not prose. The apartment changed; the old `sovrum` / `kontor` / `dusch` / `garderob` / `entre`
   names are gone. Current zone list: `docs/mqtt-and-devices.md` §5.
+- **`npm run typecheck` — 0 errors, and it must stay that way.** `checkJs` with `noEmit`: the
+  `.js` on disk is what runs, the browser still loads `web/scripts/*.js` directly, and types are
+  JSDoc comments. Deliberately lenient (`strict: false`, `noImplicitAny: false`) because most
+  dependencies here ship no types and turning those on drowns the signal; what it does catch is
+  typos, wrong arity, calling a non-function and reading through an undefined. It found a real
+  bug on its first run — see the `log()` note in `log.js`.
 - **`npm test` — 19 tests, no dependencies, ~0.4 s.** Still no CI, and the tests cover the
   device/zone logic only, not the express pipeline or auth. They run against the *real*
   `db/config.json`, so a bad config edit fails them. Several encode a bug that actually

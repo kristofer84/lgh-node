@@ -117,7 +117,8 @@ function roomGeometry(zone) {
 	const room = geo.rooms[zone];
 	if (!room) return null;
 	const c = polyCentroid(room.points);
-	const centre = c && inside(room.points, c) ? c : room.anchor;
+	//polyCentroid returns number[]; inside() wants a [x, y] pair.
+	const centre = c && inside(room.points, /** @type {[number, number]} */ (c)) ? c : room.anchor;
 	const size = Math.sqrt(polyArea(room.points));          //source units
 	return { centre, size };
 }

@@ -109,3 +109,7 @@ dist
 
 # TernJS port file
 .tern-port
+
+# TypeScript for `npm run typecheck` -- isolated from the app tree on purpose,
+# see tools/typecheck/package.json
+tools/typecheck/node_modules/
