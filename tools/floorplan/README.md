@@ -156,10 +156,15 @@ Each lamp is emitted as a group, and the three circles have distinct jobs:
   `"points": [[x,y], [x,y]]` instead of `cx`/`cy` and it emits a glow, symbol and hit
   disc per point inside a single `<g class="item">`, so they toggle together as the one
   device they are. `vardagsrum_vaggar` is a pair flanking the dining table,
-  `vardagsrum_soffa` a pair along the far wall, `koksbank` a run of five along the
-  counter, and each bathroom ceiling light a 2×2 spread across the room — the same
+  `vardagsrum_soffa` a pair along the far wall, `z_lampor_v` the zigbee-grouped bench pair,
+  `koksbank` a run of five along the counter, `entre_1` a row of three down the hall,
+  `hall_sovrum` and `hall_tvattstuga` a row of three each along the gång corridor (six in
+  total, two circuits), and each bathroom ceiling light a 2×2 spread across the room — the same
   treatment the pre-2026-08 dashboard gave them (7 in a row for the counter, 4 in a
   grid per bathroom).
+  For a row, space the points **half a step in from each end** — `a + len*(i+0.5)/n` — which
+  is the rule `runPositions()` uses for run-based entries, so hand-placed rows and
+  drawing-derived ones look the same.
 - ⚠ **The glow must not be the click target.** While one circle was both, a lamp's hit
   area was its entire radial gradient — up to `r=60` — so clicking anywhere in vardagsrum
   hit whichever lamp was topmost and the room itself was nearly unclickable.
