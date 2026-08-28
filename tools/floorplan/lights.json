@@ -245,7 +245,9 @@
   "tvattstuga_bank": {
    "cx": 112.5,
    "cy": 183,
-   "r": 26
+   "r": 26,
+   "symbol": false,
+   "tap": false
   }
  },
  "klk1": {
