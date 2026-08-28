@@ -117,14 +117,23 @@ identified in `connections`.
 
 **Server** (`mqtt-web.js`):
 
-- `bearerStrategy` (line 273) with `passport-azure-ad`:
-  `identityMetadata: …/consumers/v2.0/.well-known/openid-configuration`,
-  `clientID: bcb616b9-…`,
-  `issuer: https://login.microsoftonline.com/9188040d-6c67-4c5b-b112-36a304b66dad/v2.0`
-  (the well-known "personal Microsoft accounts" tenant).
-- The verify callback rejects a token with no `oid`, then calls
-  `validate(token.oid, token.preferred_username)`; a falsy return logs
-  `User <name> has not been granted access` and `done(null, false)` → passport answers 401.
+- ⚠ **`requireEntraToken()` — plain middleware over `jose`, since 2026-08-28.** This was
+  `bearerStrategy` with **`passport-azure-ad`** until that package turned out to be deprecated
+  by Microsoft *and* to be pulling `jsonwebtoken` ≤8.5.1 / `jws` <3.2.3, which carry
+  signature-validation-bypass advisories — on this exact path. Both it and `passport` are gone.
+  Do not put `@azure/msal-node` here in their place: MSAL Node *acquires* tokens and has no
+  resource-server validation API. The browser half (`msal-browser`, steps 1–5 above) is
+  unchanged and is the correct use of MSAL.
+- `createRemoteJWKSet(…/consumers/discovery/v2.0/keys)` fetches and caches Entra's signing
+  keys and re-fetches on an unknown `kid`, so key rotation needs no code. `jwtVerify` checks
+  the signature against the JWKS key — **taking the algorithm from the key, not from the
+  token's `alg` header**, which is the bug class those advisories describe — plus
+  `issuer: …/9188040d-6c67-4c5b-b112-36a304b66dad/v2.0` (the well-known "personal Microsoft
+  accounts" tenant) and `audience: bcb616b9-…`.
+- It then makes the same two checks the old verify callback did: reject a token with no `oid`
+  (401), then `validate(claims.oid, claims.preferred_username)` — a falsy return logs
+  `User <name> has not been granted access` and answers **403** (the old code answered 401
+  here; the client already treats 403 as "awaiting approval", which is what this is).
 - `GET /key-msal` (line 170) calls `validate()` **again** with the same arguments and
   `setCookie(key, res)` → 204 + signed cookie, or **403** if the account is not enabled.
 

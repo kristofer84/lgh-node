@@ -408,6 +408,19 @@ Record here rather than rediscovering them:
   press published two commands to one plug and the model carried it twice. If you re-derive
   zones from the HA registry, expect this shape again wherever a Z-Wave plug exposes both
   command classes.
+- **2026-08-28: `v1` and `v2` are driven as one device through the zigbee2mqtt group
+  `light.z_lampor_v`.** The operator created the group ("z lampor v", HA friendly name
+  **"Lampor MK"** — the names disagree, do not let that confuse you) so the two bench lamps
+  switch together. `db/config.json` carries `z_lampor_v.light.mood` instead of the two
+  entries, and `lights.json` gives it `points: [[55.18,135.57],[55.18,118.78]]` — the old v1
+  and v2 positions — so it draws as **two dots inside one `<g class="item">`** and both toggle
+  the group. `light.v1` and `light.v2` still exist in HA and still publish their own state;
+  they are simply no longer on the floorplan.
+  ⚠ **A freshly created z2m group publishes `state: unknown` until something commands it**,
+  and the ingest drops `unknown` along with `unavailable` — so a brand-new group reads as
+  permanently off on the dashboard until its first press. Commanding it once fixes that.
+  z2m retains nothing on `zigbee2mqtt/<group>`, so if HA ever restores the entity as `unknown`
+  after a restart, expect the same until the next command.
 - **`orangeri` has entities but no HA area** — they are scattered across `Kök`
   (`light.orangeri_tak`) and `Nattbelysning` (`light.bordslampa_orangeri`). The zone was
   assembled by name.
