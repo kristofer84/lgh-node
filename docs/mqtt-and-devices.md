@@ -385,7 +385,7 @@ switched on, and at the `on` step `toggle()` drives it to **100 explicitly**. Th
 is not optional: a plain `turn_on` restores the level the lamp last had, so after a mood press
 `on` would leave it sitting at the dimmed level. Measured on the real dimmer 2026-08-27,
 not assumed.
-Used today by `badrum_{1,2,3}_tak`, `entre_1`, `entre_2_3` and `hall_tvattstuga` — all
+Used today by `badrum_{1,2,3}_tak`, `entre_1`, `entre_2` and `hall_tvattstuga` — all
 Fibaro FGD-212 wall dimmers, all at **20/100** (70 was tried first
 and was far too bright for the step; 20 verified to strike cleanly on the real dimmer —
 `brightness_pct 20` → Z-Wave `currentValue 20` of 99 → HA 52/255, no drop-out).
@@ -536,16 +536,45 @@ Record here rather than rediscovering them:
   a `switch` and vice versa, and `dimmableFrom()` answers `false` for a switch outright, so a
   stale attribute in `log/mqtt.log` cannot resurrect the problem. Sensors and occupancy are
   deliberately outside that guard: an `occupancy` entry legitimately arrives on a `group/` topic.
-- ⚠ **`entre2` uses `light.entre_2_3`, and that is correct — do not "fix" it to
-  `light.entre_2`.** Confirmed by the operator, 2026-08-27. Node 35 is a two-channel
-  dimmer, and the entity naming is counter-intuitive: `light.entre_2` is endpoint 1 and
-  `light.entre_2_3` is **endpoint 0**, the root. Endpoints 1 and 2 report `unavailable`
-  and stay that way across an HA restart; only endpoint 0 is live. A click on the wrong
-  one fails silently as far as the dashboard is concerned — `mqtt-web.js` ignores
-  `unavailable`, so the room simply keeps its last known state, and the refusal appears
+- ⚠ **`entre2` uses `light.entre_2` (node 35, endpoint 1). CHANGED 2026-08-28 — and the
+  opposite instruction stood here until then, correctly.** Until that date the config used
+  `light.entre_2_3`, which is endpoint **0**, the root, and that genuinely was the only live
+  entity. This is not a doc that went stale; the hardware view moved underneath it.
+  **Cause** (established by a second session sweeping the Z-Wave network, 2026-08-28): node 35
+  had its **Multi Channel CC cached at version 1**. Endpoint discovery needs v2+, so zwave-js
+  never enumerated the node and reported `endpoints=[0]`. With endpoint 1 non-existent,
+  `light.entre_2` (`35-38-1`) was `unavailable` and the root entity was all there was. A
+  `node.refresh_info` on node 35 re-queried the CC version and the node re-enumerated:
+
+  | | interviewStage | endpoints | Multi Channel version |
+  |---|---|---|---|
+  | before | Complete | `[0]` | 1 |
+  | +60 s | Complete | `[0, 1, 2]` | 4 |
+
+  Node 35 is now structurally identical to node 5 (Entré 1), which never had the defect and
+  has always driven its lamps from endpoint 1. **`light.entre_2_3` is now the dead one** —
+  `restored: true`, accepts a `turn_on` with no error whatsoever, stays `unavailable`, node
+  never moves. Endpoint 2 (`light.entre_2_2`) did not exist before the re-interview and is a
+  phantom; do not wire it to anything.
+  ⚠ **Five more nodes carry the same cached-v1 defect in other command classes — 7, 8, 31, 37
+  and 100.** If a device answers on the root endpoint only and that looks wrong, suspect a
+  stale CC version before you suspect the wiring; the cache survives restarts indefinitely.
+  ⚠ **The numeric suffix in an entity_id does NOT encode the endpoint.** `light.entre_1_3` is
+  node 5 endpoint **3**; `light.entre_2_3` is node 35 endpoint **0**. Same suffix, different
+  endpoints — inferring one from the other gets entré-2 exactly backwards. Resolve via
+  `unique_id` in `core.entity_registry` (`<node>-<cc>-<endpoint>`), never via the name.
+  ⚠ **Do not use `currentValue` to tell a phantom endpoint from a real one.** Endpoint 2 reads
+  a permanent `99` on Fibaro dimmers 5, 35, 98, 100 and 16 — but `0` on 105 and 20. Neither
+  "non-zero means live" nor "always 99 means phantom" holds. `restored: true` plus the driver's
+  own endpoint list is the reliable filter.
+  A click on a dead entity fails silently as far as the dashboard is concerned — `mqtt-web.js`
+  ignores `unavailable`, so the room simply keeps its last known state, and the refusal appears
   only in `home-assistant.log`:
-  `Referenced entities light.entre_2 are missing or not currently available`.
+  `Referenced entities light.entre_2_3 are missing or not currently available`.
   That log line is the fastest way to diagnose "room X does nothing".
+  **Still outstanding: nobody has watched the entré-2 lamp physically blink.** The evidence is
+  `node.poll_value` (which queries the device, not the cache) agreeing with HA state on every
+  row, plus the structural match to node 5 — strong, but not an eyeball.
 - **`switch.ytterdorr_1_brytare` / `light.ytterdorr_2` have no area at all** — which of
   `entre1` / `entre2` each belongs to is inference, not fact.
 - **`vinkyl` has a power sensor in `config.zones.devices` but no marker in the drawing**, so it
