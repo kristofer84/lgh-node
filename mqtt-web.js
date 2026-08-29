@@ -319,9 +319,16 @@ app.post('/config/zones', wrap(async (req, res) => {
 		return res.end(JSON.stringify({ error: 'expected {zone: {device: steps}}' }));
 	}
 
+	//⚠ Apply to what is ON DISK, not to the in-memory copy. The in-memory config
+	//is a snapshot from boot; writing it back would revert any hand edit made to
+	//db/config.json since -- which is exactly what happened on 2026-08-29. Reading
+	//it here means a save touches only the devices named in the request and leaves
+	//every other edit, in any zone, intact.
+	const disk = JSON.parse((await fs.readFile('./db/config.json')).toString());
+
 	const changed = [];
 	for (const [zone, devs] of Object.entries(body)) {
-		const entries = config.zones[zone];
+		const entries = disk.zones[zone];
 		if (!entries) {
 			res.statusCode = 400;
 			return res.end(JSON.stringify({ error: `unknown zone ${zone}` }));
@@ -351,7 +358,10 @@ app.post('/config/zones', wrap(async (req, res) => {
 		}
 	}
 
-	await saveConfig();
+	await saveConfig(disk);
+	//Memory now follows disk, so the next save starts from the same place and the
+	//running model reflects the file that was just written.
+	config = disk;
 	reloadConfig();
 	io.emit('device.all', JSON.stringify(getDevice(null), null, 2));
 	log(`config saved by ${req.user?.preferred_username ?? 'unknown'}: ${changed.length} device(s)`);
@@ -805,8 +815,15 @@ function validateSteps(steps) {
 //Write db/config.json without ever leaving a half-written file where the next
 //boot would read it: a timestamped backup first, then a temp file, then an
 //atomic rename over the original.
-async function saveConfig() {
-	const json = JSON.stringify(config, null, 2) + '\n';
+//⚠ Takes the object to write. It used to serialise the module-level `config`,
+//which meant a save wrote the whole in-memory copy -- the one loaded at boot --
+//over whatever was on disk, silently discarding every hand edit made since the
+//process started. That is not hypothetical: on 2026-08-29 a config-page save
+//reverted an `orangeri` edit made 20 minutes earlier, with nothing in the log to
+//say so. The POST handler now re-reads the file and applies its changes to that,
+//so a save only ever touches the devices named in the request.
+async function saveConfig(next) {
+	const json = JSON.stringify(next, null, 2) + '\n';
 	const stamp = new Date().toISOString().replace(/[-:]/g, '').slice(0, 15);
 	await fs.copyFile('./db/config.json', `./db/config.json.bak-${stamp}`);
 	await fs.writeFile('./db/config.json.tmp', json);
