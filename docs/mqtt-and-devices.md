@@ -506,6 +506,49 @@ Record here rather than rediscovering them:
 - **`orangeri` has entities but no HA area** — they are scattered across `Kök`
   (`light.orangeri_tak`) and `Nattbelysning` (`light.bordslampa_orangeri`). The zone was
   assembled by name.
+- ⚠ **REMOVED 2026-08-29: `bordslampa_orangeri` is dead hardware and was pinning the room
+  lit.** Node 30 ("Lampa orangeri", an Everspring AD147) is `dead`, last seen
+  **2026-04-14T14:04:29Z**, and every entity it owns is `unavailable` / `restored: true`.
+  Because the model had it at `state: on` from **2026-04-01T04:01:25Z** and never received
+  another message, the `orangeri` zone contained a permanently-lit device and **the room could
+  never render as off** — it read as partly lit forever. Dropped from `config.zones.orangeri`
+  and from `lights.json` (its glow was still auto-placed at `62.09, 174.34, r 26` — restore
+  that if the plug is ever replaced). The zone is now `orangeri_tak` alone, which costs it its
+  `mood` step; **`light.orangeri_brytare` (node 36) is alive and `off` and is the obvious
+  candidate to take that step over**, but which physical lamp it drives is unconfirmed, so it
+  is deliberately not wired in.
+  ⚠ **This is the general failure mode, not a one-off: the model has no notion of staleness.**
+  An `unavailable` / `unknown` payload is *dropped* at the top of `client.on('message')`
+  (`mqtt-web.js` ~line 511) — deliberately, so a lamp does not flicker off during a restart —
+  which means a device that dies keeps its last known state **forever**, and a device that died
+  while lit stays lit in the model for as long as the config references it. `log/mqtt.log`
+  carries it across restarts. When a room will not go off, check `lastChange` on its devices
+  before you check anything else.
+- ⚠ **Three Z-Wave nodes are dead. Anything referencing them is inert** (registry sweep by a
+  second session, 2026-08-29):
+
+  | node | name | last seen | owns |
+  |---|---|---|---|
+  | 30 | Lampa orangeri (AD147) | 2026-04-14 | `light.bordslampa_orangeri`, `switch.lampa_orangeri` |
+  | 79 | Multisensor | **2023-12-19** | every `multisensor_*` entity, ~95 of them |
+  | 96 | Vinkyl (Smart Plug 16A) | 2026-08-28 | `switch.vinkyl`, `sensor.vinkyl_*` |
+
+  Node 96 is the only one plausibly recoverable — it was alive the previous afternoon and may
+  simply be unplugged. Nothing in the app depends on it: its power sensor is in
+  `config.zones.devices` but has no marker in the drawing, which is the `! power sensor
+  "vinkyl_*" has no marker in the plan` warning the generator prints on every run.
+  ⚠ **`multisensor_6_*` is not a separate live device — it is node 79 as well.** There is
+  exactly one such entity (`sensor.multisensor_6_power`) and it is `restored: true` like the
+  rest. There is no working multisensor anywhere in this installation; the only two
+  `multisensor_*` entities carrying a real state are node 79's own diagnostics, which say
+  `node_status = dead` and a frozen `last_seen`. Do not read the `_6` suffix as a replacement
+  device.
+  **Detecting this class without a registry dump needs both halves:** `sensor.<node>_node_status`
+  (zwave_js exposes one per node) gives the *device*-level truth, and `restored: true` gives the
+  *entity*-level truth. Both are necessary, because a live node can still own dead entities —
+  node 36 is alive and owns `light.orangeri_tak_basic` / `_basic_2`, both dead mirrors.
+  ⚠ Those two are node **36**, not the zigbee `light.orangeri_tak`; a name-prefix match on
+  `orangeri_tak` picks up the wrong device. Match on `unique_id`.
 - **RESOLVED 2026-08-25 (operator): the bedrooms are named after their occupants** —
   `sov2` = Mikkel, `sov3` = Kai, `sov4` = Mette. This settles the `light.lampa_mikkel`
   ambiguity (its *device* area said `Nytt kök`, its `switch.` *entity* area said `Sovrum MK`):
@@ -598,8 +641,9 @@ Record here rather than rediscovering them:
   three following the slope and two down the right wall, not a single `cx`/`cy`.
 - **Glow positions in `tools/floorplan/lights.json` start auto-seeded**, in a ring around the
   room's text anchor, and carry `"auto": true` until placed by hand. Two are still unplaced:
-  `bordslampa_orangeri` and `slinga_mette` — both belong to devices that are physically
-  disconnected, so nobody has noticed them sitting in the wrong spot. `tvattstuga_bank` is
+  `slinga_mette` — it belongs to a device that is physically disconnected, so nobody has
+  noticed it sitting in the wrong spot. (`bordslampa_orangeri` was the other; it was removed
+  2026-08-29 along with its dead node.) `tvattstuga_bank` is
   placed but **inferred**: no bench is outlined in the drawing, so it sits on the worktop over
   the washer/dryer (the `TM`/`TT` fixtures at ~110.8, 181/187). Worth confirming. Neither it
   nor `garderob_1_skap` has a run on the drawing's `Rum` layer; if either is redrawn there,
