@@ -543,10 +543,27 @@ Record here rather than rediscovering them:
   `multisensor_*` entities carrying a real state are node 79's own diagnostics, which say
   `node_status = dead` and a frozen `last_seen`. Do not read the `_6` suffix as a replacement
   device.
-  **Detecting this class without a registry dump needs both halves:** `sensor.<node>_node_status`
-  (zwave_js exposes one per node) gives the *device*-level truth, and `restored: true` gives the
-  *entity*-level truth. Both are necessary, because a live node can still own dead entities —
-  node 36 is alive and owns `light.orangeri_tak_basic` / `_basic_2`, both dead mirrors.
+  **Detecting this class needs three signals, not two.** `sensor.<node>_node_status` gives the
+  *device*-level truth and `restored: true` the *entity*-level truth — both are necessary,
+  because a live node can still own dead entities (node 36 is alive and owns
+  `light.orangeri_tak_basic` / `_basic_2`, both dead mirrors). But neither catches a **battery**
+  device, and ⚠ **`sensor.<name>_last_seen` is the only reliable signal.**
+  The case that proves it is node 2, `motion_sensor_eye`, **last seen 2025-11-11 — gone for ten
+  months and both other signals call it healthy**: battery nodes are marked `asleep`, never
+  `dead` (correct for a sleeping node, so `node_status` cannot separate "asleep 20 minutes" from
+  "gone since November"), and because its entities were never `unavailable` at a restart,
+  `restored` is never set on them either. It is at this moment publishing permanent motion, a
+  plausible 23.7 °C and a 92 % battery, all frozen last November.
+  **The app does not consume it** — checked 2026-08-29. The only occupancy entry in the config
+  is `home` → `sensorer_alla.occupancy`, and that HA group contains
+  `binary_sensor.rorelsesensor_{ytterdorr,entre,hall,garderob_1,garderob_2}_occupancy` plus
+  `input_boolean.dummy`; node 2 is not a member, and the group currently reads `off`. Node 2's
+  entities are in `log/mqtt.log` as debris only, with no `zone`, so they are never served. Keep
+  it that way: wiring `motion_sensor_eye*` into a zone would import a permanently-on sensor, and
+  the "senaste aktivitet" readout on the dashboard is driven by that group's `lastChange`.
+  Full stale list as of 2026-08-29 — only four Z-Wave nodes unseen in over 7 days, and one is
+  the controller: **79** (dead, 983 days), **2** (asleep, 290 days), **30** (dead, 136 days),
+  1 (controller). Everything else was seen the same day.
   ⚠ Those two are node **36**, not the zigbee `light.orangeri_tak`; a name-prefix match on
   `orangeri_tak` picks up the wrong device. Match on `unique_id`.
 - **RESOLVED 2026-08-25 (operator): the bedrooms are named after their occupants** —
@@ -615,9 +632,23 @@ Record here rather than rediscovering them:
   only in `home-assistant.log`:
   `Referenced entities light.entre_2_3 are missing or not currently available`.
   That log line is the fastest way to diagnose "room X does nothing".
-  **Still outstanding: nobody has watched the entré-2 lamp physically blink.** The evidence is
-  `node.poll_value` (which queries the device, not the cache) agreeing with HA state on every
-  row, plus the structural match to node 5 — strong, but not an eyeball.
+  **CONFIRMED on the hardware 2026-08-29T05:17Z, operator present.** Better than an eyeball:
+  the operator first pressed the *physical wall button*, and `zwave/Entré_2/38/**1**/currentValue`
+  went to 59 and back to 0 — the actuator itself drives endpoint 1, which is not something a
+  registry can tell you. Endpoints 0 and 2 did not move at any point. Then three taps on the
+  floorplan, round-tripping cleanly through the app:
+
+  | tap | published | endpoint 1 | HA |
+  |---|---|---|---|
+  | 1 | `webapp/dim/light.entre_2/set 20` | `20` | `on`, brightness 52 |
+  | 2 | `webapp/dim/light.entre_2/set 100` | `99` | `on`, brightness 255 |
+  | 3 | `webapp/switch/light.entre_2/state/set off` | `0` | `off` |
+
+  Command to Z-Wave confirmation was ~200 ms throughout. Nothing about entré 2 is now inferred.
+  ⚠ One piece of debris to expect: `homeassistant/light/entre_2/restored true` is still
+  **retained on the broker** from before the re-interview. `restored` is only published when
+  set, never retracted, so a stale `true` outlives the condition — do not read a retained
+  `restored` as current. The live `state` is `off`, and the app reads only `state`.
 - **`switch.ytterdorr_1_brytare` / `light.ytterdorr_2` have no area at all** — which of
   `entre1` / `entre2` each belongs to is inference, not fact.
 - **`vinkyl` has a power sensor in `config.zones.devices` but no marker in the drawing**, so it
