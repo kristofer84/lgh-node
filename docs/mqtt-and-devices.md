@@ -389,10 +389,14 @@ saying so. Caught on the wire 2026-08-29 on `light.sovrum_4_tak`: `targetValue 2
 previous mood press had left it at, which reads to the user as "it will not go to full".
 **19 dimmable lights across 11 zones were configured `on: true`; all now carry `on: 100`.**
 Verified after the change: `targetValue 99`, `currentValue 99`.
-⚠ It applies to `mood` and `night` too. Three dimmable lights still carry `mood: true`
-(`sovrum_1_byra`, `lampa_mette`, `garderob_1_skap`) and will restore-previous at that step —
-left alone deliberately, because the right level is a preference, not a bug fix.
-A `switch` is unaffected: it has no level to restore.
+⚠ It applies to `mood` and `night` too. The last three (`sovrum_1_byra`, `lampa_mette`,
+`garderob_1_skap`) were given `mood: 20` on operator instruction, 2026-08-29 — 20 % is the house
+default everywhere except `kok`, which runs at 10 %. Verified on the wire on
+`Garderob_1_skåp/38/1`: mood → `20`, on → `99`, off → `0`.
+**No dimmable light in `db/config.json` now carries a bare `true` on any step**, and none should
+again: if you add one, give it a number. A `switch` is unaffected — it has no level to restore,
+which is why `sang_hoger`, `sang_vanster`, `skapbelysning` and `slinga_mette` legitimately keep
+`true`.
 
 ⚠ **The mesh needs ~16 s to drain a whole-room press, and late reports can misreport a level.**
 Measured 2026-08-29: one `kok` press writes to five lights and produced 15 state writes over
