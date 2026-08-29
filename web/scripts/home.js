@@ -191,18 +191,25 @@ var updateViewFlagKey;
 var updateViewFlag = true;
 
 function send(item) {
-	//If auto-refresh, disable view updates for a few seconds
-	if ($('#cb-lock').is(':checked')) {
-		//To avoid overlapping updates, set a key
-		let key = rand();
-		updateViewFlagKey = key;
-
-		//Toggle skipView and schdule a reset
-		updateViewFlag = false;
-		setTimeout(function () {
-			if (updateViewFlagKey == key) updateViewFlag = true;
-		}, 2000);
-	}
+	//Hold the optimistic render for 2s. Publishing a step is not one MQTT
+	//message: HA echoes each lamp back as it reaches its new level, so a room
+	//briefly reports the step it is *leaving* and the view snaps back before it
+	//settles. Suppressing incoming updates for that window hides the flicker.
+	//
+	//This used to be gated on #cb-lock, the screen wake lock, standing in for
+	//"this is the wall panel". The race is not specific to that screen -- a
+	//phone saw the flicker the panel was protected from -- and the coupling was
+	//not guessable from either name. Unconditional now; #cb-lock only locks.
+	//
+	//The key is what makes overlapping sends safe: each one takes the flag down
+	//and only the newest is allowed to put it back up, so a second tap during
+	//the window extends it instead of ending it early.
+	let key = rand();
+	updateViewFlagKey = key;
+	updateViewFlag = false;
+	setTimeout(function () {
+		if (updateViewFlagKey == key) updateViewFlag = true;
+	}, 2000);
 
 	socket.emit('toggle', JSON.stringify(item));
 }

@@ -373,6 +373,18 @@ Landmines carried by the new plan (each recorded in full in `tools/floorplan/REA
   (`cb-lock`, `cb-mood`, `cb-temp`, `cb-devi`, `cb-raw`, `cb-nightmode`), read back on load.
 - Screen wake lock: `lock()`/`unlock()` via `navigator.wakeLock`, tied to window focus/blur.
   Blur also **disconnects the socket**; focus reconnects and re-fetches `/refresh-key`.
+- ⚠ **Two independent timers sit between a tap and the wire, and neither is obvious.**
+  `queue()` coalesces taps per zone for **500 ms**, last-click-wins, so cycling
+  `off → night → mood → on` publishes one command rather than three — but **only when
+  `#cb-mood` (the sun, "Max brightness") is ticked**; unticked, every tap sends immediately.
+  `send()` then holds the optimistic render for **2 s** by dropping `updateViewFlag`, because
+  HA echoes each lamp back as it reaches its new level and the room briefly reports the step it
+  is *leaving*. Fixed 2026-08-29: that 2 s latch used to be gated on `#cb-lock`, the **screen
+  wake lock**, standing in for "this is the wall panel" — so phones saw a flicker the panel was
+  protected from, and neither the checkbox name nor its `fa-sync-alt` icon hinted at any of it.
+  The latch is now unconditional, `#cb-lock` only locks the screen, and its icon is
+  `fa-mobile-alt`. ⚠ The CDN pins **Font Awesome 5.4.1**, so FA6 names (`fa-mobile-screen`)
+  render as an empty box — check the glyph exists in 5 before using it.
 
 
 ⚠ **Dark mode is `body.nightmode`, and it needs its own values for almost everything —
