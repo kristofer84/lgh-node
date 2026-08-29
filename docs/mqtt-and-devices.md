@@ -429,13 +429,18 @@ and the same warnings.
 
   | Area | What it actually contains |
   |---|---|
-  | `Kök` | `light.orangeri_tak`, `light.vardagsrum_linje`, `light.vardagsrum_tak_lampa` |
+  | `Kök` | `light.orangeri_tak`, `light.vardagsrum_linje`†, `light.vardagsrum_tak_lampa` |
   | `Dusch` | `light.badrum_2_spegel`, `light.badrum_2_tak` |
   | `Kontor` | `light.sovrum_3_tak` |
   | `garderob_kontor` | `light.sovrum_4_tak` |
 
   There are also stale one-device areas left over from Sonos speakers (`Kök tak`,
   `Vardagsrum tak`, `Soundbar`) and from the old plan (`Sovrum MK`, `Nytt kök`, `Matsal`).
+
+  † `light.vardagsrum_linje` no longer exists in HA — it and
+  `light.vardagsrum_taklampa_ovan_matbord` were removed from HA's own scripts 2026-08-28, and
+  survive only as orphaned retained MQTT topics. Neither is in `db/config.json`. If you meet
+  either name elsewhere it is **stale, not a typo**: they were real entities once.
 
 - **The reliable signal is the entity/device naming convention**, which *was* redone for the new
   apartment: `badrum_1_*`, `badrum_2_*`, `sovrum_2_*`, `garderob_1_*`, `entre_1`/`entre_2`.
@@ -517,6 +522,21 @@ Record here rather than rediscovering them:
   `mood` step; **`light.orangeri_brytare` (node 36) is alive and `off` and is the obvious
   candidate to take that step over**, but which physical lamp it drives is unconfirmed, so it
   is deliberately not wired in.
+  ⚠ **EMPTIED 2026-08-29 (operator): the orangeri physically contains no lights at all** — no
+  bulbs, nothing — and its multisensors and the IKEA sensor are disconnected too. The zone is
+  now `[]`, like `loggia` and `balkong`: the room still draws and is still clipped, it simply
+  has nothing in it. That removed the last light (`orangeri_tak`) and both sensor readouts,
+  which were showing a **retained** 29.3 °C and 66 % for a sensor that is unplugged — MQTT
+  retains the last value forever, so a disconnected sensor reads plausibly rather than blank.
+  To restore the room when it is fitted out again, the entries were verbatim:
+  `{"device": "orangeri_tak", "type": "light", "steps": {"on": true}}`,
+  `"orangeri_temperature.sensor"`, `"orangeri_humidity.sensor"`.
+  `light.orangeri_brytare` (node 36) is the Fibaro dimmer feeding the mains to whatever bulb is
+  fitted — **not a lamp in its own right**, and not to be given a mood step: of 34 times it went
+  unavailable, 25 took `orangeri_tak` down within 60 s (median 5 s), and the bulb dropped out
+  111 times to the dimmer's 34. Same wiring as `vardagsrum_tak`, which has an automation forcing
+  its dimmer to 100 % precisely because dimming the feed browns out the bulb; the orangeri has
+  no such automation.
   ⚠ **This is the general failure mode, not a one-off: the model has no notion of staleness.**
   An `unavailable` / `unknown` payload is *dropped* at the top of `client.on('message')`
   (`mqtt-web.js` ~line 511) — deliberately, so a lamp does not flicker off during a restart —
@@ -645,10 +665,28 @@ Record here rather than rediscovering them:
   | 3 | `webapp/switch/light.entre_2/state/set off` | `0` | `off` |
 
   Command to Z-Wave confirmation was ~200 ms throughout. Nothing about entré 2 is now inferred.
-  ⚠ One piece of debris to expect: `homeassistant/light/entre_2/restored true` is still
-  **retained on the broker** from before the re-interview. `restored` is only published when
-  set, never retracted, so a stale `true` outlives the condition — do not read a retained
-  `restored` as current. The live `state` is `off`, and the app reads only `state`.
+  ⚠⚠ **Never read `restored` over MQTT — on this broker it is wrong more often than right.**
+  Noticed as one stale topic here (`homeassistant/light/entre_2/restored true`, left over from
+  before the re-interview) and then audited across the whole broker, 2026-08-29:
+
+  | retained `restored: true` | |
+  |---|---|
+  | **74** | HA says the entity is **live** — the topic is lying |
+  | 70 | still accurate |
+  | 11 | entity no longer exists in HA at all |
+
+  The 74 include `light.entre_1`, `light.entre_2`, `light.koksbank`, `light.kokso`,
+  `light.garderob_2_tak`, `light.vardagsrum_soffa`, `switch.kylskap`, `switch.tvattmaskin` —
+  ordinary working devices. **A dead-entity filter built on MQTT `restored` would discard more
+  live entities than dead ones.** Mechanism: `mqtt_statestream` runs with
+  `publish_attributes: true` and publishes each attribute as its own retained topic;
+  `restored` exists in the attribute dict only *while* the entity is restored, and when it
+  recovers the attribute simply vanishes — statestream has no retraction path, so the retained
+  `true` is permanent. Registry-side `restored` is still correct; the divergence is purely in
+  the retained layer. Use the registry, or `_last_seen` for battery devices.
+  The app is unaffected — it reads only `state`, and `restored` is not in `VALUE_TYPES`. Keep it
+  that way. (The retained set has not been cleared: other consumers read this broker, so that is
+  the operator's call.)
 - **`switch.ytterdorr_1_brytare` / `light.ytterdorr_2` have no area at all** — which of
   `entre1` / `entre2` each belongs to is inference, not fact.
 - **`vinkyl` has a power sensor in `config.zones.devices` but no marker in the drawing**, so it
