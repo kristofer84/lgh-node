@@ -734,9 +734,12 @@ Record here rather than rediscovering them:
   the operator's call.)
 - ⚠ **MOVED 2026-08-30: the `sov3` climate sensor is the kitchen's now.** The Aqara
   WSDCGQ11LM `0x00158d0005408895` was renamed on the HA side on **2026-08-29T08:20Z** (entities)
-  / **08:22Z** (device): it is `Kök` in HA, area `Kök`, and zigbee2mqtt still calls it
-  `Sovrum 3`. One device, two names — which is why z2m has no "Kök" device and why nothing was
-  added. `sensor.sovrum_3_temperature` / `_humidity` **no longer exist in HA at all** — not
+  / **08:22Z** (device): it is `Kök` in HA, area `Kök`. For most of that day zigbee2mqtt still
+  called it `Sovrum 3` — one device under two names, which is why z2m appeared to have no "Kök"
+  device and why nothing was added. **The z2m side was renamed to `Kök` too at 17:45Z the same
+  day**, so the two now agree; a snapshot taken between those times shows the mismatch and is
+  not wrong, just old. The device has been renamed twice in one day, so re-check the entity_ids
+  before trusting any note about it. `sensor.sovrum_3_temperature` / `_humidity` **no longer exist in HA at all** — not
   unavailable, not disabled, absent from the registry; the rename changed the entity_ids. So
   `kok` gains `kok_temperature` / `kok_humidity` and **`sov3` now has no readout**, which is
   correct: there is no sensor in that room any more.
@@ -749,6 +752,22 @@ Record here rather than rediscovering them:
   them live. The one entity that is demonstrably healthy, `kok_temperature`, is the one with
   *no* `restored` topic at all. Same finding as the light audit: the registry is the only
   authority. See the ⚠⚠ note in §"the dim step" for the mechanism.
+  ⚠ **`kok2_temperature` / `_humidity` / `_pressure` are a ghost, not a second kitchen sensor.**
+  No such entity exists in the registry or the state machine and z2m has no such device — during
+  the rename HA briefly allocated `sensor.kok2_*` because `sensor.kok_*` was still held,
+  statestream published it, the id went away and the retained topics stayed. Do not wire it.
+  ⚠ **Method note, so this is not re-derived: subscribing to a wildcard delivers the entire
+  retained backlog at once, and that is indistinguishable from a mass republish.** Watching
+  `homeassistant/sensor/+/state` produced what looked exactly like a house-wide HA restart —
+  every climate entity "publishing", including ones long dead, cycling through `unavailable` and
+  `unknown`. HA had not restarted: no startup lines in three hours of log, container up ten
+  days, `mqtt` and `zigbee2mqtt` both `restarts=0`. The only thing that actually changed was one
+  device being reconfigured. **A wildcard subscription cannot measure liveness**; use the
+  recorder's last-reported time, or `sensor.<name>_battery`.
+  Live as of 2026-08-30: `hall`, `sovrum`, `garderob_1`, `orangeri`, `kok` all reported within
+  the last 15 minutes. `sovrum_2` is real but sluggish (1.4 d). **`vardagsrum` is dead — battery
+  0** — which is a flat battery, not a rename, and independently matches the operator saying
+  there is no sensor in that room "at the moment".
 - **`switch.ytterdorr_1_brytare` / `light.ytterdorr_2` have no area at all** — which of
   `entre1` / `entre2` each belongs to is inference, not fact.
 - **`vinkyl` has a power sensor in `config.zones.devices` but no marker in the drawing**, so it
