@@ -725,6 +725,23 @@ Record here rather than rediscovering them:
   The app is unaffected — it reads only `state`, and `restored` is not in `VALUE_TYPES`. Keep it
   that way. (The retained set has not been cleared: other consumers read this broker, so that is
   the operator's call.)
+- ⚠ **MOVED 2026-08-30: the `sov3` climate sensor is the kitchen's now.** The Aqara
+  WSDCGQ11LM `0x00158d0005408895` was renamed on the HA side on **2026-08-29T08:20Z** (entities)
+  / **08:22Z** (device): it is `Kök` in HA, area `Kök`, and zigbee2mqtt still calls it
+  `Sovrum 3`. One device, two names — which is why z2m has no "Kök" device and why nothing was
+  added. `sensor.sovrum_3_temperature` / `_humidity` **no longer exist in HA at all** — not
+  unavailable, not disabled, absent from the registry; the rename changed the entity_ids. So
+  `kok` gains `kok_temperature` / `kok_humidity` and **`sov3` now has no readout**, which is
+  correct: there is no sensor in that room any more.
+  ⚠ The old entity_ids still publish `29.1` and `56` on MQTT and will do so forever — retained
+  statestream topics from before the rename, `restored: true`, never retracted. That frozen 29.1
+  is what made the room look implausibly warm. **Do not wire `sensor.sovrum_3_*` to anything.**
+  ⚠ **`restored: true` cannot find these.** Audited every sensor in `db/config.json` against the
+  retained topics 2026-08-30: **20 of 22 carry `restored: true`**, including `vardagsrum`,
+  `hall`, `sovrum`, `sovrum_2`, `garderob_1`, `utomhus` and all six appliance meters — all of
+  them live. The one entity that is demonstrably healthy, `kok_temperature`, is the one with
+  *no* `restored` topic at all. Same finding as the light audit: the registry is the only
+  authority. See the ⚠⚠ note in §"the dim step" for the mechanism.
 - **`switch.ytterdorr_1_brytare` / `light.ytterdorr_2` have no area at all** — which of
   `entre1` / `entre2` each belongs to is inference, not fact.
 - **`vinkyl` has a power sensor in `config.zones.devices` but no marker in the drawing**, so it
