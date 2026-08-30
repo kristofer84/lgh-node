@@ -566,9 +566,16 @@ Record here rather than rediscovering them:
   has nothing in it. That removed the last light (`orangeri_tak`) and both sensor readouts,
   which were showing a **retained** 29.3 °C and 66 % for a sensor that is unplugged — MQTT
   retains the last value forever, so a disconnected sensor reads plausibly rather than blank.
-  To restore the room when it is fitted out again, the entries were verbatim:
-  `{"device": "orangeri_tak", "type": "light", "steps": {"on": true}}`,
-  `"orangeri_temperature.sensor"`, `"orangeri_humidity.sensor"`.
+  To restore the room when it is fitted out again, the light entry was verbatim:
+  `{"device": "orangeri_tak", "type": "light", "steps": {"on": true}}` — but give it a number
+  rather than `true`, per the restore-previous trap above.
+  ⚠ **Correction, 2026-08-30: the two sensor entries were put back.** Removing them was my
+  error, not the operator's instruction. "The multisensors and the IKEA sensor are disconnected"
+  refers to the Z-Wave Multisensor (node 79, dead since 2023) and a separate IKEA device — *not*
+  to the Aqara WSDCGQ11LM `0x00158d00053f342d` that actually feeds `orangeri_temperature` /
+  `_humidity`, which is alive and reporting. The room has no lights and a working climate
+  sensor; those are separate facts and I conflated them. Rooms with a sensor, per the operator
+  2026-08-30: **klk1, sov1, kök, orangeri, gång**.
   `light.orangeri_brytare` (node 36) is the Fibaro dimmer feeding the mains to whatever bulb is
   fitted — **not a lamp in its own right**, and not to be given a mood step: of 34 times it went
   unavailable, 25 took `orangeri_tak` down within 60 s (median 5 s), and the bulb dropped out
