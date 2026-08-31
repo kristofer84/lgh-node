@@ -517,6 +517,16 @@ client.on('message', function (topic, message) {
 		const split = topic.split('/');
 		const valueType = split[3];
 
+		//⚠ An EMPTY payload is a retained-topic deletion, not a value. Publishing a
+		//zero-length retained message is how MQTT clears a topic, and every
+		//subscriber receives it as an ordinary message. Without this guard the
+		//reducer below stored '' over the real value and, worse, the derived pass
+		//read '' as "not on" and switched `onoff` to false -- so clearing the
+		//broker's retained set turned every light off on the dashboard at once.
+		//Observed 2026-08-31 while doing exactly that. There is nothing to learn
+		//from a deletion, so drop it and keep what we already know.
+		if (message.length === 0) return;
+
 		//homeassistant/light/entre/state: on
 		if (split[0] === 'homeassistant' && Object.hasOwn(VALUE_TYPES, valueType) && message.toString() !== 'unavailable' && message.toString() !== 'unknown') {
 			let deviceType = split[1];
