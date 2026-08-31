@@ -64,10 +64,112 @@ async function connect() {
 	socket.on('disconnect', () => appendLog('disconnected'));
 }
 
+//The panel used to be `raw.join('<br />')` of whole JSON payloads, which is how
+//a single washing-machine reading became three wrapped lines of
+//{"devices":{"tvattmaskin_electric_consumption_w":{"state":false,"lastChange":
+//1788161322722}}}. The payload shape is always {zone: {device: {fields}}}, so it
+//is split into columns instead, and the full JSON is kept on the row's `title`
+//for when the detail is actually wanted.
+const RAW_MAX = 300;
+
+//`steps` and `dimmable` are config, not news, and `lastChange` only repeats the
+//timestamp already in the first column. What is left is the state itself.
+function summarise(d) {
+	const bits = [];
+	if (d !== null && typeof d === 'object') {
+		let lit;
+		if (Object.hasOwn(d, 'state')) {
+			const v = d.state;
+			lit = v === true || v === 'on';
+			bits.push(v === true ? 'on' : v === false ? 'off' : String(v));
+		}
+		else if (Object.hasOwn(d, 'onoff')) {
+			lit = !!d.onoff;
+			bits.push(lit ? 'on' : 'off');
+		}
+
+		//`dim` is raw 0-255 off the wire; a percentage is what the config and the
+		//rest of the UI speak. Only shown when the lamp is actually lit: a dimmer
+		//keeps reporting its last level after being switched off (that is what
+		//Z-Wave targetValue 255 restores), and "off 100%" reads as a fault.
+		const n = Number(d.dim);
+		if (lit && Object.hasOwn(d, 'dim') && Number.isFinite(n)) bits.push(`${Math.round(n / 255 * 100)}%`);
+	}
+	return bits.join(' ') || '-';
+}
+
+/** @param {unknown} msg @returns {Array<{device: string, value: string, title: string, note?: boolean}>} */
+function parseLog(msg) {
+	if (typeof msg !== 'string') {
+		//connect_error hands us an Error, whose String() is "[object Object]"
+		//unless the message is pulled out.
+		const e = /** @type {any} */ (msg);
+		return [{ device: String(e?.message ?? e), value: '', title: '', note: true }];
+	}
+	if (!msg.startsWith('{')) return [{ device: msg, value: '', title: '', note: true }];
+	try {
+		const obj = JSON.parse(msg);
+		const rows = [];
+		for (const [zone, devices] of Object.entries(obj)) {
+			for (const [device, d] of Object.entries(devices ?? {})) {
+				rows.push({ device: `${zone} / ${device}`, value: summarise(d), title: JSON.stringify(d) });
+			}
+		}
+		return rows.length ? rows : [{ device: msg, value: '', title: '', note: true }];
+	} catch {
+		return [{ device: msg, value: '', title: '', note: true }];
+	}
+}
+
 function appendLog(msg) {
-	if (raw.length >= 40) { raw.shift(); }
-	raw.push(`${getTime()} ${msg}`);
-	$('#raw').html(raw.join("<br />"));
+	for (const row of parseLog(msg)) {
+		const last = raw[raw.length - 1];
+		//Collapse a run of identical messages instead of scrolling the useful ones
+		//off the top.
+		if (last && last.device === row.device && last.value === row.value) {
+			last.n++;
+			last.time = getTime();
+		}
+		else {
+			raw.push({ ...row, time: getTime(), n: 1 });
+			if (raw.length > RAW_MAX) raw.shift();
+		}
+	}
+	renderLog();
+}
+
+function renderLog() {
+	const body = document.getElementById('raw-body');
+	if (!body) return;
+
+	//Stick to the bottom only if the reader is already there; otherwise leave
+	//their scroll position alone while they are reading back.
+	const atBottom = body.scrollHeight - body.scrollTop - body.clientHeight < 40;
+
+	body.textContent = '';
+	if (!raw.length) {
+		const empty = document.createElement('div');
+		empty.className = 'raw-empty';
+		empty.textContent = 'Inga meddelanden än.';
+		body.append(empty);
+	}
+	for (const e of raw) {
+		const row = document.createElement('div');
+		row.className = e.note ? 'raw-row raw-note' : 'raw-row';
+		if (e.title) row.title = e.title;
+		//textContent, not innerHTML: these strings come off the wire.
+		row.append(
+			Object.assign(document.createElement('span'), { className: 'raw-t', textContent: e.time }),
+			Object.assign(document.createElement('span'), { className: 'raw-d', textContent: e.device }),
+			Object.assign(document.createElement('span'), { className: 'raw-v', textContent: e.value }),
+			Object.assign(document.createElement('span'), { className: 'raw-n', textContent: e.n > 1 ? `x${e.n}` : '' }),
+		);
+		body.append(row);
+	}
+
+	const count = document.getElementById('raw-count');
+	if (count) count.textContent = raw.length ? `${raw.length} rader` : '';
+	if (atBottom) body.scrollTop = body.scrollHeight;
 }
 
 function disconnect() {
@@ -508,6 +610,12 @@ $(document).ready(function () {
 		let cb = $('#cb-raw');
 		cb.click();
 	});
+
+	//`.click()` on the checkbox is what the backdrop already uses: it flips the
+	//box, fires the change handler and writes the cookie, so closing from the
+	//header behaves identically to closing from anywhere else.
+	$('#raw-close').click(() => $('#cb-raw').click());
+	$('#raw-clear').click(() => { raw.length = 0; renderLog(); });
 });
 
 
@@ -583,10 +691,10 @@ function unlock() {
 	wakeLock.release().then(() => { wakeLock = null; });
 }
 
-const push = document.getElementById('push')
-push.addEventListener("click", async () => {
-	await fetch('/push');
-	alert('Push sent')
-});
+// const push = document.getElementById('push')
+// push.addEventListener("click", async () => {
+// 	await fetch('/push');
+// 	alert('Push sent')
+// });
 
 connect();

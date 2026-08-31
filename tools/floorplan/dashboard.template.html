@@ -32,11 +32,19 @@
   </head>
   <body>
     <div class="removed" id="install">Install application</div>
-    <div id="subscribe">Subscribe</div>
-    <div id="push">Push</div>
+    <!-- <div id="subscribe">Subscribe</div>
+    <div id="push">Push</div> -->
     <div class="removed" id="popup"></div>
     <div class="raw-common removed" id="raw-bg"></div>
-    <div class="raw-common removed" id="raw"></div>
+    <div class="raw-common removed" id="raw">
+      <div id="raw-head">
+        <span id="raw-title">Meddelanden</span>
+        <span id="raw-count"></span>
+        <button id="raw-clear" type="button">Rensa</button>
+        <button id="raw-close" type="button">St&auml;ng</button>
+      </div>
+      <div id="raw-body"></div>
+    </div>
     <div id="settings">
       <label><input id="cb-settings" type="checkbox" /><i class="fas fa-cog fa-2x"></i></label>
       <div id="menu">
