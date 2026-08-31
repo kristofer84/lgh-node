@@ -338,24 +338,51 @@ for (const zone of Object.keys(geo.rooms)) {
 	//by updateArea(). They are not descendants of the <g class="room">, so CSS
 	//cannot reach them from the room -- this group is what gives style.css a
 	//handle on "every lamp in a room that is fully on".
-	lightLayer.push(`          <g id="lights-${zone}" class="zone-lights" clip-path="url(#${zone}-clip)">`);
+	//⚠ TWO groups per zone, glows first, symbols second. SVG has no z-index --
+	//paint order is document order -- so while each lamp emitted its own glow
+	//immediately followed by its own symbol, a later lamp's glow (r up to 60)
+	//painted straight over an earlier lamp's symbol (r 6) and the dot vanished
+	//under its neighbour. Every glow in the room is laid down before any symbol
+	//is, so no symbol can be covered by a glow. Cross-room bleed cannot happen:
+	//both groups are clipped to the room.
+	//Both carry `class="zone-lights"` and both are given the room's `light` by
+	//updateArea(); both item wrappers are given `state` by updateItem(). The CSS
+	//is written as descendant selectors from those attributes, so it does not
+	//care which of the two layers an element ended up in.
+	const placed = shown.map((l, i) => ({ l, p: placement(zone, l.device, i, shown.length) })).filter(x => x.p);
+
+	lightLayer.push(`          <g id="glows-${zone}" class="zone-lights" clip-path="url(#${zone}-clip)">`);
+	//Furniture stays with the glows and ahead of them: it is what a glow spills
+	//out from under, so it has to be painted below the glow, not above it.
 	for (const l of shown) {
 		const p = lights[zone]?.[l.device];
 		if (p?.under && p.run && geo.runs?.[p.run]) {
 			lightLayer.push(`            <polygon class="furniture" points="${poly(geo.runs[p.run])}" pointer-events="none" />`);
 		}
 	}
-	shown.forEach((l, i) => {
-		const p = placement(zone, l.device, i, shown.length);
-		if (!p) return;
+	for (const { l, p } of placed) {
+		lightLayer.push(`            <g class="item-glow" id="glow-${l.device}">`);
+		for (const q of positionsOf(p)) {
+			const spill = p.under && p.run && geo.runs?.[p.run] ? ` clip-path="url(#${l.device}-spill)"` : '';
+			lightLayer.push(`              <circle class="${['glow', l.tier].filter(Boolean).join(' ')}" cx="${tx(q.cx)}" cy="${ty(q.cy)}" r="${p.r}" fill="url(#pf)"${spill} pointer-events="none" />`);
+		}
+		lightLayer.push(`            </g>`);
+	}
+	lightLayer.push(`          </g>`);
+
+	lightLayer.push(`          <g id="lights-${zone}" class="zone-lights" clip-path="url(#${zone}-clip)">`);
+	for (const { l, p } of placed) {
+		//`symbol: false` AND `tap: false` together leave nothing for this layer to
+		//hold -- the lamp is glow-only. Skip the wrapper rather than emit an empty
+		//one: the glow group carries `state` for it, and every lookup of the
+		//symbol group is optional-chained.
+		if (p.symbol === false && p.tap === false) continue;
 		//The click target is the small symbol, NOT the glow. While one circle did
 		//both, a lamp's hit area was its whole radial gradient (r up to 60), so
 		//clicking anywhere in vardagsrum hit whichever lamp happened to be on
 		//top, and the room itself was almost unclickable.
 		lightLayer.push(`            <g class="item" id="${l.device}">`);
 		for (const q of positionsOf(p)) {
-			const spill = p.under && p.run && geo.runs?.[p.run] ? ` clip-path="url(#${l.device}-spill)"` : '';
-			lightLayer.push(`              <circle class="${['glow', l.tier].filter(Boolean).join(' ')}" cx="${tx(q.cx)}" cy="${ty(q.cy)}" r="${p.r}" fill="url(#pf)"${spill} pointer-events="none" />`);
 			//A run of strip lighting reads better as its glow alone; a row of
 			//rings along a counter just looks like a row of holes. `symbol: false`
 			//in lights.json drops the ring but keeps the glow and the tap area.
@@ -373,7 +400,7 @@ for (const zone of Object.keys(geo.rooms)) {
 			}
 		}
 		lightLayer.push(`            </g>`);
-	});
+	}
 	lightLayer.push(`          </g>`);
 }
 lightLayer.push(`        </g>`);

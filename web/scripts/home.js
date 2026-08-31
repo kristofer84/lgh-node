@@ -400,10 +400,7 @@ function updateView() {
 		//and that told it nothing once the light symbols became always-visible.
 		//It also means a symbol shows whether its own lamp is on, rather than
 		//only reflecting the room's mood/night tier.
-		lights.forEach(light => {
-			let el = document.getElementById(light);
-			if (el) el.setAttribute("state", model[zone][light].onoff ? "on" : "off");
-		});
+		lights.forEach(light => setItemState(light, model[zone][light].onoff ? "on" : "off"));
 
 		let th = Object.keys(model[zone]).filter(th => !model[zone][th].hasOwnProperty('onoff'));
 		let entities = {};
@@ -464,11 +461,31 @@ function updateArea(element, value) {
 	//say anything about "the lamps of a room in state X" -- it is what lets the
 	//`on` step drop the individual glows. Doing it here rather than in
 	//updateView() means the optimistic update on a room press gets it too.
-	if (element?.id) document.getElementById("lights-" + element.id)?.setAttribute("light", value);
+	if (element?.id) {
+		document.getElementById("lights-" + element.id)?.setAttribute("light", value);
+		document.getElementById("glows-" + element.id)?.setAttribute("light", value);
+	}
 }
 
+//A lamp is TWO elements now: its glow in the zone's `glows-` layer and its
+//symbol in the `lights-` layer, so that no glow can be painted over a
+//neighbour's symbol. Both wrappers carry `state`, because the CSS reaches the
+//glow and the point through the same [state=...] descendant selectors.
 function updateItem(element, value) {
 	element?.setAttribute("state", value);
+	if (element?.id) document.getElementById("glow-" + element.id)?.setAttribute("state", value);
+}
+
+/** @param {string} id @param {string} value */
+function setItemState(id, value) {
+	document.getElementById(id)?.setAttribute("state", value);
+	document.getElementById("glow-" + id)?.setAttribute("state", value);
+}
+
+/** @param {string} id */
+function clearItemState(id) {
+	document.getElementById(id)?.removeAttribute("state");
+	document.getElementById("glow-" + id)?.removeAttribute("state");
 }
 
 // END Update model and view
@@ -484,7 +501,7 @@ $(document).ready(function () {
 		//longer descendants of the room group and $(ar).find() no longer reaches
 		//them. Clear this zone's lamps by name instead, so the room-level render
 		//takes over until the server echoes the change back.
-		Object.keys(model[name] ?? {}).forEach(d => document.getElementById(d)?.removeAttribute('state'));
+		Object.keys(model[name] ?? {}).forEach(clearItemState);
 
 		var item = {
 			type: 'room',

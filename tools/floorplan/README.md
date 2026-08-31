@@ -236,3 +236,36 @@ Each lamp is emitted as a group, and the three circles have distinct jobs:
 - The old white `.name-blocker` rects behind each readout are gone. They existed to mask
   room names printed into the background *photo*; the plan is line-art, so there is
   nothing to mask and the readouts sit directly on the drawing.
+
+## ⚠ Two layers per zone: glows below, symbols above
+
+SVG has no `z-index` — paint order is document order. Each lamp used to emit its
+glow immediately followed by its own symbol, so a later lamp's glow (r up to 60)
+painted straight over an earlier lamp's symbol (r 6) and the dot disappeared
+under its neighbour. Fixed 2026-08-31 by emitting **two sibling groups per
+zone**:
+
+    <g id="glows-<zone>"  class="zone-lights" clip-path=...>   furniture, then every glow
+    <g id="lights-<zone>" class="zone-lights" clip-path=...>   every symbol + hit target
+
+Every glow in a room is laid down before any symbol in it, so no symbol can be
+covered. Cross-room bleed was never possible — both groups are clipped to the
+room.
+
+Things that follow from this, and will break if changed carelessly:
+
+- **Furniture stays in the glows group, ahead of the glows.** It is what a glow
+  spills out from under (`under` + `run` in `lights.json`), so it must be painted
+  *below* the glow. Moving it to the symbol layer would cover the glow entirely.
+- **Both groups carry `class="zone-lights"` and both get the room's `light`
+  attribute** from `updateArea()` in `web/scripts/home.js`. `.zone-lights[light="on"] .glow`
+  is what drops the individual glows at the `on` step; it needs the attribute on
+  whichever group holds the glow.
+- **Both per-lamp wrappers carry `state`**, set by `updateItem()` / `setItemState()`
+  and removed by `clearItemState()`. The CSS reaches the glow and the point through
+  the same `[state="on"]` descendant selectors, so it does not care which layer an
+  element is in — but a lamp whose glow group missed the attribute would stop
+  lighting up.
+- **A lamp with `symbol: false` AND `tap: false` gets no entry in the symbol
+  layer at all** — there would be nothing in it. Its glow group holds its `state`,
+  and every lookup of the symbol group is optional-chained.
