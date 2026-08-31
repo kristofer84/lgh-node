@@ -325,5 +325,21 @@
    "symbol": false,
    "tap": false
   }
+ },
+ "klk2": {
+  "klk2_spegel": {
+   "cx": 111.0,
+   "cy": 240.5,
+   "r": 14,
+   "symbol": false,
+   "tap": false
+  },
+  "klk2_belysning": {
+   "cx": 105.0,
+   "cy": 250.5,
+   "r": 17,
+   "symbol": false,
+   "tap": false
+  }
  }
 }
