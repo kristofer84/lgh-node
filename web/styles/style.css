@@ -448,14 +448,16 @@ body.nightmode .furniture {
 
 /* The light symbol. Always visible -- it is both the thing you tap and the
    marker for where the lamp is -- and it fills in when that lamp is on. */
-/* ⚠ An unlit symbol must not punch a hole in a neighbour's glow. Its fill is
-   therefore barely-there and the same hue as the page, never a contrasting one:
-   the ring is what marks the lamp, the disc is not. At the old values -- white
-   0.55 here, black 0.35 in nightmode -- a dark lamp standing inside a lit lamp's
-   wash read as a blob of shadow rather than an off switch. */
+/* ⚠ An unlit symbol punches an OPAQUE hole in whatever is under it -- that is
+   the intent, so an off lamp still reads as off inside a lit neighbour's wash.
+   It only works if the fill is fully opaque AND the page colour: at
+   fill-opacity 0.55 the glow came through the disc and tinted it amber, so a
+   dark lamp inside a bright one looked half-lit. If the page background
+   changes, this changes with it. The lit state is the opposite -- solid
+   #ffcc00, below. */
 .point {
-  fill: #fff;
-  fill-opacity: 0.22;
+  fill: #ffffff;
+  fill-opacity: 1;
   stroke: #000;
   stroke-opacity: 0.5;
   stroke-width: 1.2;
@@ -467,9 +469,10 @@ body.nightmode .furniture {
   stroke-opacity: 0.6;
 }
 
+/* #222 is body.nightmode's background, so the hole is the page showing through. */
 body.nightmode .point {
-  fill: #fff;
-  fill-opacity: 0.07;
+  fill: #222222;
+  fill-opacity: 1;
   stroke: #fff;
   stroke-opacity: 0.5;
 }
