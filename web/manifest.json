@@ -1,22 +1,33 @@
 {
+  "id": "/dashboard",
   "name": "Home map",
+  "short_name": "Home map",
+  "description": "Floorplan control for the apartment lights and climate sensors.",
+  "lang": "sv",
+  "dir": "ltr",
+  "start_url": "/dashboard",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#222222",
+  "theme_color": "#222222",
   "icons": [
     {
-      "src": "./code.png",
+      "src": "/icon-192.png",
       "type": "image/png",
       "sizes": "192x192",
       "purpose": "any"
     },
     {
-      "src": "./code.png",
+      "src": "/icon-512.png",
       "type": "image/png",
-      "sizes": "192x192",
+      "sizes": "512x512",
+      "purpose": "any"
+    },
+    {
+      "src": "/icon-maskable-512.png",
+      "type": "image/png",
+      "sizes": "512x512",
       "purpose": "maskable"
     }
-  ],
-  "start_url": "./dashboard",
-  "display": "standalone",
-  "background_color": "#222",
-  "theme_color": "red",
-  "version": "1.4"
+  ]
 }

@@ -258,7 +258,11 @@ async function logMiddleware(req, res, next) {
 }
 
 async function cookieMiddleware(req, res, next) {
-	const bypass = ['/style.css', '/code.png', '/favicon-192.png', '/login', '/sk.jpeg', '/favicon.ico', '/key-msal', '/config.json', '/manifest.json', '/scripts/sw.js', '/scripts/sw-init.js', '/init.js', '/dashboard'];
+	//The three icon-*.png entries are here for the same reason /manifest.json and
+	///favicon-192.png are: the browser fetches a web app manifest and its icons
+	//without credentials when installing or drawing the tab, so an icon behind
+	//the gate is a 401 and the PWA silently falls back to a blank square.
+	const bypass = ['/style.css', '/code.png', '/favicon-192.png', '/icon-192.png', '/icon-512.png', '/icon-maskable-512.png', '/login', '/sk.jpeg', '/favicon.ico', '/key-msal', '/config.json', '/manifest.json', '/scripts/sw.js', '/scripts/sw-init.js', '/init.js', '/dashboard'];
 
 	if (bypass.includes(req.path) || req.path && (req.path.startsWith('/static/') || req.path.startsWith('/public/'))) {
 		return next();
