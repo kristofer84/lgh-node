@@ -781,7 +781,7 @@ Record here rather than rediscovering them:
   `sang_*`, `skapbelysning`, `slinga_mette`, `tvattstuga_bank` — plugs, so table/floor lamps,
   **not** switches; do not read "Fibaro" as one category). `.night` is reserved for the one
   thing you would leave on overnight.
-  Three deliberate exceptions: **`koksbank`, `kok_kokshylla` and `garderob_1_skap` are `.mood`
+  Three deliberate exceptions: **`koksbank`, `kokshylla` and `garderob_1_skap` are `.mood`
   even though they are FGD-212** — counter, shelf and wardrobe accent strips, not the main
   light; and the two **wardrobe lights in `sov2`/`sov3` stay untiered** — task lights inside a
   closed closet have no business in a mood scene, and since 2026-08-27 they are visible and
