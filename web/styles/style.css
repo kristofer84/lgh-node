@@ -159,6 +159,16 @@ body.nightmode input[type="checkbox"]:checked ~ i {
   position: fixed;
   transition: opacity 0.3s ease-out;
   opacity: 0;
+  /* An element at opacity 0 still catches clicks. `.removed` (display:none) is
+     what normally keeps these two out of the way, but there is a window during
+     the fade where neither class is set, so pointer-events is the belt to that
+     brace. */
+  pointer-events: none;
+}
+
+#raw.display,
+#raw-bg.display {
+  pointer-events: auto;
 }
 
 #raw-bg {
@@ -178,8 +188,12 @@ body.nightmode input[type="checkbox"]:checked ~ i {
    hardcoded negative margins. That is unreadable on a desktop and cramped on a
    phone, so it is sized against the viewport now and centred with a transform,
    which needs no magic numbers and stays right if the content changes. */
+/* ⚠ NO `display` on this selector. `.removed` is display:none and it is a CLASS
+   (0-1-0), so an id rule (1-0-0) here silently outranks it and the panel never
+   hides -- invisible at opacity 0, full-size, z-index 600, swallowing every
+   click on the floorplan. Shipped exactly that on 2026-08-31. The layout mode
+   belongs on `#raw.display` below, which only exists while the panel is open. */
 #raw {
-  display: flex;
   flex-direction: column;
   left: 50%;
   top: 50%;
@@ -280,7 +294,13 @@ body.nightmode input[type="checkbox"]:checked ~ i {
 }
 
 #raw.display {
+  display: flex;
   opacity: 1;
+}
+
+/* After #raw.display, so that equal specificity resolves to hidden. */
+#raw.removed {
+  display: none;
 }
 
 /* Raw end */
