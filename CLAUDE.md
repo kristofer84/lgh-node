@@ -151,4 +151,4 @@ records a landmine (a confirmed bug, or a load-bearing discipline).
   it fail. `test/helpers.mjs` explains why they evaluate `mqtt-web.js`'s source text rather
   than importing it. Beyond that, verification still means reading the code and restarting the
   process by hand. **Edits are not live until that restart.**
-- Commit messages end with: `Co-Authored-By: Claude Opus 5 (1M context) <noreply@anthropic.com>`.
+- Commit messages end with a `Co-Authored-By:` trailer naming the model that wrote the change, e.g. `Co-Authored-By: deepseek-v4-pro`. A lot of different models are used here, so name the actual one rather than hardcoding a single model, and leave the email off.
