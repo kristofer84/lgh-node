@@ -11,24 +11,24 @@ if (navigator.serviceWorker) {
 			applicationServerKey,
 		};
 
-		const btn = document.getElementById('subscribe')
-		btn.addEventListener("click", () => {
-			alert('click')
-			registration.pushManager.subscribe(options).then(async (pushSubscription) => {
-				console.log(pushSubscription);
-				await postSubscription(pushSubscription);
-				// The push subscription details needed by the application 
-				// server are now available, and can be sent to it using, for 
-				// example, an XMLHttpRequest.
-			},
-				(error) => {
-					// During development it often helps to log errors to the 
-					// console. In a production environment it might make sense to 
-					// also report information about errors back to the application 
-					// server.
-					console.error(error);
-				});
-		});
+		// const btn = document.getElementById('subscribe')
+		// btn.addEventListener("click", () => {
+		// 	alert('click')
+		// 	registration.pushManager.subscribe(options).then(async (pushSubscription) => {
+		// 		console.log(pushSubscription);
+		// 		await postSubscription(pushSubscription);
+		// 		// The push subscription details needed by the application 
+		// 		// server are now available, and can be sent to it using, for 
+		// 		// example, an XMLHttpRequest.
+		// 	},
+		// 		(error) => {
+		// 			// During development it often helps to log errors to the 
+		// 			// console. In a production environment it might make sense to 
+		// 			// also report information about errors back to the application 
+		// 			// server.
+		// 			console.error(error);
+		// 		});
+		// });
 	},
 		(error) => {
 			console.log(`Service worker registration failed: 
