@@ -305,6 +305,124 @@ body.nightmode input[type="checkbox"]:checked ~ i {
 
 /* Raw end */
 
+/* Dimmer/hold popup -- same overlay mechanics as #raw, but a compact card with
+   up to two sliders. Appears on a hold over a dimmable (or colour) lamp. */
+/* The backdrop sits below the card but above the floorplan, dims the plan and
+   closes the popup when clicked -- the same job #raw-bg does for the log. */
+#dimmer-bg {
+  left: 0;
+  right: 0;
+  top: 0;
+  bottom: 0;
+  z-index: 610;
+  background: black;
+}
+
+#dimmer-bg.display {
+  opacity: 0.5;
+  pointer-events: auto;
+}
+
+#dimmer {
+  flex-direction: column;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: min(90vw, 360px);
+  background: #1b1b1b;
+  color: #e8e8e8;
+  border: 1px solid #454545;
+  border-radius: 8px;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.55);
+  font: 15px/1.5 Roboto, system-ui, sans-serif;
+  z-index: 620;
+  overflow: hidden;
+}
+
+#dimmer-head {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex: 0 0 auto;
+  padding: 0.5rem 0.75rem;
+  background: #262626;
+  border-bottom: 1px solid #454545;
+}
+
+#dimmer-title {
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+#dimmer button {
+  font: inherit;
+  color: #e8e8e8;
+  background: #333;
+  border: 1px solid #555;
+  border-radius: 5px;
+  padding: 0.2rem 0.7rem;
+  cursor: pointer;
+}
+
+#dimmer button:hover {
+  background: #3d3d3d;
+}
+
+#dimmer-body {
+  flex: 1 1 auto;
+  padding: 0.9rem 1rem 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.dimmer-row {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.dimmer-label {
+  color: #9a9a9a;
+  min-width: 5.2rem;
+}
+
+.dimmer-val {
+  color: #ffcc00;
+  font-variant-numeric: tabular-nums;
+  min-width: 3.6rem;
+  text-align: right;
+}
+
+.dimmer-row input[type="range"] {
+  width: 100%;
+  accent-color: #ffcc00;
+  cursor: pointer;
+}
+
+/* A colour row that is hidden (lamp is dim-only) must not leave a gap. */
+.dimmer-row.removed {
+  display: none;
+}
+
+#dimmer.display {
+  display: flex;
+  opacity: 1;
+  pointer-events: auto;
+}
+
+/* After #dimmer.display, so equal specificity resolves to hidden. */
+#dimmer.removed {
+  display: none;
+}
+
+/* Dimmer end */
+
 stop {
   --sc: #ffcc00;
 }

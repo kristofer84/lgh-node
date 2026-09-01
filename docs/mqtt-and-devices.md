@@ -247,7 +247,7 @@ the order the code tests them:
 
 | Condition | Fields |
 |---|---|
-| `d.type === 'light'` **or `'switch'`** | `onoff` (**boolean**, `d.onoff === 'true'`), `dim` (0–255 number or `undefined`, via `brightnessOf()` — HA sends the literal string `"null"` while the lamp is off), `level` (percent from the device string's 4th segment), `night`, `mood` |
+| `d.type === 'light'` **or `'switch'`** | `onoff` (**boolean**, `d.onoff === 'true'`), `dim` (0–255 number or `undefined`, via `brightnessOf()` — HA sends the literal string `"null"` while the lamp is off), `level` (percent from the device string's 4th segment), `night`, `mood`, `steps`, `dimmable`, and — when the lamp reports them — `colorTemp`, `colorMin`, `colorMax` (kelvin, via `kelvinOf()`) |
 | `d.type === 'occupancy'` | *(empty object — `lastChange` alone carries the signal)* |
 | `d.type === 'sensor'` | `state` |
 | has `onoff` | `onoff` (boolean) |
@@ -277,6 +277,8 @@ Iterates `config.zones` (so it reflects **config**, not `devices`) and returns:
     "<device>": {
       // light | switch:
       "onoff": true, "dim": "…", "mood": true|undefined, "night": true|undefined,
+      "dimmable": true|false,
+      "colorTemp": 2403, "colorMin": 2202, "colorMax": 4000,   // color_temp lamps only
       // occupancy:
       "lastChange": 1784407053134,
       // everything else:
@@ -303,6 +305,7 @@ server-side. The handshake is same-origin so the browser sends the cookie by its
 | server → client | `device.all` | **a JSON string** of `getDevice(null)`, pretty-printed with two spaces. Sent once, on connect, by `clientConnected()`. |
 | server → client | `device` | **a JSON string** of `getDevice('<name>')`. Emitted by `queueSend()` on every state change. |
 | client → server | `toggle` | **a JSON string** `{ type: 'room' \| 'item', name, value }`. `type: 'room'` → `toggle(name, value)`; anything else → `toggleItem(name, value)`. |
+| client → server | `set` | **a JSON string** `{ kind: 'dim' \| 'colortemp', name, value }`. From the hold-on-a-lamp popup. `dim` → `publishItemDim(name, value)` (percent, treated as an integer 1–100); `colortemp` → `publishItemColorTemp(name, value)` (kelvin). Both are validated and dropped with a log on malformed input. |
 
 Both server→client payloads are **strings**, not objects — the client does
 `JSON.parse(msg)`. Keep it that way or `web/scripts/home.js` breaks.
@@ -444,6 +447,38 @@ the old trigger pattern (`webapp/switch/+/+/set`) cannot match, and a second aut
 Both live in `/media/storage/ha/homeassistant/automations.yaml` — **outside this repo**. If
 dimming stops working, check that automation exists and is enabled before touching this code.
 
+**White balance follows the same pattern.** The hold-on-a-lamp popup (see §“hold & dimmer”
+below) can also move a `color_temp` lamp's colour, and `publishColorTemp()` writes
+**`webapp/colortemp/<entity>/set`** with a **kelvin** payload (2202–4000 across the flat). This
+needs a third automation, **`(mqtt in) Vitbalans enhet`**, listening on `webapp/colortemp/+/set`
+and calling `light.turn_on` with `color_temp_kelvin` — also in `automations.yaml`, outside this
+repo. The kelvin range is ingested as `min/max_color_temp_kelvin` (raw-only value types) and
+exposed to the client as `colorMin`/`colorMax`/`colorTemp` on the device payload.
+
+The automation to add (paste into `/media/storage/ha/homeassistant/automations.yaml`,
+matching the existing `Dimma enhet` shape):
+
+```yaml
+- id: '1787900000000'
+  alias: (mqtt in) Vitbalans enhet
+  description: >-
+    Sätter vitbalans från webbappen (lgh-node). Eget ämne, precis som Dimma enhet,
+    så det inte krockar med Kontrollera enhet (on/off) eller Dimma enhet (% ljusstyrka).
+    Ämne: webapp/colortemp/<entity_id>/set, payload = kelvin (2202-4000).
+  triggers:
+  - trigger: mqtt
+    topic: webapp/colortemp/+/set
+  conditions: []
+  actions:
+  - action: light.turn_on
+    target:
+      entity_id: '{{ trigger.topic.split(''/'')[-2] }}'
+    data:
+      color_temp_kelvin: '{{ trigger.payload | int }}'
+  mode: queued
+  max: 50
+```
+
 The client picks the next value with `getNextStateRoom()` (`web/scripts/home.js` 324):
 `on → off`, `off → night` (if nightable) else `mood` (if moodable) else `on`,
 `mood → on` (if "max brightness" checked) else `off`, `night → mood` (if moodable) else as mood.
@@ -452,6 +487,23 @@ The client picks the next value with `getNextStateRoom()` (`web/scripts/home.js`
 
 Scans **all** zones for a device whose first segment matches `item`, and publishes to each match
 that is a `light` or `switch`. A device listed in two zones is published to twice.
+
+### Hold & dimmer — per-lamp level and white balance
+
+`web/scripts/home.js` binds a **hold gesture** on each `.item` group (the lamp click targets).
+A clean tap still toggles (`toggleItem` via the `toggle` message); a **500 ms hold without
+moving more than ~12 px** opens `#dimmer`, a small overlay with up to two sliders:
+
+- **Ljusstyrka** — for any `dimmable` lamp, a 1–100 % slider seeded from the lamp's `dim`
+  (0–255 on the wire, shown as percent).
+- **Vitbalans** — only for `color_temp` lamps, a Kelvin slider bounded by the lamp's own
+  `colorMin`/`colorMax` (uniformly 2202–4000 K in this flat).
+
+Dragging either slider debounces 250 ms and emits a `set` message (see the socket table in §7)
+so the last value in a quiet spell wins. The popup markup lives in
+`tools/floorplan/dashboard.template.html` (static, carried into the generated dashboard); its
+styles are in `web/styles/style.css`. Because `home.js` binds clicks with direct jQuery at
+ready, the markup must be static in the generated file — same rule as the room bindings.
 
 ## 8. Where `db/config.json` came from — and what is still guesswork ⚠
 

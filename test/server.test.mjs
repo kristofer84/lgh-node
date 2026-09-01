@@ -11,7 +11,7 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { parseEntry, sceneFor } from '../web/scripts/zones.js';
 
-const boot = body => load(['init', 'brightnessOf', 'dimmableFrom', 'friendlyName', 'shapeOf', 'getDevice', 'toggle'], `init();\n${body}`, { parseEntry, sceneFor });
+const boot = body => load(['init', 'brightnessOf', 'kelvinOf', 'dimmableFrom', 'friendlyName', 'shapeOf', 'getDevice', 'toggle'], `init();\n${body}`, { parseEntry, sceneFor });
 
 test('init() stamps zone, type and tier from the config', () => {
 	const { result } = boot('return { devices, config };');
@@ -46,7 +46,7 @@ test('⚠ init() CLEARS a tier the config no longer declares', () => {
 	//The stale keys include the pre-2026-08-28 names, which is exactly what an
 	//old log/mqtt.log contains.
 	const doctored = { [victim.device]: { mood: true, night: true, level: 99, steps: { night: true }, onoff: 'true' } };
-	const { result } = load(['init', 'brightnessOf', 'dimmableFrom', 'friendlyName', 'shapeOf', 'getDevice', 'toggle'],
+	const { result } = load(['init', 'brightnessOf', 'kelvinOf', 'dimmableFrom', 'friendlyName', 'shapeOf', 'getDevice', 'toggle'],
 		'init(); return devices;',
 		{
 			parseEntry, sceneFor,
@@ -86,7 +86,7 @@ test('⚠ the snapshot and the per-device payload agree', () => {
 test('toggle() publishes what sceneFor says, for every zone and step', () => {
 	for (const step of ['off', 'night', 'mood', 'on']) {
 		const { result, published } = load(
-			['init', 'brightnessOf', 'dimmableFrom', 'friendlyName', 'shapeOf', 'getDevice', 'toggle'],
+			['init', 'brightnessOf', 'kelvinOf', 'dimmableFrom', 'friendlyName', 'shapeOf', 'getDevice', 'toggle'],
 			`init(); const zones = Object.keys(config.zones);
 			 for (const z of zones) toggle(z, ${JSON.stringify(step)});
 			 return config;`,
@@ -98,7 +98,7 @@ test('toggle() publishes what sceneFor says, for every zone and step', () => {
 });
 
 test('toggle() rejects an unknown zone and a missing value without publishing', () => {
-	const { published } = load(['init', 'brightnessOf', 'dimmableFrom', 'friendlyName', 'shapeOf', 'getDevice', 'toggle'],
+	const { published } = load(['init', 'brightnessOf', 'kelvinOf', 'dimmableFrom', 'friendlyName', 'shapeOf', 'getDevice', 'toggle'],
 		`init(); toggle('no_such_zone', 'on'); toggle(Object.keys(config.zones)[0], undefined); return null;`,
 		{ parseEntry, sceneFor });
 	assert.deepEqual(published, []);
@@ -219,13 +219,52 @@ test('brightnessOf survives HA sending the string "null"', () => {
 	assert.deepEqual(result, [178, undefined, undefined, undefined, undefined]);
 });
 
+test('kelvinOf reads colour-temperature attributes as numbers or nothing', () => {
+	const { result } = boot(`return [
+		kelvinOf({color_temp_kelvin:'2403'}, 'color_temp_kelvin'),
+		kelvinOf({color_temp_kelvin:'null'}, 'color_temp_kelvin'),
+		kelvinOf({}, 'color_temp_kelvin'), kelvinOf(undefined, 'color_temp_kelvin'),
+		kelvinOf({color_temp_kelvin:'warm'}, 'color_temp_kelvin')
+	];`);
+	assert.deepEqual(result, [2403, undefined, undefined, undefined, undefined]);
+});
+
+test('color_temp lamps carry colorTemp and its kelvin range in the payload', () => {
+	//The range is what drives the white-balance slider on the dashboard; it must
+	//be a number or absent, never the raw string HA publishes.
+	const { result } = boot(`
+		const name = Object.keys(config.zones).flatMap(z => config.zones[z])
+			.map(parseEntry).find(e => e.type === 'light').device;
+		devices[name].color_temp_kelvin = '2403';
+		devices[name].min_color_temp_kelvin = '2202';
+		devices[name].max_color_temp_kelvin = '4000';
+		const one = getDevice(name);
+		return one[Object.keys(one)[0]][name];`);
+	assert.equal(result.colorTemp, 2403);
+	assert.equal(result.colorMin, 2202);
+	assert.equal(result.colorMax, 4000);
+});
+
+test('a light with no colour data reports none of the colour fields', () => {
+	const { result } = boot(`
+		const name = Object.keys(config.zones).flatMap(z => config.zones[z])
+			.map(parseEntry).find(e => e.type === 'light').device;
+		delete devices[name].color_temp_kelvin;
+		const one = getDevice(name);
+		return one[Object.keys(one)[0]][name];`);
+	assert.equal(result.colorTemp, undefined);
+	assert.equal(result.colorMin, undefined);
+	assert.equal(result.colorMax, undefined);
+});
+
+
 test('⚠ reloadConfig() re-stamps the config without discarding observed state', () => {
 	//The config page saves and then reloads in-process. init() cannot be reused
 	//for that: its first act is to read log/mqtt.log over `devices`, which would
 	//throw away every state MQTT has reported since boot -- the whole model would
 	//blank until each device next published.
 	const { result } = load(
-		['init', 'brightnessOf', 'dimmableFrom', 'friendlyName', 'shapeOf', 'getDevice', 'toggle', 'reloadConfig'],
+		['init', 'brightnessOf', 'kelvinOf', 'dimmableFrom', 'friendlyName', 'shapeOf', 'getDevice', 'toggle', 'reloadConfig'],
 		`init();
 		 const name = Object.keys(config.zones).flatMap(z => config.zones[z])
 			.map(parseEntry).find(e => e.type === 'light').device;

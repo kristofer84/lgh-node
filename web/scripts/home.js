@@ -516,6 +516,9 @@ $(document).ready(function () {
 
 $(document).ready(function () {
 	$(".item").click(e => {
+		//A tap that follows a hold already opened the dimmer popup; suppress the
+		//toggle so the user does not also flip the lamp on release.
+		if (suppressTap) { suppressTap = false; return; }
 		e.stopPropagation();
 		let ar = e.currentTarget;
 		var name = ar.id;
@@ -530,6 +533,176 @@ $(document).ready(function () {
 		updateItem(ar, nextState);
 		queue(item);
 	});
+});
+
+//-------------------------------------------------- hold gesture + dimmer
+//A long press on a dimmable lamp opens a small popup with a brightness slider
+//(and, for color_temp lamps, a white-balance slider) instead of toggling it.
+//The `.hit` circles are the click targets, so listens go on the `.item` group
+//and any pointer that starts inside it. Motion cancels the hold; a clean tap
+//still toggles, because `click` only fires when the pointer did not move.
+const HOLD_MS = 500;
+const HOLD_MOVE = 12; //px of travel before the hold is cancelled
+
+let holdTimer = null;
+let holdTarget = null;      // the <g class="item"> being held
+let holdStart = null;       // {x, y} at pointerdown
+let suppressTap = false;
+
+function clearHold() {
+	if (holdTimer) { clearTimeout(holdTimer); holdTimer = null; }
+	holdTarget = null;
+	holdStart = null;
+}
+
+function bindHold() {
+	//Direct binding, matching $(".room").click -- the generated markup is static.
+	document.querySelectorAll('.item').forEach(el => {
+		el.addEventListener('pointerdown', (/** @type {PointerEvent} */ e) => {
+			holdTarget = el;
+			holdStart = { x: e.clientX, y: e.clientY };
+			holdTimer = setTimeout(() => { holdTimer = null; openDimmer(el.id); }, HOLD_MS);
+		});
+		el.addEventListener('pointermove', (/** @type {PointerEvent} */ e) => {
+			if (!holdStart) return;
+			if (Math.hypot(e.clientX - holdStart.x, e.clientY - holdStart.y) > HOLD_MOVE) {
+				clearHold();
+			}
+		});
+	});
+
+	//End anywhere on the document, so lifting a finger off the lamp (or a
+	//touch being stolen by scrolling) still cleans up the pending timer.
+	document.addEventListener('pointerup', onHoldEnd);
+	document.addEventListener('pointercancel', onHoldEnd);
+}
+
+function onHoldEnd() {
+	//If the popup just opened on this press, swallow the click that follows.
+	if (holdTimer === null && holdTarget && $('#dimmer').hasClass('display')) {
+		suppressTap = true;
+	}
+	clearHold();
+}
+
+//What the model knows about this lamp -- dimmable-ness, current dim %, and the
+//white-balance range. The device id on the floorplan is the model key.
+function lampInfo(id) {
+	for (const zone of Object.keys(model)) {
+		const d = model[zone]?.[id];
+		if (!d) continue;
+		return {
+			zone,
+			dimmable: !!d.dimmable,
+			dim: Number.isFinite(Number(d.dim)) ? Math.round(Number(d.dim) / 255 * 100) : undefined,
+			colorTemp: Number.isFinite(Number(d.colorTemp)) ? Math.round(Number(d.colorTemp)) : undefined,
+			colorMin: Number.isFinite(Number(d.colorMin)) ? Number(d.colorMin) : undefined,
+			colorMax: Number.isFinite(Number(d.colorMax)) ? Number(d.colorMax) : undefined,
+		};
+	}
+	return { dimmable: false };
+}
+
+let dimmerDevice = null;
+let dimmerDimSend = null;
+let dimmerCtSend = null;
+
+function openDimmer(id) {
+	const info = lampInfo(id);
+	//Nothing to adjust -- a binary lamp with no colour range. A hold on it does
+	//nothing (the tap path still toggles on a clean press).
+	const hasColor = info.colorTemp !== undefined
+		|| (info.colorMin !== undefined && info.colorMax !== undefined);
+	if (!info.dimmable && !hasColor) return;
+
+	dimmerDevice = id;
+	holdTarget = document.getElementById(id);
+
+	$('#dimmer-title').textContent = id;
+
+	//Brightness row.
+	const dimRow = $('#dimmer-dim-row');
+	const dim = $('#dimmer-dim');
+	if (info.dimmable) {
+		dimRow.removeClass('removed');
+		dim.val(info.dim ?? 100);
+		updateDimmerDimLabel();
+	} else {
+		dimRow.addClass('removed');
+	}
+
+	//White-balance row. Only for color_temp lamps. The range is uniform across
+	//the flat (2202-4000 K), but read the model's own bounds so it never lies.
+	const ctRow = $('#dimmer-ct-row');
+	const ct = $('#dimmer-ct');
+	if (hasColor) {
+		const mn = info.colorMin ?? 2202;
+		const mx = info.colorMax ?? 4000;
+		ct.attr('min', mn).attr('max', mx);
+		ctRow.removeClass('removed');
+		//Default to the middle (roughly neutral white) until the lamp reports; a
+		//lamp with a live temperature starts from where it actually is.
+		ct.val(info.colorTemp ?? Math.round((mn + mx) / 2));
+		updateDimmerCtLabel();
+	} else {
+		ctRow.addClass('removed');
+	}
+
+	$('#dimmer').removeClass('removed').addClass('display');
+	$('#dimmer-bg').removeClass('removed').addClass('display');
+}
+
+function closeDimmer() {
+	dimmerDevice = null;
+	dimmerDimSend = null;
+	dimmerCtSend = null;
+	$('#dimmer').removeClass('display').addClass('removed');
+	$('#dimmer-bg').removeClass('display').addClass('removed');
+}
+
+function updateDimmerDimLabel() {
+	const v = Number($('#dimmer-dim').val());
+	$('#dimmer-dim-val').textContent = `${v}%`;
+}
+
+function updateDimmerCtLabel() {
+	const v = Math.round(Number($('#dimmer-ct').val()));
+	$('#dimmer-ct-val').textContent = `${v}K`;
+}
+
+//Send a dim % or a colour temperature for the lamp under the popup. Debounced:
+//dragging a slider fires dozens of `input` events, and only the last value in a
+//quiet spell should go out (mirrors how room presses are queued in send()).
+function sendDimmerDim(value) {
+	if (!dimmerDevice) return;
+	clearTimeout(dimmerDimSend);
+	dimmerDimSend = setTimeout(() => {
+		socket.emit('set', JSON.stringify({ kind: 'dim', name: dimmerDevice, value }));
+	}, 250);
+}
+
+function sendDimmerCt(value) {
+	if (!dimmerDevice) return;
+	clearTimeout(dimmerCtSend);
+	dimmerCtSend = setTimeout(() => {
+		socket.emit('set', JSON.stringify({ kind: 'colortemp', name: dimmerDevice, value }));
+	}, 250);
+}
+
+$(document).ready(function () {
+	bindHold();
+
+	$('#dimmer-dim').on('input', function () {
+		updateDimmerDimLabel();
+		sendDimmerDim(Number(this.value));
+	});
+	$('#dimmer-ct').on('input', function () {
+		updateDimmerCtLabel();
+		sendDimmerCt(Number(this.value));
+	});
+	$('#dimmer-close').on('click', closeDimmer);
+	//Clicking the backdrop closes the popup, same as the log panel's #raw-bg.
+	$('#dimmer-bg').on('click', closeDimmer);
 });
 
 

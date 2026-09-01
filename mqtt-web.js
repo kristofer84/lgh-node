@@ -67,6 +67,13 @@ const VALUE_TYPES = {
 	//can take a percentage at all. HA publishes e.g. ["brightness"],
 	//["color_temp"] or ["onoff"]; only the last means not dimmable.
 	supported_color_modes: { derives: false },
+	//White balance. HA publishes the LAMP'S CURRENT colour as `color_temp_kelvin`
+	//(2202..4000 for every Z-Wave/Tradfri bulb here) as a raw string, and its
+	//RANGE as min/max_color_temp_kelvin attributes. Raw-only: a temperature must
+	//never be read as "is it on", which is the exact bug that bit `brightness`.
+	color_temp_kelvin: { derives: false },
+	min_color_temp_kelvin: { derives: false },
+	max_color_temp_kelvin: { derives: false },
 	//Also raw-only: the config page shows it so a row reads "Lampa Mikkel"
 	//rather than `lampa_mikkel`. HA publishes it JSON-quoted.
 	friendly_name: { derives: false },
@@ -718,6 +725,30 @@ function clientConnected(user, client) {
 		}
 	});
 
+	//The hold-on-a-lamp popup: set one lamp's level or white balance, outside
+	//the room's step cycle. `kind` is `dim` (percent 1-100) or `colortemp`
+	//(kelvin). Both are validated here -- a malformed payload must log and drop,
+	//not take the server down or publish garbage to MQTT.
+	client.on('set', data => {
+		let obj;
+		try { obj = JSON.parse(data.toString()); } catch { log(`set: bad JSON`); return; }
+		if (!obj || typeof obj.name !== 'string') { log(`set: missing name`); return; }
+
+		if (obj.kind === 'dim') {
+			const pct = Number(obj.value);
+			if (!Number.isFinite(pct)) { log(`set: bad dim ${obj.value}`); return; }
+			publishItemDim(obj.name, Math.min(100, Math.max(1, Math.round(pct))));
+		}
+		else if (obj.kind === 'colortemp') {
+			const k = Number(obj.value);
+			if (!Number.isFinite(k)) { log(`set: bad colortemp ${obj.value}`); return; }
+			publishItemColorTemp(obj.name, Math.round(k));
+		}
+		else {
+			log(`set: unknown kind ${obj.kind}`);
+		}
+	});
+
 	client.on('disconnect', () => {
 		//connections used to grow for the lifetime of the process
 		connections.delete(client.id);
@@ -767,6 +798,14 @@ function shapeOf(d, meta) {
 			//for as long as the model has existed.
 			ret.dim = brightnessOf(d);
 		}
+		//White balance, for lamps whose colour mode is color_temp. Kelvin is
+		//what the hold-popup slider speaks; mireds are the inverse and not worth
+		//exposing (250..454 maps monotonically to 4000..2202 K).
+		const ct = kelvinOf(d, 'color_temp_kelvin');
+		if (ct !== undefined) ret.colorTemp = ct;
+		const mn = kelvinOf(d, 'min_color_temp_kelvin');
+		const mx = kelvinOf(d, 'max_color_temp_kelvin');
+		if (mn !== undefined && mx !== undefined) { ret.colorMin = mn; ret.colorMax = mx; }
 		return ret;
 	}
 	if (meta.type === 'occupancy') return seen ? { lastChange: d['lastChange'] } : {};
@@ -927,6 +966,15 @@ function brightnessOf(d) {
 	return Number.isFinite(n) ? n : undefined;
 }
 
+//Same shape as brightnessOf: HA publishes these as raw strings, or nothing if
+//the lamp has never reported them. Returns a number or undefined.
+function kelvinOf(d, key) {
+	let raw = d === undefined ? undefined : d[key];
+	if (raw === undefined || raw === null || raw === 'null') return undefined;
+	let n = Number(raw);
+	return Number.isFinite(n) ? n : undefined;
+}
+
 function toggle(zone, value) {
 	if (config.zones[zone] === undefined) {
 		log(`Missing zone: ${zone}`);
@@ -963,11 +1011,43 @@ function toggleItem(item, value) {
 	}));
 }
 
+//The hold-popup's two sliders. Same device->entity sweep as toggleItem, but the
+//action is a dim % or a colour temperature, not on/off.
+function itemEntities(item) {
+	const out = [];
+	Object.values(config.zones).forEach(zone => zone.forEach(entry => {
+		const e = parseEntry(entry);
+		if (e.device !== item) return;
+		if (e.type !== 'light' && e.type !== 'switch') return;
+		out.push(e.entity);
+	}));
+	return out;
+}
+
+function publishItemDim(item, percent) {
+	itemEntities(item).forEach(entity => publishDim(entity, percent));
+}
+
+function publishItemColorTemp(item, kelvin) {
+	itemEntities(item).forEach(entity => publishColorTemp(entity, kelvin));
+}
+
 function publishDim(device, percent) {
 	if (percent === undefined) return;
 	var topic = `webapp/dim/${device}/set`;
 	log(`${topic}: ${percent}`);
 	client.publish(topic, String(percent));
+}
+
+//White balance for a color_temp lamp. Kelvin goes out on its own topic the same
+//way dim does -- the "Kontrollera enhet" automation only turns on/off, so a
+//third topic keeps colour from colliding with either existing path. Needs the
+//HA automation `(mqtt in) Vitbalans enhet` (webapp/colortemp/+/set).
+function publishColorTemp(device, kelvin) {
+	if (kelvin === undefined) return;
+	var topic = `webapp/colortemp/${device}/set`;
+	log(`${topic}: ${kelvin}`);
+	client.publish(topic, String(kelvin));
 }
 
 function publish(device, property, message) {
