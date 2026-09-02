@@ -116,9 +116,9 @@ body.nightmode input[type="checkbox"]:checked ~ i {
   opacity: 0;
   transition: top 1s ease, opacity 0.8s ease;
   position: absolute;
-  width: 230px;
+  width: 200px;
   top: -60px;
-  right: 25px;
+  right: 55px;
 }
 
 #settings.slide #menu {
