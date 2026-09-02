@@ -1099,6 +1099,25 @@ $(document).ready(function () {
 	//header behaves identically to closing from anywhere else.
 	$('#raw-close').click(() => $('#cb-raw').click());
 	$('#raw-clear').click(() => { raw.length = 0; renderLog(); });
+
+	// Fullscreen is a momentary action with no persisted state, so it is a plain
+	// button rather than a checkbox: it asks for fullscreen when not in it and
+	// leaves it otherwise, and mirrors the outcome in the expand/compress glyph.
+	$('#btn-fullscreen').click(() => {
+		if (document.fullscreenElement) {
+			document.exitFullscreen();
+		} else {
+			document.documentElement.requestFullscreen();
+		}
+	});
+	document.addEventListener('fullscreenchange', () => {
+		const icon = $('#btn-fullscreen i');
+		if (document.fullscreenElement) {
+			icon.removeClass('fa-expand').addClass('fa-compress');
+		} else {
+			icon.removeClass('fa-compress').addClass('fa-expand');
+		}
+	});
 });
 
 

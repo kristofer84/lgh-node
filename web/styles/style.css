@@ -102,6 +102,25 @@ body.nightmode input[type="checkbox"]:checked ~ i {
   color: lawngreen;
 }
 
+/* The fullscreen button mirrors the menu's checkbox icons: a bare icon that
+   tints with nightmode, but it is a momentary action, not a persisted state. */
+#btn-fullscreen {
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  font: inherit;
+}
+
+#btn-fullscreen i {
+  color: lightgray;
+  transition: color 0.3s;
+}
+
+body.nightmode #btn-fullscreen i {
+  color: #333;
+}
+
 #settings {
   position: absolute;
   left: 20px;
@@ -962,7 +981,7 @@ body.nightmode [state="on"] .point {
   position: absolute;
   top: 0;
   left: 0;
-  max-height: 95vh;
+  max-height: 92vh;
   width: 100%;
 }
 
