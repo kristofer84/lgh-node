@@ -83,25 +83,32 @@ test('⚠ the snapshot and the per-device payload agree', () => {
 	}
 });
 
-test('toggle() publishes what sceneFor says, for every zone and step', () => {
+test('toggle() publishes the whole room scene as one message, for every zone and step', () => {
 	for (const step of ['off', 'night', 'mood', 'on']) {
-		const { result, published } = load(
+		const { result, published, scenes } = load(
 			['init', 'brightnessOf', 'kelvinOf', 'dimmableFrom', 'friendlyName', 'shapeOf', 'getDevice', 'toggle'],
 			`init(); const zones = Object.keys(config.zones);
 			 for (const z of zones) toggle(z, ${JSON.stringify(step)});
 			 return config;`,
 			{ parseEntry, sceneFor });
-		const want = Object.keys(result.zones).flatMap(z => sceneFor(result.zones[z], step))
-			.map(a => a.level !== undefined ? { entity: a.entity, dim: a.level } : { entity: a.entity, state: a.state });
-		assert.deepEqual(published, want, `step ${step}`);
+		//No per-device publishes any more -- the room goes out as one JSON message.
+		assert.deepEqual(published, [], `step ${step} should not publish per device`);
+		const zones = Object.keys(result.zones);
+		assert.equal(scenes.length, zones.length, `step ${step} should publish one scene per zone`);
+		for (const [i, z] of zones.entries()) {
+			assert.equal(scenes[i].topic, `webapp/scene/${z}/set`);
+			const want = sceneFor(result.zones[z], step);
+			assert.deepEqual(JSON.parse(scenes[i].msg), want, `zone ${z} at ${step}`);
+		}
 	}
 });
 
 test('toggle() rejects an unknown zone and a missing value without publishing', () => {
-	const { published } = load(['init', 'brightnessOf', 'kelvinOf', 'dimmableFrom', 'friendlyName', 'shapeOf', 'getDevice', 'toggle'],
+	const { published, scenes } = load(['init', 'brightnessOf', 'kelvinOf', 'dimmableFrom', 'friendlyName', 'shapeOf', 'getDevice', 'toggle'],
 		`init(); toggle('no_such_zone', 'on'); toggle(Object.keys(config.zones)[0], undefined); return null;`,
 		{ parseEntry, sceneFor });
 	assert.deepEqual(published, []);
+	assert.deepEqual(scenes, []);
 });
 
 test('every zone has steps that differ from one another', () => {

@@ -111,7 +111,7 @@ records a landmine (a confirmed bug, or a load-bearing discipline).
 | Floorplan generator ⚠ | `tools/floorplan/` — `generate.mjs`, `geometry.json`, `lights.json`, `base.svg`, its own `README.md` |
 | Device state persistence ⚠ | `exitHandler` in `mqtt-web.js` → `log/mqtt.log`, **written only on exit** |
 | socket.io wiring + auth bridge | `middlewareTransform` + `io.use(...)` in `mqtt-web.js` (~line 302) |
-| Outbound commands | `publish()` in `mqtt-web.js` → `webapp/switch/<type>.<device>/state/set` |
+| Outbound commands | `publish()` in `mqtt-web.js` → `webapp/switch/<type>.<device>/state/set`; room toggles → one JSON message `webapp/scene/<zone>/set` (HA dispatches, Z-Wave via multicast) |
 | Dashboard page (SVG floorplan) ⚠ | `web/dashboard.html` (**generated**) + `web/scripts/home.js` + `web/styles/style.css` |
 | Landing page | `web/index.html` + `web/script.js` (script.js is fully commented out) |
 | PWA / service worker / web push | `web/manifest.json`, `web/scripts/sw*.js`, `notifications.js`, `subscription.js` |

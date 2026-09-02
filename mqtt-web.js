@@ -1008,11 +1008,13 @@ function toggle(zone, value) {
 	}
 
 	//What the step means lives in web/scripts/zones.js, shared with the client
-	//and the floorplan builder. All this does is put the result on the wire.
-	for (const action of sceneFor(config.zones[zone], value)) {
-		if (action.level !== undefined) publishDim(action.entity, action.level);
-		else publish(action.entity, 'state', action.state);
-	}
+	//and the floorplan builder. The whole room goes out as ONE message, not one
+	//per device: HA deserialises it and dispatches the batch (z-wave devices via
+	//multicast, everything else individually) -- see (mqtt in) Rumsscen.
+	const topic = `webapp/scene/${zone}/set`;
+	const payload = JSON.stringify(sceneFor(config.zones[zone], value));
+	log(`${topic}: ${payload}`);
+	client.publish(topic, payload);
 }
 
 function toggleItem(item, value) {

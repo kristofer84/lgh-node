@@ -55,10 +55,12 @@ export function preamble(src = source()) {
 
 //Build a scope containing the named functions from mqtt-web.js plus the stubs,
 //run `body` in it, and return whatever body returns. `published` collects
-//everything publish()/publishDim() would have sent.
+//everything publish()/publishDim() would have sent (per-device); `scenes`
+//collects the batched room-scene publishes that toggle() now sends.
 export function load(names, body, extra = {}) {
 	const src = source();
 	const published = [];
+	const scenes = [];
 	const scope = {
 		readFileSync: p => readFileSync(join(ROOT, String(p).replace(/^\.\//, ''))),
 		log: () => {},
@@ -66,12 +68,14 @@ export function load(names, body, extra = {}) {
 		writeFileSync: () => {},
 		publish: (entity, prop, msg) => published.push({ entity, [prop]: msg }),
 		publishDim: (entity, level) => published.push({ entity, dim: level }),
+		client: { publish: (topic, msg) => scenes.push({ topic, msg }) },
 		published,
+		scenes,
 		...extra,
 	};
 	const fn = new Function(
 		...Object.keys(scope),
 		`let devices, config;\n${preamble(src)}\n${names.map(n => grab(n, src)).join('\n')}\n${body}`
 	);
-	return { result: fn(...Object.values(scope)), published };
+	return { result: fn(...Object.values(scope)), published, scenes };
 }

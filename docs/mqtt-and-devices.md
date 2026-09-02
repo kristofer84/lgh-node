@@ -128,7 +128,7 @@ arriving after `state` would otherwise reset it to false purely by order).
 
 ## 4. Outbound topic convention
 
-`publish(device, property, message)` (line 695) sends to:
+`publish(device, property, message)` sends to:
 
 ```
 webapp/switch/<type>.<device>/<property>/set
@@ -140,6 +140,12 @@ bridges `webapp/switch/...` back into actual device commands. That bridge is not
 
 `property` is always `'state'` in current code; `message` is `on` / `off`. `publish()` returns
 early if `message` is `undefined`.
+
+A **room** toggle does not go through `publish()` at all. `toggle()` writes one message to
+`webapp/scene/<zone>/set` whose payload is the whole scene as a JSON array of
+`{entity, state}` / `{entity, level}` (the output of `sceneFor()`). Home Assistant's
+`(mqtt in) Rumsscen` automation receives it and hands it to `script.rumsscen`, which splits the
+batch into Z-Wave multicast vs individual calls — see §7.
 
 ## 5. `db/config.json` (gitignored — not in the repo)
 
@@ -413,6 +419,26 @@ Rejects an unknown zone and an `undefined` value with a log line. Then, for ever
   the comment says "Night && mood"), `off` to the rest
 - otherwise → publish `value` verbatim to all of them
 
+⚠⚠ **`toggle()` no longer publishes per device.** It sends the room's whole scene as **one**
+MQTT message to `webapp/scene/<zone>/set`, with the JSON payload of `sceneFor(zone, value)` —
+an array of `{entity, state}` / `{entity, level}`. The per-device loop used to mean N queued HA
+automation runs (one `light.turn_on`/`homeassistant.turn_*` each, acknowledged and serialised
+one at a time); the batch lets HA act on the room in one sweep. Dispatch happens in
+**`script.rumsscen`** (`scripts.yaml`) and the trigger in **`(mqtt in) Rumsscen`**
+(`automations.yaml`), both outside this repo:
+
+- Z-Wave entities (platform `zwave_js`, looked up at runtime via `integration_entities('zwave_js')`,
+  not a hand-list) are sent with **`zwave_js.multicast_set_value`** — one frame reaching many
+  nodes at once. Dimmers (`light.*`) use CC 38 (Multilevel Switch, endpoint 1) grouped by
+  brightness; switches (`switch.*`) use CC 37 (Binary Switch, endpoint 0) grouped by on/off;
+  a dimmer turned off uses CC 32 (Basic, value 0). Multicast is **unacknowledged** and chunked
+  to 4 nodes/frame (see `bel_z_wave_off` for why); a lone remainder falls back to a normal call.
+- Everything else (`mqtt`/`plejd`/`tradfri`/`switch_as_x`) gets a normal acknowledged
+  `light.turn_on`/`homeassistant.turn_*` per device, exactly as before.
+
+The change is deliberately **room-level only**: a single-lamp tap (`toggleItem`) and the
+hold-popup sliders (`dim`/`colortemp`) still publish per device on their old topics.
+
 ⚠⚠ **On a DIMMABLE light, a `true` step does not mean 100 % — it means "restore whatever
 level this lamp was last at".** This is the single most expensive thing in this file to
 rediscover, and it is invisible from the app: the app publishes a plain on, HA calls
@@ -466,16 +492,15 @@ the sun icon) is gone, so `getNextStateRoom()` always goes `mood → on`. Full b
 always reachable from the floorplan.
 
 ⚠ **Brightness leaves on a different topic and needs a second HA automation.**
-`toggle()` itself is now four lines — it asks `sceneFor()` what the step means and puts the
-answer on the wire. `publish()` writes `webapp/switch/<entity>/<property>/set`, which the long-standing HA
-automation **`(mqtt in) Kontrollera enhet`** picks up — and that automation runs
-`homeassistant.turn_{{trigger.payload}}` and **discards the property segment entirely**, so
-that path can only ever carry `on`/`off`. A payload of `70` would call
-`homeassistant.turn_70`. `publishDim()` therefore writes **`webapp/dim/<entity>/set`**, which
-the old trigger pattern (`webapp/switch/+/+/set`) cannot match, and a second automation added
-2026-08-27, **`(mqtt in) Dimma enhet`**, calls `light.turn_on` with `brightness_pct`.
-Both live in `/media/storage/ha/homeassistant/automations.yaml` — **outside this repo**. If
-dimming stops working, check that automation exists and is enabled before touching this code.
+For the per-device paths that remain (`toggleItem`, the hold-popup sliders), `publishDim()`
+writes **`webapp/dim/<entity>/set`**, which the old trigger pattern
+(`webapp/switch/+/+/set`) cannot match, and an automation added 2026-08-27,
+**`(mqtt in) Dimma enhet`**, calls `light.turn_on` with `brightness_pct`. A room toggle, by
+contrast, carries its brightness inside the single `webapp/scene/<zone>/set` JSON payload and
+never touches `webapp/dim/...` — see the ⚠⚠ note above.
+Both automations live in `/media/storage/ha/homeassistant/automations.yaml` — **outside this
+repo**. If dimming stops working, check that automation exists and is enabled before touching
+this code.
 
 **White balance follows the same pattern.** The hold-on-a-lamp popup (see §“hold & dimmer”
 below) can also move a `color_temp` lamp's colour, and `publishColorTemp()` writes
