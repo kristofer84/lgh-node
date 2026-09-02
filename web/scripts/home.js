@@ -271,14 +271,10 @@ window.addEventListener("touchend", touchend, false);
 // START Sending updates
 var toSend = {};
 
-//Queues multiple event for the same zone and sends the last one
+//Queues multiple events for the same zone and sends the last one. Always
+//debounced now: the old "Max brightness" checkbox (#cb-mood) could skip the
+//delay when unchecked, but that toggle is gone and the debounce is unconditional.
 function queue(item) {
-	//Only wait if max is checked
-	if (!$('#cb-mood').is(':checked')) {
-		send(item);
-		return;
-	}
-
 	//Set a new key for every click
 	let key = rand();
 	toSend[item.name] = { "value": item.value, "lastKey": key };
@@ -430,9 +426,9 @@ function getNextStateRoom(element) {
 	return nextStep(element.getAttribute("light"), {
 		moodable: element.getAttribute("moodable"),
 		nightable: element.getAttribute("nightable"),
-		//The "Max brightness" checkbox, the sun icon. Without it a room never
-		//reaches the `on` step.
-		allowMax: $("#cb-mood").is(':checked'),
+		//Full brightness is always reachable now -- the "Max brightness"
+		//checkbox (#cb-mood, the sun icon) is gone.
+		allowMax: true,
 	});
 }
 
@@ -1122,7 +1118,7 @@ $(document).ready(function () {
 		d.setTime(d.getTime() + (365 * 24 * 60 * 60 * 1000)); //seconds
 		let cookie = `${cb.id}=${cb.checked}; expires=${d.toGMTString()};path=/`;
 		document.cookie = cookie;
-		if (cb.id === 'cb-lock' || cb.id === 'cb-mood') {
+		if (cb.id === 'cb-lock') {
 			popup(cb);
 		}
 	});

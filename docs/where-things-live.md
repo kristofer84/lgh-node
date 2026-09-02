@@ -370,13 +370,16 @@ Landmines carried by the new plan (each recorded in full in `tools/floorplan/REA
   `/socket.io/socket.io.js` from the server. `home.js` is `type="module"` but relies on the
   jQuery global — module ordering happens to work because modules are deferred.
 - UI checkbox state persists in **unsigned document cookies** named after the element ids
-  (`cb-lock`, `cb-mood`, `cb-temp`, `cb-devi`, `cb-raw`, `cb-nightmode`), read back on load.
+  (`cb-lock`, `cb-temp`, `cb-devi`, `cb-raw`, `cb-nightmode`), read back on load.
+  (`cb-mood`, "Max brightness", was removed — full-brightness and the send debounce are
+  now unconditional.)
 - Screen wake lock: `lock()`/`unlock()` via `navigator.wakeLock`, tied to window focus/blur.
   Blur also **disconnects the socket**; focus reconnects and re-fetches `/refresh-key`.
 - ⚠ **Two independent timers sit between a tap and the wire, and neither is obvious.**
   `queue()` coalesces taps per zone for **500 ms**, last-click-wins, so cycling
-  `off → night → mood → on` publishes one command rather than three — but **only when
-  `#cb-mood` (the sun, "Max brightness") is ticked**; unticked, every tap sends immediately.
+  `off → night → mood → on` publishes one command rather than three. The debounce is now
+  **unconditional** (it used to skip when `#cb-mood`, the "Max brightness" sun icon, was
+  unticked; that toggle is gone).
   `send()` then holds the optimistic render for **2 s** by dropping `updateViewFlag`, because
   HA echoes each lamp back as it reaches its new level and the room briefly reports the step it
   is *leaving*. Fixed 2026-08-29: that 2 s latch used to be gated on `#cb-lock`, the **screen

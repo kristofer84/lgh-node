@@ -241,10 +241,11 @@ export function stepOf(zoneModel) {
 
 //------------------------------------------------------------- the cycle
 
-//What a press moves the room to. `allowMax` is the "Max brightness" checkbox
-//(#cb-mood, the sun icon): without it a room never reaches the `on` step, which
-//for a room whose lights all carry a level means full brightness is unreachable
-//from the floorplan.
+//What a press moves the room to. `allowMax` is whether the `on` step is
+//reachable. It used to be the "Max brightness" checkbox (#cb-mood, the sun
+//icon); that toggle is gone and home.js always passes true, but the parameter
+//stays so the cycle grammar remains explicit and testable. Without max, a room
+//whose lights all carry a level could never reach full brightness.
 /**
  * @param {string|null} current  the room's present step
  * @param {{moodable?: unknown, nightable?: unknown, allowMax?: unknown}} [opts]

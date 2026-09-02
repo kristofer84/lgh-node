@@ -435,10 +435,9 @@ Used today by `badrum_{1,2,3}_tak`, `entre_1`, `entre_2` and `hall_tvattstuga` �
 Fibaro FGD-212 wall dimmers, all at **20/100** (70 was tried first
 and was far too bright for the step; 20 verified to strike cleanly on the real dimmer —
 `brightness_pct 20` → Z-Wave `currentValue 20` of 99 → HA 52/255, no drop-out).
-⚠ Reaching the 100% step needs the **Max brightness** checkbox (`#cb-mood`, the sun icon):
-`getNextStateRoom()` goes `mood → on` only when it is ticked, otherwise `mood → off`. With it
-off, a room whose lights all carry a level cycles `off → 20% → off` and full brightness is
-unreachable from the floorplan.
+⚠ Reaching the 100% step is now unconditional: the **Max brightness** checkbox (`#cb-mood`,
+the sun icon) is gone, so `getNextStateRoom()` always goes `mood → on`. Full brightness is
+always reachable from the floorplan.
 
 ⚠ **Brightness leaves on a different topic and needs a second HA automation.**
 `toggle()` itself is now four lines — it asks `sceneFor()` what the step means and puts the
