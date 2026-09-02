@@ -578,15 +578,15 @@ to the script.
     data:
       variables:
         scene: '{{ trigger.payload }}'
-        duration: '1s'
+        duration: '4s'
   mode: restart
   max_exceeded: silent
 ```
 
 `mode: restart` means a rapid second press abandons the in-flight scene and starts over — the
 dashboard's step cycle is a toggle, so the last press must win, not queue behind an earlier one.
-`duration` is the Z-Wave dim transition and is overridable here; `1s` reads snappier than the
-`4s` default in the older `(bel) Z-wave` script.
+`duration` is the Z-Wave dim transition and is overridable here; `4s` matches the default in
+the older `(bel) Z-wave` scene script, so a room preset ramps at the same pace as those.
 
 **The script** — `scripts.yaml`, key `rumsscen`. The whole room is partitioned into three
 camps and dispatched in one sweep.
