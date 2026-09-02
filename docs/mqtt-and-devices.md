@@ -554,12 +554,13 @@ lost, and each part is annotated with the landmines that were paid for in blood.
 | `{entity: 'light.*', level: N}` | Z-Wave (`zwave_js`) | CC 38 · endpoint 1 · `targetValue` = `round(N·99/100)`, grouped by `N`, chunked |
 | `{entity: 'light.*', state: 'off'}` | Z-Wave | CC 32 · endpoint 1 · value `0` |
 | `{entity: 'switch.*', state: 'on'\|'off'}` | Z-Wave | CC 37 · endpoint 0 · `true`/`false`, grouped by state, chunked |
-| any | not Z-Wave (`mqtt`·`tradfri`·`plejd`·`switch_as_x`) | `light.turn_on` (with `level`) / `homeassistant.turn_on` / `homeassistant.turn_off` |
+| any | not Z-Wave (`mqtt`·`tradfri`·`plejd`·`switch_as_x`) | `light.turn_on` (with `level` + `transition: secs`) / `homeassistant.turn_on` / `homeassistant.turn_off` |
 
 Invariants an edit must preserve: `scene` is **already a parsed list** (never `from_json` it
 unconditionally); multicast is **unacknowledged** and chunked to `batch(4)` with a 3 s gap; a
 lone remainder (`count ≤ 1`) must fall back to a normal call because `multicast_set_value`
-refuses a single node.
+refuses a single node; the fade (`secs`, derived from `duration`) applies to **both** Z-Wave
+(`transitionDuration`) and non-Z-Wave `light.turn_on` (`transition`), but not to on/off switches.
 
 **The trigger** — `automations.yaml`: one fire-and-forget automation that hands the raw payload
 to the script.
@@ -600,6 +601,7 @@ rumsscen:
     zdim: "{{ items | selectattr('entity', 'in', zwave) | selectattr('entity', 'match', '^light\\.') | list }}"
     zsw: "{{ items | selectattr('entity', 'in', zwave) | selectattr('entity', 'match', '^switch\\.') | list }}"
     other: "{{ items | rejectattr('entity', 'in', zwave) | list }}"
+    secs: "{{ duration | replace('s', '') | float }}"
   sequence:
   # 1. Non-Z-Wave: one acknowledged call per device.
   - repeat:
@@ -610,7 +612,7 @@ rumsscen:
           sequence:
           - action: light.turn_on
             target: {entity_id: "{{ repeat.item.entity }}"}
-            data: {brightness_pct: "{{ repeat.item.level }}"}
+            data: {brightness_pct: "{{ repeat.item.level }}", transition: "{{ secs }}"}
         - conditions: "{{ repeat.item.state == 'on' }}"
           sequence:
           - action: homeassistant.turn_on
@@ -696,6 +698,12 @@ ones most likely to be re-discovered the hard way:
   Binary Switch (**CC 37**, **endpoint 0**, `true`/`false`). Dimmer-off uses **CC 32**
   (Basic, value 0) — the same incantation as the proven `bel_z_wave_off` — rather than
   `targetValue 0`, kept identical to the path already running in production.
+- **The fade must reach non-Z-Wave lights too.** Z-Wave gets the `duration` string straight
+  into `transitionDuration` (which accepts `4s`); ZigBee/Tasmota/Plejd `light.*` entities have
+  no such option and would snap instantly, so `secs` strips the `s` and passes `transition:
+  secs` (a float seconds) to their `light.turn_on`. A bare `brightness_pct` without that is the
+  bug that was paid for when ZigBee lamps ignored the room fade. Switches still fade nothing:
+  on/off has no level to ramp.
 - **The app talks percent; Z-Wave talks 0–99.** `sceneFor()` emits `level` in percent
   (1–100, e.g. `100` for the `on` step). The script maps it with
   `round(level * 99 / 100)` before putting it on the wire (`100 → 99`, `20 → 20`, `10 → 10`),
