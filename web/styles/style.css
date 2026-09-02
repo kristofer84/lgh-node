@@ -658,9 +658,11 @@ body.nightmode input[type="checkbox"]:checked ~ i {
 }
 
 #room-config-grid input[type="checkbox"] {
+  display: inline-block;
   width: 1rem;
   height: 1rem;
   cursor: pointer;
+  accent-color: #ffcc00;
 }
 
 #room-config-grid input[type="number"] {
