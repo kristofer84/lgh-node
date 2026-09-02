@@ -493,6 +493,9 @@ function clearItemState(id) {
 // START Buttons
 $(document).ready(function () {
 	$(".room").click(e => {
+		//A tap that follows a hold already opened the preset menu; suppress the
+		//cycle so the user does not also advance the room on release.
+		if (suppressTap) { suppressTap = false; return; }
 		let ar = e.currentTarget;
 		var name = ar.id;
 		let nextState = getNextStateRoom(ar);
@@ -541,27 +544,31 @@ $(document).ready(function () {
 //The `.hit` circles are the click targets, so listens go on the `.item` group
 //and any pointer that starts inside it. Motion cancels the hold; a clean tap
 //still toggles, because `click` only fires when the pointer did not move.
+//A long press on a room does the same but opens the preset menu instead.
 const HOLD_MS = 500;
 const HOLD_MOVE = 12; //px of travel before the hold is cancelled
 
 let holdTimer = null;
-let holdTarget = null;      // the <g class="item"> being held
 let holdStart = null;       // {x, y} at pointerdown
+let holdOpened = false;     // the hold already opened a popup on this press
 let suppressTap = false;
 
 function clearHold() {
 	if (holdTimer) { clearTimeout(holdTimer); holdTimer = null; }
-	holdTarget = null;
 	holdStart = null;
+	holdOpened = false;
 }
 
-function bindHold() {
-	//Direct binding, matching $(".room").click -- the generated markup is static.
-	document.querySelectorAll('.item').forEach(el => {
+//A hold fires on `pointerup` for the element it started on; `open` must return
+//a truthy value when it actually opened a popup so the release does not also click.
+function holdFor(selector, open) {
+	document.querySelectorAll(selector).forEach(el => {
 		el.addEventListener('pointerdown', (/** @type {PointerEvent} */ e) => {
-			holdTarget = el;
 			holdStart = { x: e.clientX, y: e.clientY };
-			holdTimer = setTimeout(() => { holdTimer = null; openDimmer(el.id); }, HOLD_MS);
+			holdTimer = setTimeout(() => {
+				holdTimer = null;
+				if (open(el.id) !== undefined) holdOpened = true;
+			}, HOLD_MS);
 		});
 		el.addEventListener('pointermove', (/** @type {PointerEvent} */ e) => {
 			if (!holdStart) return;
@@ -570,6 +577,12 @@ function bindHold() {
 			}
 		});
 	});
+}
+
+function bindHold() {
+	//Direct binding, matching $(".room").click -- the generated markup is static.
+	holdFor('.item', openDimmer);
+	holdFor('.room', openRoomMenu);
 
 	//End anywhere on the document, so lifting a finger off the lamp (or a
 	//touch being stolen by scrolling) still cleans up the pending timer.
@@ -578,8 +591,9 @@ function bindHold() {
 }
 
 function onHoldEnd() {
-	//If the popup just opened on this press, swallow the click that follows.
-	if (holdTimer === null && holdTarget && $('#dimmer').hasClass('display')) {
+	//If a hold opened a popup on this press, swallow the click that follows so
+	//the release does not also toggle/cycle the lamp or room.
+	if (holdOpened) {
 		suppressTap = true;
 	}
 	clearHold();
@@ -613,10 +627,9 @@ function openDimmer(id) {
 	//nothing (the tap path still toggles on a clean press).
 	const hasColor = info.colorTemp !== undefined
 		|| (info.colorMin !== undefined && info.colorMax !== undefined);
-	if (!info.dimmable && !hasColor) return;
+	if (!info.dimmable && !hasColor) return false;
 
 	dimmerDevice = id;
-	holdTarget = document.getElementById(id);
 
 	$('#dimmer-title').textContent = id;
 
@@ -648,16 +661,28 @@ function openDimmer(id) {
 		ctRow.addClass('removed');
 	}
 
-	$('#dimmer').removeClass('removed').addClass('display');
-	$('#dimmer-bg').removeClass('removed').addClass('display');
+	//Two-phase, like #raw: remove `removed` first so the element paints at
+	//opacity 0, then add `display` on the next tick so opacity animates to 1.
+	$('#dimmer').removeClass('removed');
+	$('#dimmer-bg').removeClass('removed');
+	setTimeout(() => {
+		$('#dimmer').addClass('display');
+		$('#dimmer-bg').addClass('display');
+	}, 20);
+	return true;
 }
 
 function closeDimmer() {
 	dimmerDevice = null;
 	dimmerDimSend = null;
 	dimmerCtSend = null;
-	$('#dimmer').removeClass('display').addClass('removed');
-	$('#dimmer-bg').removeClass('display').addClass('removed');
+	//Drop `display` so opacity fades back to 0 (0.3s), then hide for real.
+	$('#dimmer').removeClass('display');
+	$('#dimmer-bg').removeClass('display');
+	setTimeout(() => {
+		$('#dimmer').addClass('removed');
+		$('#dimmer-bg').addClass('removed');
+	}, 350);
 }
 
 function updateDimmerDimLabel() {
@@ -689,6 +714,260 @@ function sendDimmerCt(value) {
 	}, 250);
 }
 
+//-------------------------------------------------- room preset menu
+//A long press on a room opens labelled preset buttons (one per available step)
+//instead of cycling through them one tap at a time. Each button sends the same
+//`toggle` message a normal room press sends, only with the chosen step value.
+const ROOM_PRESETS = [
+	{ key: 'off', label: 'Av' },
+	{ key: 'night', label: 'Natt' },
+	{ key: 'mood', label: 'Dämpat' },
+	{ key: 'on', label: 'På' },
+];
+
+let roomMenuZone = null;
+
+//A step is offered when the room's lamps can do it. `night`/`mood` are read off
+//the room group's attributes (set by updateView from stepOf), `off` and `on`
+//are always offered.
+function roomAvailableSteps(roomEl) {
+	const out = ['off', 'on'];
+	if (roomEl.hasAttribute('nightable')) out.push('night');
+	if (roomEl.hasAttribute('moodable')) out.push('mood');
+	return out;
+}
+
+function openRoomMenu(id) {
+	const roomEl = document.getElementById(id);
+	if (!roomEl) return false;
+
+	const steps = roomAvailableSteps(roomEl);
+	if (steps.length <= 1) return false;
+
+	//Current step, for highlighting the active preset.
+	const current = roomEl.getAttribute('light') ?? 'off';
+
+	roomMenuZone = id;
+	$('#room-menu-title').textContent = id;
+
+	//Build the buttons in cycle order: off, night, mood, on.
+	const body = $('#room-menu-body');
+	body.empty();
+	ROOM_PRESETS.forEach((/** @type {{key: string, label: string}} */ p) => {
+		if (!steps.includes(p.key)) return;
+		const btn = $('<button>', {
+			type: 'button',
+			class: 'room-preset' + (p.key === current ? ' current' : ''),
+			text: p.label,
+		});
+		btn.on('click', () => {
+			sendRoomStep(p.key);
+			closeRoomMenu();
+		});
+		body.append(btn);
+	});
+
+	//Two-phase, same as #dimmer/#raw, so opacity fades in.
+	$('#room-menu').removeClass('removed');
+	$('#room-menu-bg').removeClass('removed');
+	setTimeout(() => {
+		$('#room-menu').addClass('display');
+		$('#room-menu-bg').addClass('display');
+	}, 20);
+	return true;
+}
+
+function closeRoomMenu() {
+	roomMenuZone = null;
+	$('#room-menu').removeClass('display');
+	$('#room-menu-bg').removeClass('display');
+	setTimeout(() => {
+		$('#room-menu').addClass('removed');
+		$('#room-menu-bg').addClass('removed');
+	}, 350);
+}
+
+function sendRoomStep(step) {
+	if (!roomMenuZone) return;
+	const roomEl = document.getElementById(roomMenuZone);
+	if (!roomEl) return;
+
+	//Same optimistic render a normal room press does: clear the zone's lamps by
+	//name and mark the area, then queue the toggle for the server.
+	Object.keys(model[roomMenuZone] ?? {}).forEach(clearItemState);
+	updateArea(roomEl, step);
+
+	queue({
+		type: 'room',
+		name: roomMenuZone,
+		value: step,
+	});
+}
+
+//------------------------------------------ room light-settings editor
+//The per-room step table that used to live on config.html. Opened from the
+//room-menu's config symbol; edits `steps` and nothing else, then saves through
+//the same GET/POST /config/zones endpoint config.html used.
+const CONFIG_STEPS = [
+	{ key: 'night', label: 'Natt' },
+	{ key: 'mood', label: 'Dämpat' },
+	{ key: 'on', label: 'På' },
+];
+
+let roomConfigZone = null;
+let roomConfigDirty = {};   // {device: steps}
+
+function cfg$ (id) { return document.getElementById(id); }
+function cfgBtn(id) { return /** @type {HTMLButtonElement} */ (document.getElementById(id)); }
+function cfgField(root, sel) { return /** @type {HTMLInputElement | null} */ (root.querySelector(sel)); }
+
+function cfgSetStatus(text, kind) {
+	const el = cfg$('room-config-status');
+	el.textContent = text ?? '';
+	el.className = kind ?? '';
+}
+
+function cfgClampPct(v) {
+	const n = Math.round(Number(v));
+	if (!Number.isFinite(n)) return 100;
+	return Math.min(100, Math.max(1, n));
+}
+
+//A tick means: on. For a dimmable device that is a percentage -- always a
+//number, never `true`, as a plain turn_on would restore the last dim level.
+function cfgReadRow(tr) {
+	const steps = {};
+	for (const { key } of CONFIG_STEPS) {
+		const box = cfgField(tr, `input[type=checkbox][data-step="${key}"]`);
+		if (!box?.checked) continue;
+		const pct = cfgField(tr, `input[type=number][data-step="${key}"]`);
+		steps[key] = pct ? cfgClampPct(pct.value) : true;
+	}
+	return steps;
+}
+
+function cfgMarkDirty(device, tr) {
+	roomConfigDirty[device] = cfgReadRow(tr);
+	cfgBtn('room-config-save').disabled = false;
+	cfgSetStatus('Osparade ändringar', 'warn');
+}
+
+function cfgBuildRow(row) {
+	const tr = document.createElement('tr');
+
+	const name = document.createElement('td');
+	name.className = 'light';
+	name.textContent = row.name ?? row.device;
+	const id = document.createElement('span');
+	id.className = 'id';
+	id.textContent = `${row.type}.${row.device}`;
+	name.append(id);
+	tr.append(name);
+
+	for (const { key } of CONFIG_STEPS) {
+		const td = document.createElement('td');
+		const value = row.steps?.[key];
+
+		const box = document.createElement('input');
+		box.type = 'checkbox';
+		box.dataset.step = key;
+		box.checked = value !== undefined;
+		box.setAttribute('aria-label', `${row.name ?? row.device} ${key}`);
+		td.append(box);
+
+		if (row.dimmable) {
+			const pct = document.createElement('input');
+			pct.type = 'number';
+			pct.dataset.step = key;
+			pct.min = '1';
+			pct.max = '100';
+			pct.step = '1';
+			pct.value = String(typeof value === 'number' ? value : 100);
+			pct.disabled = !box.checked;
+			pct.setAttribute('aria-label', `${row.name ?? row.device} ${key} procent`);
+			pct.addEventListener('change', () => {
+				pct.value = String(cfgClampPct(pct.value));
+				cfgMarkDirty(row.device, tr);
+			});
+			td.append(pct, Object.assign(document.createElement('span'), { className: 'pct', textContent: '%' }));
+			box.addEventListener('change', () => { pct.disabled = !box.checked; });
+		}
+
+		box.addEventListener('change', () => cfgMarkDirty(row.device, tr));
+		tr.append(td);
+	}
+
+	return tr;
+}
+
+async function cfgLoad(zone) {
+	cfg$('room-config-rows').textContent = '';
+
+	const res = await fetch('/config/zones');
+	if (!res.ok) {
+		cfgSetStatus(res.status === 401
+			? 'Inte inloggad — öppna planritningen först.'
+			: `Kunde inte hämta inställningar (HTTP ${res.status}).`, 'error');
+		return;
+	}
+	const zones = await res.json();
+	const rows = zones[zone] ?? [];
+	for (const row of rows) cfg$('room-config-rows').append(cfgBuildRow(row));
+}
+
+function openRoomConfig(zone) {
+	roomConfigZone = zone;
+	roomConfigDirty = {};
+	cfg$('room-config-title').textContent = zone;
+	cfgBtn('room-config-save').disabled = true;
+	cfgSetStatus('');
+
+	//Close the preset menu behind it and fade the editor in.
+	closeRoomMenu();
+	$('#room-config').removeClass('removed');
+	$('#room-config-bg').removeClass('removed');
+	setTimeout(() => {
+		$('#room-config').addClass('display');
+		$('#room-config-bg').addClass('display');
+	}, 20);
+
+	cfgLoad(zone);
+}
+
+function closeRoomConfig() {
+	roomConfigZone = null;
+	roomConfigDirty = {};
+	$('#room-config').removeClass('display');
+	$('#room-config-bg').removeClass('display');
+	setTimeout(() => {
+		$('#room-config').addClass('removed');
+		$('#room-config-bg').addClass('removed');
+	}, 350);
+}
+
+async function cfgSave() {
+	if (!Object.keys(roomConfigDirty).length || !roomConfigZone) return;
+	cfgBtn('room-config-save').disabled = true;
+	cfgSetStatus('Sparar…');
+	try {
+		const body = { [roomConfigZone]: roomConfigDirty };
+		const res = await fetch('/config/zones', {
+			method: 'POST',
+			headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify(body),
+		});
+		const data = await res.json().catch(() => ({}));
+		if (!res.ok) throw new Error(data.error ?? `HTTP ${res.status}`);
+
+		roomConfigDirty = {};
+		await cfgLoad(roomConfigZone);
+		cfgSetStatus(`Sparat (${data.changed?.length ?? 0} lampor)`, 'ok');
+	} catch (err) {
+		cfgSetStatus(`Kunde inte spara: ${err.message}`, 'error');
+		cfgBtn('room-config-save').disabled = false;
+	}
+}
+
 $(document).ready(function () {
 	bindHold();
 
@@ -703,6 +982,16 @@ $(document).ready(function () {
 	$('#dimmer-close').on('click', closeDimmer);
 	//Clicking the backdrop closes the popup, same as the log panel's #raw-bg.
 	$('#dimmer-bg').on('click', closeDimmer);
+
+	$('#room-menu-close').on('click', closeRoomMenu);
+	$('#room-menu-bg').on('click', closeRoomMenu);
+	$('#room-menu-config').on('click', () => {
+		if (roomMenuZone) openRoomConfig(roomMenuZone);
+	});
+
+	$('#room-config-close').on('click', closeRoomConfig);
+	$('#room-config-bg').on('click', closeRoomConfig);
+	$('#room-config-save').on('click', cfgSave);
 });
 
 

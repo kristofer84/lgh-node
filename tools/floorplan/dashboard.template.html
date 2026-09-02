@@ -46,6 +46,43 @@
       <div id="raw-body"></div>
     </div>
     <div class="raw-common removed" id="dimmer-bg"></div>
+    <div class="raw-common removed" id="room-menu-bg"></div>
+    <div class="raw-common removed" id="room-menu">
+      <div id="room-menu-head">
+        <span id="room-menu-title"></span>
+        <button id="room-menu-config" type="button" title="Ljusinställningar"><i class="fas fa-sliders-h"></i></button>
+        <button id="room-menu-close" type="button">St&auml;ng</button>
+      </div>
+      <div id="room-menu-body"></div>
+    </div>
+    <div class="raw-common removed" id="room-config-bg"></div>
+    <div class="raw-common removed" id="room-config">
+      <div id="room-config-head">
+        <span id="room-config-title"></span>
+        <button id="room-config-close" type="button">St&auml;ng</button>
+      </div>
+      <div id="room-config-body">
+        <table id="room-config-grid">
+          <thead>
+            <tr>
+              <th class="light">Lampa</th>
+              <th>Natt</th>
+              <th>Dämpat</th>
+              <th>På</th>
+            </tr>
+          </thead>
+          <tbody id="room-config-rows"></tbody>
+        </table>
+        <p class="hint">
+          En bock tänder lampan i det läget. För dimbara lampor anger procenten hur
+          mycket. Omarkerad betyder släckt i det läget — <em>av</em> släcker alltid allt.
+        </p>
+      </div>
+      <div id="room-config-foot">
+        <button id="room-config-save" type="button" disabled>Spara</button>
+        <span id="room-config-status" role="status"></span>
+      </div>
+    </div>
     <div class="raw-common removed" id="dimmer">
       <div id="dimmer-head">
         <span id="dimmer-title"></span>
@@ -74,7 +111,6 @@
         <!--			<label><input id="cb-energy" name="Show power usage" type="checkbox" /><i class="fas fa-bolt fa-2x"></i></label> -->
         <label><input id="cb-raw" name="Raw messages" type="checkbox" /><i class="fas fa-stream fa-2x"></i></label>
         <label><input id="cb-nightmode" name="Nightmode" type="checkbox" /><i class="fas fa-moon fa-2x"></i></label>
-        <a id="settings-link" href="./config.html" title="Ljusinställningar"><i class="fas fa-sliders-h fa-2x"></i></a>
       </div>
     </div>
     <div id="image-mapper">

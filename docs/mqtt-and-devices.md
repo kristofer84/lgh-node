@@ -339,12 +339,17 @@ reachable when untiered lights got their own tap targets. `partial` renders a fa
 (0.12 against mood's 0.22) and keeps the glows, and presses to `off` — which is what it did
 while it was mislabelled.
 
-### The config page — `web/config.html`, `/config/zones`
+### The light-settings editor — inline on the dashboard, `/config/zones`
 
-Pick a room, tick which lights each step turns on, type a percentage where the hardware takes
-one. It edits `steps` and nothing else: which devices are in a zone, **their order**, and the
-sensor entries are all preserved. Order matters — the floorplan generator uses it to place a
-lamp that has no position of its own yet.
+Long-press a room to open the preset menu, tap its config symbol (the sliders icon in the
+menu header) and the room's step table opens as a modal (`#room-config`). Pick which lights
+each step turns on and type a percentage where the hardware takes one. It edits `steps` and
+nothing else: which devices are in a zone, **their order**, and the sensor entries are all
+preserved. Order matters — the floorplan generator uses it to place a lamp that has no
+position of its own yet.
+
+This used to live on a dedicated `web/config.html` page; it was folded into the dashboard and
+the page removed. The `cfg*` functions in `web/scripts/home.js` render and save it.
 
 - `GET /config/zones` → one row per switchable device per zone: `steps`, the HA friendly name,
   and `dimmable`.

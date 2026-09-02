@@ -104,7 +104,7 @@ records a landmine (a confirmed bug, or a load-bearing discipline).
 | Client login UI | `web/login.html`, `web/public/login/{login,login-msal,login-webn}.js` |
 | MQTT ingest + device state | `client.on('message')` in `mqtt-web.js` (~line 363); ⚠ **what HA publishes at all** is `mqtt_statestream:` in `/media/storage/ha/homeassistant/configuration.yaml`, outside this repo |
 | Zone/device config ⚠ | `db/config.json` (gitignored) — `config.zones`. Switchable devices are objects with explicit `steps`; sensors keep the legacy dotted string. **Source of truth for the floorplan** |
-| Light settings page ⚠ | `web/config.html` + `web/scripts/config.js` + `web/styles/config.css`; `GET`/`POST /config/zones` in `mqtt-web.js` — **must stay below `cookieMiddleware`** |
+| Light settings editor ⚠ | Inline modal on the dashboard: `#room-config` in `tools/floorplan/dashboard.template.html` + the `cfg*` functions in `web/scripts/home.js`; `GET`/`POST /config/zones` in `mqtt-web.js` — **must stay below `cookieMiddleware`**. Opened from the room-menu's config symbol; `web/config.html` is gone |
 | Zone grammar + step semantics ⚠ | `web/scripts/zones.js` — **shared by the server, the floorplan builder and the browser**. Parses `device.type[.tier[.level]]`, decides what a step publishes (`sceneFor`) and which step a room is in (`stepOf`). Under `web/` because that is the only place all three can import it without a build step |
 | Tests | `test/` — `npm test`. `helpers.mjs` documents the source-extraction harness |
 | Type checking ⚠ | `tsconfig.json` (`checkJs` + `noEmit`) + `types/globals.d.ts` + `tools/typecheck/` (isolated install). Types live in JSDoc comments in the `.js` files; nothing is compiled and nothing is emitted |

@@ -55,11 +55,9 @@ body.nightmode #readouts text {
 }
 
 /* The menu's one link rather than checkbox -- it has to pick up the same colour
-   as the icons around it in both modes, which those get from `body`. */
-#settings-link {
-  color: inherit;
-  text-decoration: none;
-}
+   as the icons around it in both modes, which those get from `body`.
+   (Removed with config.html -- the room light-settings editor now lives in the
+   room-menu's config symbol.) */
 
 .removed {
   display: none;
@@ -356,6 +354,7 @@ body.nightmode input[type="checkbox"]:checked ~ i {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  user-select: none;
 }
 
 #dimmer button {
@@ -366,6 +365,7 @@ body.nightmode input[type="checkbox"]:checked ~ i {
   border-radius: 5px;
   padding: 0.2rem 0.7rem;
   cursor: pointer;
+  user-select: none;
 }
 
 #dimmer button:hover {
@@ -390,6 +390,7 @@ body.nightmode input[type="checkbox"]:checked ~ i {
 .dimmer-label {
   color: #9a9a9a;
   min-width: 5.2rem;
+  user-select: none;
 }
 
 .dimmer-val {
@@ -397,6 +398,7 @@ body.nightmode input[type="checkbox"]:checked ~ i {
   font-variant-numeric: tabular-nums;
   min-width: 3.6rem;
   text-align: right;
+  user-select: none;
 }
 
 .dimmer-row input[type="range"] {
@@ -423,6 +425,323 @@ body.nightmode input[type="checkbox"]:checked ~ i {
 
 /* Dimmer end */
 
+/* Room preset menu -- a long press on a room opens preset buttons instead of
+   cycling. Same overlay mechanics as #dimmer/#raw: a backdrop that closes on
+   click, and a compact card of labelled buttons (one per available step). */
+#room-menu-bg {
+  left: 0;
+  right: 0;
+  top: 0;
+  bottom: 0;
+  z-index: 610;
+  background: black;
+}
+
+#room-menu-bg.display {
+  opacity: 0.5;
+  pointer-events: auto;
+}
+
+#room-menu {
+  flex-direction: column;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: min(90vw, 320px);
+  background: #1b1b1b;
+  color: #e8e8e8;
+  border: 1px solid #454545;
+  border-radius: 8px;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.55);
+  font: 15px/1.5 Roboto, system-ui, sans-serif;
+  z-index: 620;
+  overflow: hidden;
+}
+
+#room-menu-head {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex: 0 0 auto;
+  padding: 0.5rem 0.75rem;
+  background: #262626;
+  border-bottom: 1px solid #454545;
+}
+
+#room-menu-title {
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  user-select: none;
+}
+
+#room-menu button {
+  font: inherit;
+  color: #e8e8e8;
+  background: #333;
+  border: 1px solid #555;
+  border-radius: 5px;
+  padding: 0.2rem 0.7rem;
+  cursor: pointer;
+  user-select: none;
+}
+
+#room-menu button:hover {
+  background: #3d3d3d;
+}
+
+#room-menu-body {
+  flex: 1 1 auto;
+  padding: 0.9rem 1rem 1rem;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.6rem;
+}
+
+/* A preset button. `.current` highlights the step the room is in now. */
+.room-preset {
+  font: inherit;
+  color: #e8e8e8;
+  background: #333;
+  border: 1px solid #555;
+  border-radius: 6px;
+  padding: 0.7rem 1rem;
+  cursor: pointer;
+  text-align: center;
+  user-select: none;
+}
+
+.room-preset:hover {
+  background: #3d3d3d;
+}
+
+.room-preset.current {
+  background: #ffcc00;
+  color: #1b1b1b;
+  border-color: #ffcc00;
+  font-weight: 600;
+}
+
+#room-menu.display {
+  display: flex;
+  opacity: 1;
+  pointer-events: auto;
+}
+
+#room-menu.removed {
+  display: none;
+}
+
+/* The config symbol in the preset menu header -- opens the room's light
+   settings, the same step table config.html used to show. */
+#room-menu-config {
+  padding: 0.2rem 0.55rem;
+}
+
+#room-menu-config i {
+  color: #ffcc00;
+}
+
+/* Room preset menu end */
+
+/* Room light-settings editor -- the per-room step table that used to live on
+   its own page (config.html). Now a modal on the floorplan, opened from the
+   preset menu's config symbol. Same two-phase fade as the other overlays. */
+#room-config-bg {
+  left: 0;
+  right: 0;
+  top: 0;
+  bottom: 0;
+  z-index: 630;
+  background: black;
+}
+
+#room-config-bg.display {
+  opacity: 0.5;
+  pointer-events: auto;
+}
+
+#room-config {
+  flex-direction: column;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: min(94vw, 560px);
+  max-height: 82vh;
+  background: #1b1b1b;
+  color: #e8e8e8;
+  border: 1px solid #454545;
+  border-radius: 8px;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.55);
+  font: 14px/1.5 Roboto, system-ui, sans-serif;
+  z-index: 640;
+  overflow: hidden;
+}
+
+#room-config-head {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex: 0 0 auto;
+  padding: 0.5rem 0.75rem;
+  background: #262626;
+  border-bottom: 1px solid #454545;
+}
+
+#room-config-title {
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  user-select: none;
+}
+
+#room-config button {
+  font: inherit;
+  color: #e8e8e8;
+  background: #333;
+  border: 1px solid #555;
+  border-radius: 5px;
+  padding: 0.2rem 0.7rem;
+  cursor: pointer;
+  user-select: none;
+}
+
+#room-config button:hover:not(:disabled) {
+  background: #3d3d3d;
+}
+
+#room-config button:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+#room-config-body {
+  flex: 1 1 auto;
+  overflow: auto;
+  padding: 0.75rem 1rem;
+}
+
+#room-config-grid {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+#room-config-grid th,
+#room-config-grid td {
+  padding: 0.4rem 0.5rem;
+  text-align: center;
+  border-bottom: 1px solid #333;
+}
+
+#room-config-grid th {
+  color: #9a9a9a;
+  font-weight: 600;
+  user-select: none;
+}
+
+#room-config-grid td.light {
+  text-align: left;
+  color: #e8e8e8;
+  user-select: none;
+}
+
+#room-config-grid .id {
+  display: block;
+  color: #7d7d7d;
+  font-size: 0.85em;
+}
+
+#room-config-grid input[type="checkbox"] {
+  width: 1rem;
+  height: 1rem;
+  cursor: pointer;
+}
+
+#room-config-grid input[type="number"] {
+  width: 3.2rem;
+  margin-left: 0.3rem;
+  padding: 0.15rem 0.3rem;
+  background: #262626;
+  color: #e8e8e8;
+  border: 1px solid #454545;
+  border-radius: 4px;
+  font: inherit;
+  text-align: right;
+}
+
+#room-config-grid input[type="number"]:disabled {
+  opacity: 0.35;
+}
+
+#room-config-grid .pct {
+  color: #7d7d7d;
+  font-size: 0.8em;
+  margin-left: 0.15rem;
+}
+
+#room-config-grid input[type="number"]:disabled + .pct {
+  opacity: 0.35;
+}
+
+#room-config .hint {
+  color: #7d7d7d;
+  font-size: 0.9em;
+  margin-top: 0.75rem;
+}
+
+#room-config-foot {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.5rem 0.75rem;
+  background: #262626;
+  border-top: 1px solid #454545;
+}
+
+#room-config-save {
+  background: #ffcc00;
+  color: #1b1b1b;
+  border-color: #ffcc00;
+  font-weight: 600;
+}
+
+#room-config-status {
+  flex: 1;
+  font-size: 0.9em;
+  user-select: none;
+}
+
+#room-config-status.ok {
+  color: lawngreen;
+}
+
+#room-config-status.warn {
+  color: #ffcc00;
+}
+
+#room-config-status.error {
+  color: #ff5c5c;
+}
+
+#room-config.display {
+  display: flex;
+  opacity: 1;
+  pointer-events: auto;
+}
+
+#room-config.removed {
+  display: none;
+}
+
+/* Room light-settings editor end */
+
 stop {
   --sc: #ffcc00;
 }
@@ -437,6 +756,7 @@ stop {
 .temp {
   font-size: 15px;
   font-weight: 600;
+  user-select: none;
 }
 
 /* Room outline */
