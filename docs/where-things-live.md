@@ -352,10 +352,14 @@ Landmines carried by the new plan (each recorded in full in `tools/floorplan/REA
 
 ### Dashboard client ⚠ — `web/scripts/home.js`, `web/styles/style.css`
 
-- `updateView()` now **null-guards `document.getElementById(zone)`**. Before that, the four
-  zones with no room drawn for them (`home`, `utomhus`, `moja`, `devices`) threw a TypeError as
-  soon as one of them held a mood/night light, aborting the render for **every later zone**.
-  Fixed; do not re-report. `updateArea()` still swallows a miss with `?.`.
+- `updateView()` null-guards `document.getElementById(zone)` **and still renders sensor-only
+  zones**: the four zones with no room drawn (`home`, `utomhus`, `moja`, `devices`) skip the
+  room/step pass but still feed `updateEntity()`, so the `utomhus` temperature/humidity readouts
+  show and the appliance markers (`frys`, `kylskap`, …) get their `active-outline` when drawing
+  power. Before, the unguarded `getElementById` threw as soon as one such zone held a mood/night
+  light, aborting the render for every later zone; and the early `return` also dropped the
+  sensors, so `utomhus` readouts and appliance outlines never showed. `updateArea()` still
+  swallows a miss with `?.`.
 - The dead `socketKey` cookie branch and its `var` are gone from `home.js` — nothing hands the
   session key to page JS any more (see the socket.io row).
 - ⚠ **`style.css` room tints are tuned to line-art, not to the old photo.** `.room-outline` is

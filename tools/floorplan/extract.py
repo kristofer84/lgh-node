@@ -18,6 +18,12 @@ SRC = sys.argv[1] if len(sys.argv) > 1 else os.path.join(HERE, 'lgh_rot.svg')
 PPU = 8      # raster pixels per drawing unit
 SCALE = 3    # drawing units -> dashboard user units
 
+# Extra empty margin added to the BOTTOM of the viewBox, in drawing units. The
+# envelope (silhouette) stops at the apartment's lowest wall, but the drawing
+# (appliances, vinkyl, …) and the readout space need a little more room below
+# it. 12 drawing units = 36 user units, taking the viewBox from 694 to 730 tall.
+BOTTOM_PAD = 12.0
+
 # Rendered room label -> zone key. Zone keys MUST match db/config.json.
 ZONE = {
     'VARDAGSRUM': 'vardagsrum', 'KÖK': 'kok', 'GÅNG': 'gang', 'HALL': 'gang',
@@ -321,7 +327,7 @@ def main():
     xs = [p[0] for p in pts]; ys = [p[1] for p in pts]
     ox, oy = min(xs) - 1.0, min(ys) - 1.0
     vw = round((max(xs) - min(xs) + 2) * SCALE)
-    vh = round((max(ys) - min(ys) + 2) * SCALE)
+    vh = round((max(ys) - min(ys) + 2 + BOTTOM_PAD) * SCALE)
 
     out = {
         'transform': {'origin': [round(ox, 3), round(oy, 3)], 'scale': SCALE, 'viewBox': [0, 0, vw, vh]},

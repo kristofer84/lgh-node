@@ -422,6 +422,17 @@ for (const [zone, room] of Object.entries(geo.rooms)) {
 		readoutLayer.push(`          <text class="temp hidden" id="th-${s.device}" x="${x}" y="${y}" />`);
 	});
 }
+//Zones with sensors but NO room drawn (utomhus -- the outdoor weather station).
+//Their readout has no anchor, so readouts.json gives an absolute drawing
+//position (`x`/`y`) instead of an anchor nudge.
+for (const [zone, pos] of Object.entries(readoutNudge)) {
+	if (geo.rooms[zone] || pos.x === undefined || pos.y === undefined) continue;
+	if (!config.zones[zone]) continue;
+	const readouts = zones[zone].sensors.filter(s => /(temperature|humidity)$/.test(s.device));
+	readouts.forEach((s, i) => {
+		readoutLayer.push(`          <text class="temp hidden" id="th-${s.device}" x="${tx(pos.x)}" y="${ty(pos.y) + i * 15}" />`);
+	});
+}
 readoutLayer.push(`        </g>`);
 
 out.push(...basePlan);
@@ -432,7 +443,19 @@ out.push(...readoutLayer);
 //------------------------------------------------------- appliance markers
 // home.js maps a power sensor to a rect by name.split('_')[0]
 const fixtureFor = {
-	K: 'kylskap', F: 'frys', DM: 'diskmaskin', TM: 'tvattmaskin', TT: 'torktumlare',
+	K: 'kylskap', F: 'frys', DM: 'diskmaskin', TM: 'tvattmaskin', TT: 'torktumlare', V: 'vinkyl',
+};
+//Explicit marker box per appliance, in VIEWBOX units [x, y, w, h]. The text
+//label (K/F/DM/...) only says WHERE the appliance is roughly drawn; it is not
+//centred on the appliance, so each box is hand-tuned to sit on the appliance
+//itself rather than derived from the label. Hand-edited like lights.json.
+const applianceBox = {
+	kylskap: [219, 519, 18, 18],
+	frys: [322, 431, 18, 18],
+	vinkyl: [156, 595, 10, 18],
+	diskmaskin: [219, 455, 18, 18],
+	tvattmaskin: [194, 432, 18, 18],
+	torktumlare: [194, 450, 18, 18],
 };
 const wanted = new Set((config.zones.devices ?? []).map(e => e.split('_')[0]));
 const used = new Set();
@@ -441,7 +464,8 @@ for (const f of geo.fixtures) {
 	const id = fixtureFor[f.text];
 	if (!id || !wanted.has(id) || used.has(id)) continue;
 	used.add(id);
-	out.push(`          <rect class="device hidden" id="${id}" x="${tx(f.x) - 11}" y="${ty(f.y) - 14}" width="22" height="22" />`);
+	const [x, y, w, h] = applianceBox[id] ?? [tx(f.x) - 8, ty(f.y) - 8, 16, 16];
+	out.push(`          <rect class="device hidden" id="${id}" x="${x}" y="${y}" width="${w}" height="${h}" />`);
 }
 out.push(`        </g>`);
 for (const id of wanted) {
@@ -450,7 +474,7 @@ for (const id of wanted) {
 
 //------------------------------------------------------------- footer line
 if (config.zones.home?.some(e => e.startsWith('sensorer_alla'))) {
-	out.push(`        <g transform="translate(12, ${VB[3] - 10})">`);
+	out.push(`        <g transform="translate(5, ${VB[3] - 20})">`);
 	out.push(`          <text class="temp hidden" id="info-senaste_aktivitet" default="Senaste aktivitet: " x="0" y="0" />`);
 	out.push(`        </g>`);
 }

@@ -376,16 +376,24 @@ function updateMap(data) {
 //Update view from model
 function updateView() {
 	Object.keys(model).forEach(zone => {
-		//Which step this zone is displaying, and whether it has the lamps to
-		//offer a mood/night step at all. Shared with the server, which uses the
-		//inverse (sceneFor) to decide what a step publishes.
 		const { step: value, moodable, nightable, lights } = stepOf(model[zone]);
 
 		let ar = document.getElementById(zone);
 		//Zones without a room drawn for them (home, utomhus, moja, devices) are
-		//normal. This used to be unguarded, so any such zone containing a
-		//mood/night light threw and aborted the render for every later zone.
-		if (!ar) return;
+		//normal. They still carry sensors (utomhus_temperature / _humidity) whose
+		//readouts live in the readout layer, not a room group, so feed those and
+		//skip the room-only pass. This used to `return` here and drop the sensors
+		//too -- which is why the utomhus readout never showed.
+		if (!ar) {
+			const th = Object.keys(model[zone]).filter(n => !model[zone][n].hasOwnProperty('onoff'));
+			if (th.length) {
+				const entities = {};
+				th.forEach(name => entities[name] = model[zone][name]);
+				updateEntity(entities);
+			}
+			return;
+		}
+
 		if (moodable && !ar.hasAttribute("moodable")) ar.setAttribute("moodable", "moodable");
 		if (nightable && !ar.hasAttribute("nightable")) ar.setAttribute("nightable", "nightable");
 

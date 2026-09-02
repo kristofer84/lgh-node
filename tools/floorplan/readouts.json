@@ -1,5 +1,5 @@
 {
- "_comment": "Per-zone nudge for the temperature/humidity readout, in DRAWING units (the same units as geometry.json). Applied to the room's text anchor. Hand-edited; extract.py never touches this file.",
+ "_comment": "Per-zone nudge for the temperature/humidity readout, in DRAWING units (the same units as geometry.json). Applied to the room's text anchor. Hand-edited; extract.py never touches this file. A zone with NO room (e.g. utomhus) uses `x`/`y` as an absolute drawing position instead of a `dx`/`dy` nudge from an anchor.",
  "klk1": {
   "dy": -6
  },
@@ -8,5 +8,9 @@
  },
  "kok": {
   "dy": -11
+ },
+ "utomhus": {
+  "x": 58.33,
+  "y": 58.32
  }
 }

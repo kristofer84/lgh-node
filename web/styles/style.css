@@ -962,7 +962,7 @@ body.nightmode [state="on"] .point {
   position: absolute;
   top: 0;
   left: 0;
-  max-height: 85vh;
+  max-height: 95vh;
   width: 100%;
 }
 
