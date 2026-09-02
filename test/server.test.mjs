@@ -169,6 +169,31 @@ test('⚠ a light message cannot land on a same-named switch', () => {
 	assert.equal(g.sensorer_alla.state, 'on', 'occupancy still ingests from its own domain');
 });
 
+test('the On/Off Mode select marks its own device non-dimmable', () => {
+	//Fibaro config param 32 ships as select.<name>_on_off_mode; the verdict is
+	//copied onto the real device key because the select lands under its own.
+	const src = source();
+	const handler = grabCallback("client.on('message'", src);
+	const run = (devices, topic, payload) => {
+		const fn = new Function('devices', 'lgMqtt', 'log', 'queueSend', 'console',
+			`${preamble(src)}\nconst h = ${handler}; h(${JSON.stringify(topic)}, Buffer.from(${JSON.stringify(payload)}));`);
+		fn(devices, () => {}, () => {}, () => {}, { log() {} });
+		return devices;
+	};
+	const d = { badrum_2_spegel: { zone: 'bad2', type: 'light', supported_color_modes: '["brightness"]' } };
+
+	run(d, 'homeassistant/select/badrum_2_spegel_on_off_mode/state', 'Enable (Dimming not possible)');
+	assert.equal(d.badrum_2_spegel.onoffMode, true, 'on/off mode not recorded');
+
+	//⚠ The same entity also publishes friendly_name/options; those must NOT
+	//clobber the verdict -- friendly_name would leave it false.
+	run(d, 'homeassistant/select/badrum_2_spegel_on_off_mode/friendly_name', '"Badrum 2 spegel On/Off Mode"');
+	assert.equal(d.badrum_2_spegel.onoffMode, true, 'friendly_name clobbered on/off mode');
+
+	run(d, 'homeassistant/select/badrum_2_spegel_on_off_mode/state', 'Disable (Dimming possible)');
+	assert.equal(d.badrum_2_spegel.onoffMode, false, 'on/off mode not cleared');
+});
+
 test('a switch is never dimmable, whatever attributes linger', () => {
 	const { result } = boot(`return [
 		dimmableFrom({ type: 'switch', supported_color_modes: '["brightness"]' }),
@@ -177,6 +202,17 @@ test('a switch is never dimmable, whatever attributes linger', () => {
 		dimmableFrom({ type: 'light' }),
 	];`);
 	assert.deepEqual(result, [false, true, false, false]);
+});
+
+test('a Fibaro dimmer in on/off mode is not dimmable (config param 32)', () => {
+	//supported_color_modes still reads ["brightness"] for a dimmer wired to a
+	//non-dimmable load; the select entity's verdict must override it.
+	const { result } = boot(`return [
+		dimmableFrom({ type: 'light', supported_color_modes: '["brightness"]', onoffMode: true }),
+		dimmableFrom({ type: 'light', supported_color_modes: '["brightness"]', onoffMode: false }),
+		dimmableFrom({ type: 'light', supported_color_modes: '["brightness"]' }),
+	];`);
+	assert.deepEqual(result, [false, true, true]);
 });
 
 test('⚠ dim reaches the payload (brightness is an ingested value type)', () => {

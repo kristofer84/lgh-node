@@ -554,6 +554,23 @@ client.on('message', function (topic, message) {
 				device = split.join('_').replace('current_', '');
 			}
 
+			//Z-Wave "On/Off Mode" (Fibaro dimmer config param 32). HA exposes it
+			//as a select.<name>_on_off_mode entity whose `state` is one of the
+			//option labels. "... Dimming not possible" means the dimmer is wired
+			//to a non-dimmable load and must be treated as binary even though
+			//supported_color_modes still reads ["brightness"]. The select entity
+			//lands under its own device key (<name>_on_off_mode) via the reducer
+			//above, so the VERDICT is copied onto the real device key here.
+			//⚠ Only the `state` value type carries the verdict -- the same entity
+			//also publishes `friendly_name` and `options`, which must not clobber
+			//it (friendly_name would set onoffMode false on arrival order alone).
+			if (deviceType === 'select' && valueType === 'state' && device.endsWith('_on_off_mode')) {
+				const base = device.slice(0, -'_on_off_mode'.length);
+				if (devices[base]) {
+					devices[base].onoffMode = message.toString().includes('Dimming not possible');
+				}
+			}
+
 			let colorCode = '';
 			const colorEnd = '\x1b[0m';
 			if (message.toString() == 'on') {
@@ -942,6 +959,10 @@ function dimmableFrom(d) {
 	//the attribute makes this immune to a stale supported_color_modes left in
 	//log/mqtt.log by a same-named `light.` entity that no longer exists.
 	if (d?.type === 'switch') return false;
+	//A Fibaro dimmer switched to on/off mode (config param 32 = "Dimming not
+	//possible") is wired to a non-dimmable load. supported_color_modes still
+	//says ["brightness"], so the select entity's verdict is what overrides it.
+	if (d?.onoffMode === true) return false;
 	const raw = d === undefined ? undefined : d['supported_color_modes'];
 	if (!raw) return false;
 	try {

@@ -115,6 +115,17 @@ post-remap names, and the `climate` domain is what publishes them. This remap ha
 (a), so the generic nested write lands under the **un-remapped** name and leaves stray
 sub-objects in `devices` (visible in `log/mqtt.log`).
 
+⚠ **A `select.*_on_off_mode` message is special-cased.** The Fibaro dimmer's config param 32
+ships as a zwave-js `select.<name>_on_off_mode` entity (its state is one of the option labels).
+The ingest strips the `_on_off_mode` suffix and copies a boolean verdict onto the *real* device
+key as `onoffMode` — `true` when the state contains `"Dimming not possible"`. `dimmableFrom()`
+reads that flag before `supported_color_modes`, because a dimmer wired to a non-dimmable load
+still reports `["brightness"]` there.
+
+⚠ **Only the `state` value type carries the verdict.** The same entity also publishes
+`friendly_name` and `options`, which must not clobber `onoffMode` (a `friendly_name` message
+arriving after `state` would otherwise reset it to false purely by order).
+
 ## 4. Outbound topic convention
 
 `publish(device, property, message)` (line 695) sends to:
@@ -364,6 +375,21 @@ rewrite what every light in the flat does.
 exactly this; anything whose only mode is `onoff` gets no percentage box. Guessing from the
 device model is wrong — it misses that the garderob drivers dim and that `lampa_mikkel`,
 `lampa_kai`, `sang_*` and `tvattstuga_bank` do not.
+
+⚠ **A Fibaro dimmer switched to on/off mode is NOT dimmable, whatever `supported_color_modes`
+says.** A FGD-212 wired to a non-dimmable load has config parameter 32 ("On/Off Mode") set to
+"Enable (Dimming not possible)", but HA still publishes `supported_color_modes: ["brightness"]`
+for it. The zwave-js `select.<name>_on_off_mode` entity carries the real verdict; it is
+published to MQTT (added to `mqtt_statestream` include globs as `select.*_on_off_mode`), and the
+ingest copies it onto the device key as `onoffMode`, which `dimmableFrom()` reads before
+`supported_color_modes`. Until that message arrives the device is assumed dimmable — graceful,
+because a missing select state means the parameter has not been read, not that it is off.
+
+⚠ **The select entity must first be enabled, or it never publishes.** The zwave-js integration
+marks every config-parameter and diagnostic entity `disabled_by: integration` (in
+`core.entity_registry`), so `mqtt_statestream` sends nothing for it even with the glob. Enable
+the `select.*_on_off_mode` entities (Z-Wave JS UI per-device, or HA entity settings) and the
+value starts flowing; this is a HA-side step, nothing in this repo can turn it on.
 
 ⚠ **A dimmable device is stored as a NUMBER at every step it is on at, never `true`.** A plain
 `turn_on` restores whatever level the lamp last had, so a dimmable light recorded as `true` at
