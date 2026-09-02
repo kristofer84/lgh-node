@@ -540,6 +540,21 @@ orangeri and vardagsrum lights; `Dusch` holds the badrum_2 lights; `Kontor` hold
 the apartment rename**, so a power sensor's name does not identify its room either — resolve it
 through `device_id`. Full detail and the open gaps: `docs/mqtt-and-devices.md` §8.
 
+### Outbound commands + the HA-side dispatch — `mqtt-web.js`, files outside this repo
+
+`publish()` → `webapp/switch/<type>.<device>/state/set` (per-device, `toggleItem` and the
+hold-popup sliders). A **room** toggle does not use `publish()` at all: `toggle()` writes one
+JSON message to `webapp/scene/<zone>/set` (payload = `sceneFor(zone, step)`).
+
+⚠ **The consumer of that scene topic is outside this repo** — `(mqtt in) Rumsscen`
+(automation) + `script.rumsscen` (script) in `/media/storage/ha/homeassistant/`, which split the
+batch into `zwave_js.multicast_set_value` (Z-Wave, grouped by value, chunked 4/frame) vs
+individual calls (everything else). Transport is derived at runtime from
+`integration_entities('zwave_js')`, not a hand-list. **The full YAML, the CC/endpoint table and
+the `from_json`/chunking landmines are reproduced in `docs/mqtt-and-devices.md` §7 — that is the
+only copy, since the HA files are not in git.** See also `docs/mqtt-and-devices.md` §4 for the
+outbound topic convention.
+
 ### Device state persistence ⚠ — `exitHandler`, `mqtt-web.js` 662
 
 - ⚠ **`log/mqtt.log` is written only inside `exitHandler`.** There is no periodic flush. A

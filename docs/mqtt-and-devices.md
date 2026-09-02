@@ -538,6 +538,189 @@ The client picks the next value with `getNextStateRoom()` (`web/scripts/home.js`
 `on → off`, `off → night` (if nightable) else `mood` (if moodable) else `on`,
 `mood → on` (if "max brightness" checked) else `off`, `night → mood` (if moodable) else as mood.
 
+### 🗄 The HA-side dispatch: `(mqtt in) Rumsscen` + `script.rumsscen` ⚠ outside this repo
+
+`toggle()`'s single `webapp/scene/<zone>/set` message is dead air until something on the Home
+Assistant side listens for it. That something lives in **`/media/storage/ha/homeassistant/`**,
+which is **outside this repo** and therefore not in git, not version-controlled here, and not
+captured by any of the repo's tests. The full implementation is reproduced below so it is not
+lost, and each part is annotated with the landmines that were paid for in blood.
+
+**Contract, in one table.** The payload is `sceneFor(zone, step)` verbatim — a JSON array of
+`{entity, state|level}`. `state` is `'on'`|`'off'`; `level` is a brightness in percent (1–100).
+
+| item → entity shape | transport (from `integration_entities('zwave_js')`) | dispatch |
+|---|---|---|
+| `{entity: 'light.*', level: N}` | Z-Wave (`zwave_js`) | CC 38 · endpoint 1 · `targetValue` = `round(N·99/100)`, grouped by `N`, chunked |
+| `{entity: 'light.*', state: 'off'}` | Z-Wave | CC 32 · endpoint 1 · value `0` |
+| `{entity: 'switch.*', state: 'on'\|'off'}` | Z-Wave | CC 37 · endpoint 0 · `true`/`false`, grouped by state, chunked |
+| any | not Z-Wave (`mqtt`·`tradfri`·`plejd`·`switch_as_x`) | `light.turn_on` (with `level`) / `homeassistant.turn_on` / `homeassistant.turn_off` |
+
+Invariants an edit must preserve: `scene` is **already a parsed list** (never `from_json` it
+unconditionally); multicast is **unacknowledged** and chunked to `batch(4)` with a 3 s gap; a
+lone remainder (`count ≤ 1`) must fall back to a normal call because `multicast_set_value`
+refuses a single node.
+
+**The trigger** — `automations.yaml`: one fire-and-forget automation that hands the raw payload
+to the script.
+
+```yaml
+- id: '1790000000000'
+  alias: (mqtt in) Rumsscen
+  triggers:
+  - trigger: mqtt
+    topic: webapp/scene/+/set
+  conditions: []
+  actions:
+  - action: script.turn_on
+    target:
+      entity_id: script.rumsscen
+    data:
+      variables:
+        scene: '{{ trigger.payload }}'
+        duration: '1s'
+  mode: restart
+  max_exceeded: silent
+```
+
+`mode: restart` means a rapid second press abandons the in-flight scene and starts over — the
+dashboard's step cycle is a toggle, so the last press must win, not queue behind an earlier one.
+`duration` is the Z-Wave dim transition and is overridable here; `1s` reads snappier than the
+`4s` default in the older `(bel) Z-wave` script.
+
+**The script** — `scripts.yaml`, key `rumsscen`. The whole room is partitioned into three
+camps and dispatched in one sweep.
+
+```yaml
+rumsscen:
+  alias: (rum) Rumsscen
+  variables:
+    zwave: "{{ integration_entities('zwave_js') }}"
+    items: "{{ scene if scene is not string else (scene | from_json) }}"
+    zdim: "{{ items | selectattr('entity', 'in', zwave) | selectattr('entity', 'match', '^light\\.') | list }}"
+    zsw: "{{ items | selectattr('entity', 'in', zwave) | selectattr('entity', 'match', '^switch\\.') | list }}"
+    other: "{{ items | rejectattr('entity', 'in', zwave) | list }}"
+  sequence:
+  # 1. Non-Z-Wave: one acknowledged call per device.
+  - repeat:
+      for_each: "{{ other }}"
+      sequence:
+      - choose:
+        - conditions: "{{ 'level' in repeat.item }}"
+          sequence:
+          - action: light.turn_on
+            target: {entity_id: "{{ repeat.item.entity }}"}
+            data: {brightness_pct: "{{ repeat.item.level }}"}
+        - conditions: "{{ repeat.item.state == 'on' }}"
+          sequence:
+          - action: homeassistant.turn_on
+            target: {entity_id: "{{ repeat.item.entity }}"}
+        default:
+        - action: homeassistant.turn_off
+          target: {entity_id: "{{ repeat.item.entity }}"}
+  # 2. Z-Wave dimmers on: CC 38, grouped by brightness, chunked.
+  - repeat:
+      for_each: "{{ zdim | selectattr('level', 'defined') | sort(attribute='level') | groupby('level') }}"
+      sequence:
+      - variables:
+          pct: "{{ repeat.item[0] | int }}"
+          lvl: "{{ ((repeat.item[0] | int) * 99 / 100) | round(0) | int }}"
+          ents: "{{ repeat.item[1] | map(attribute='entity') | list }}"
+      - repeat:
+          for_each: "{{ ents | batch(4) | list }}"
+          sequence:
+          - if: "{{ not repeat.first }}"
+            then: [{delay: '00:00:03'}]
+          - if: "{{ repeat.item | count > 1 }}"
+            then:
+            - action: zwave_js.multicast_set_value
+              data: {command_class: '38', value: "{{ lvl }}", endpoint: '1', property: targetValue, options: {transitionDuration: "{{ duration }}"}}
+              target: {entity_id: "{{ repeat.item }}"}
+            else:
+            - action: light.turn_on
+              target: {entity_id: "{{ repeat.item }}"}
+              data: {brightness_pct: "{{ pct }}"}
+  # 3. Z-Wave dimmers off: CC 32 (Basic) value 0.
+  - repeat:
+      for_each: "{{ zdim | rejectattr('level', 'defined') | map(attribute='entity') | batch(4) | list }}"
+      sequence:
+      - if: "{{ not repeat.first }}"
+        then: [{delay: '00:00:03'}]
+      - if: "{{ repeat.item | count > 1 }}"
+        then:
+        - action: zwave_js.multicast_set_value
+          data: {command_class: '32', value: '0', endpoint: '1', property: targetValue}
+          target: {entity_id: "{{ repeat.item }}"}
+        else:
+        - action: light.turn_off
+          target: {entity_id: "{{ repeat.item }}"}
+  # 4. Z-Wave switches: CC 37, grouped by on/off.
+  - repeat:
+      for_each: "{{ zsw | sort(attribute='state') | groupby('state') }}"
+      sequence:
+      - variables:
+          onoff: "{{ repeat.item[0] == 'on' }}"
+          ents: "{{ repeat.item[1] | map(attribute='entity') | list }}"
+      - repeat:
+          for_each: "{{ ents | batch(4) | list }}"
+          sequence:
+          - if: "{{ not repeat.first }}"
+            then: [{delay: '00:00:03'}]
+          - if: "{{ repeat.item | count > 1 }}"
+            then:
+            - action: zwave_js.multicast_set_value
+              data: {command_class: '37', value: "{{ onoff }}", endpoint: '0', property: targetValue}
+              target: {entity_id: "{{ repeat.item }}"}
+            else:
+            - choose:
+              - conditions: "{{ onoff }}"
+                sequence: [{action: homeassistant.turn_on, target: {entity_id: "{{ repeat.item }}"}}]
+              default: [{action: homeassistant.turn_off, target: {entity_id: "{{ repeat.item }}"}}]
+  mode: restart
+```
+
+**Why each decision is what it is** — these are the parts that are not obvious and were the
+ones most likely to be re-discovered the hard way:
+
+- **Transport is derived, not listed.** `integration_entities('zwave_js')` reads the entity
+  registry at runtime, so a newly added Z-Wave lamp is multicast automatically and an old
+  device removed from the mesh stops being targeted without a hand-edited list. (The older
+  `bel_all_off` script keeps an explicit `zwave_lights`/`zwave_switches` split; that is the
+  hand-list bug class this deliberately avoids.) The three light domains in the apartment —
+  `zwave_js` (dimmers), `mqtt`/`tradfri`/`plejd` (ZigBee/Tasmota/Plejd), and `switch_as_x`
+  (a Z-Wave *binary switch* re-exposed as a `light`) — separate cleanly: only the first is
+  multicast, so `switch_as_x` lights fall to the individual-call camp and behave correctly,
+  just not batched.
+- **Dimmer vs switch is the entity domain, not a flag.** Within Z-Wave, `light.*` is always a
+  Multilevel Switch (**CC 38**, **endpoint 1**, `targetValue` = 0–99) and `switch.*` is a
+  Binary Switch (**CC 37**, **endpoint 0**, `true`/`false`). Dimmer-off uses **CC 32**
+  (Basic, value 0) — the same incantation as the proven `bel_z_wave_off` — rather than
+  `targetValue 0`, kept identical to the path already running in production.
+- **The app talks percent; Z-Wave talks 0–99.** `sceneFor()` emits `level` in percent
+  (1–100, e.g. `100` for the `on` step). The script maps it with
+  `round(level * 99 / 100)` before putting it on the wire (`100 → 99`, `20 → 20`, `10 → 10`),
+  matching the convention the scene buttons already used.
+- **`scene` arrives already-parsed.** HA's MQTT trigger auto-decodes a JSON payload, so
+  `trigger.payload` is a Python list by the time the script sees it, not a string. The first
+  version called `scene | from_json` unconditionally and died with
+  `orjson.JSONDecodeError: Input must be bytes …`; the `scene if scene is not string else …`
+  guard is the fix. Do **not** remove it, and do not `from_json` a second time.
+- **Multicast is fire-and-forget, and must be chunked.** One `multicast_set_value` frame
+  reaches many nodes at once but is **unacknowledged** — sent once, never re-sent. A frame to
+  more than a few nodes exceeds Z-Wave JS's patience (~20 s SendDataAbort) and gets cut off
+  mid-transmission with `NoAck`, silently leaving the tail nodes untouched (measured 2026-08-28:
+  23 nodes → abort at 20.03 s, 14/23 off). Hence `batch(4)` with a 3 s gap between chunks, and
+  the `count > 1` guard: `multicast_set_value` refuses a single node, so a lone remainder falls
+  back to a regular acknowledged `light.turn_on`/`homeassistant.turn_*` call instead.
+- **Group-by-value is the whole point.** A single multicast frame carries *one* `value`, so
+  dimmers at different brightnesses cannot share a frame; `groupby('level')` emits one frame per
+  distinct brightness (and `groupby('state')` one per on/off). Without it the room would be sent
+  as one giant mixed-value multicast that misses most of the nodes.
+- **`zdim`/`zsw` are filtered by `match('^light\\.')` / `^switch\\.`** — a Z-Wave entity can be
+  anything (sensors, batteries, the 3966 entities under the integration), so the partition must
+  also pin the domain or a stray Z-Wave sensor in the payload would be target-driven as if it
+  were a light.
+
 ### `toggleItem(item, value)` — single device
 
 Scans **all** zones for a device whose first segment matches `item`, and publishes to each match

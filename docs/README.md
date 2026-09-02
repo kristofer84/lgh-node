@@ -55,7 +55,9 @@
   allowlist in `configuration.yaml`, outside this repo — `sensor` is not a domain,
   `binary_sensor` is never published, and two globs in it match nothing). Then the
   `homeassistant/<type>/<device>/<valueType>` inbound convention (including the ⚠ `climate`
-  remap) and the `webapp/switch/...` outbound one, the dotted `zone` → device-string format with
+  remap) and the outbound convention — `webapp/switch/...` for per-device, and **one JSON
+  message per room** on `webapp/scene/<zone>/set` that HA dispatches (Z-Wave via multicast;
+  §4 + §7, the latter reproducing the full `script.rumsscen` YAML that lives outside git), the dotted `zone` → device-string format with
   its `.mood` / `.night` suffixes, **the 22 zones of the new apartment and why `db/config.json`
   is now the floorplan's source of truth**, the two different shapes `getDevice()` returns, the
   `device` / `device.all` / `toggle` socket.io events, ⚠ §8 on the untrustworthy HA area
