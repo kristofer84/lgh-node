@@ -272,6 +272,31 @@ test('kelvinOf reads colour-temperature attributes as numbers or nothing', () =>
 	assert.deepEqual(result, [2403, undefined, undefined, undefined, undefined]);
 });
 
+test('validateSteps accepts {level, kelvin} and clamps kelvin to the lamp range', () => {
+	const { result } = load(['validateSteps'], `return [
+		validateSteps({ mood: 20 }),
+		validateSteps({ mood: { level: 20, kelvin: 2700 } }, [2202, 4000]),
+		validateSteps({ on: { level: 100, kelvin: 4000 } }, [2202, 4000]),
+		validateSteps({ mood: { level: 20, kelvin: 5000 } }, [2202, 4000]),
+		validateSteps({ mood: { level: 20, kelvin: 1000 } }, [2202, 4000]),
+		validateSteps({ mood: { kelvin: 2700 } }),
+		validateSteps({ mood: { level: 0, kelvin: 2700 } }),
+		validateSteps({ mood: { level: 20, kelvin: 'warm' } }),
+		validateSteps({ bogus: true }),
+	];`);
+	assert.deepEqual(result, [
+		undefined,
+		undefined,
+		undefined,
+		'mood.kelvin 5000 above lamp range 4000',
+		'mood.kelvin 1000 below lamp range 2202',
+		'mood.level must be a whole percent 1-100',
+		'mood.level must be a whole percent 1-100',
+		'mood.kelvin must be a positive number',
+		'unknown step bogus',
+	]);
+});
+
 test('color_temp lamps carry colorTemp and its kelvin range in the payload', () => {
 	//The range is what drives the white-balance slider on the dashboard; it must
 	//be a number or absent, never the raw string HA publishes.

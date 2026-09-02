@@ -40,6 +40,12 @@ test('parseEntry: the object form is taken as written', () => {
 	assert.deepEqual(e.steps, { mood: 20, on: 100 });
 });
 
+test('parseEntry: the object form carries a {level, kelvin} step through untouched', () => {
+	const e = parseEntry({ device: 'golvlampa', type: 'light', steps: { mood: { level: 20, kelvin: 2700 }, on: 100 } });
+	assert.equal(e.device, 'golvlampa');
+	assert.deepEqual(e.steps, { mood: { level: 20, kelvin: 2700 }, on: 100 });
+});
+
 test('the explicit form expresses what a tier could not', () => {
 	//Neither of these was reachable before: a tier made `night` imply `mood`, and
 	//`on` always lit everything. These two cases are the reason for the format.
@@ -92,6 +98,22 @@ test('sceneFor: a level dims at its step and goes to 100 at on', () => {
 	]);
 	//...but `off` is still a plain off, not a dim to zero.
 	assert.deepEqual(sceneFor(zone, 'off').at(-1), { entity: 'light.tak', state: 'off' });
+});
+
+test('sceneFor: a {level, kelvin} step publishes brightness AND a kelvin', () => {
+	const zone = [{ device: 'golvlampa', type: 'light', steps: { mood: { level: 20, kelvin: 2700 }, on: 100 } }];
+	assert.deepEqual(sceneFor(zone, 'mood'), [{ entity: 'light.golvlampa', level: 20, kelvin: 2700 }]);
+	//The same lamp at `on` (a plain number) carries no kelvin.
+	assert.deepEqual(sceneFor(zone, 'on'), [{ entity: 'light.golvlampa', level: 100 }]);
+	//A malformed object step (no level) is an off, not a NaN payload.
+	const broken = [{ device: 'x', type: 'light', steps: { mood: { kelvin: 2700 } } }];
+	assert.deepEqual(sceneFor(broken, 'mood'), [{ entity: 'light.x', state: 'off' }]);
+});
+
+test('stepOf matches a {level, kelvin} step on its level, not its kelvin', () => {
+	const stepsValue = steps({ mood: { level: 20, kelvin: 2700 }, on: 100 });
+	assert.equal(stepOf(model({ gal: { onoff: true, dim: 52, steps: stepsValue } })).step, 'mood');
+	assert.equal(stepOf(model({ gal: { onoff: true, dim: 255, steps: stepsValue } })).step, 'on');
 });
 
 test('sceneFor ignores sensors and occupancy', () => {

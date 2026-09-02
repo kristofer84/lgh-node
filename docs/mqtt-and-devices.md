@@ -143,9 +143,11 @@ early if `message` is `undefined`.
 
 A **room** toggle does not go through `publish()` at all. `toggle()` writes one message to
 `webapp/scene/<zone>/set` whose payload is the whole scene as a JSON array of
-`{entity, state}` / `{entity, level}` (the output of `sceneFor()`). Home Assistant's
-`(mqtt in) Rumsscen` automation receives it and hands it to `script.rumsscen`, which splits the
-batch into Z-Wave multicast vs individual calls — see §7.
+`{entity, state}` / `{entity, level}` / `{entity, level, kelvin}` (the output of `sceneFor()`).
+The third form carries white balance: a step authored as `{level, kelvin}` in `db/config.json`
+publishes its kelvin alongside its brightness, and only for lamps whose `steps` entry is an
+object. Home Assistant's `(mqtt in) Rumsscen` automation receives it and hands it to
+`script.rumsscen`, which splits the batch into Z-Wave multicast vs individual calls — see §7.
 
 ## 5. `db/config.json` (gitignored — not in the repo)
 
@@ -188,7 +190,9 @@ batch into Z-Wave multicast vs individual calls — see §7.
 > { "device": "badrum_1_tak", "type": "light", "steps": { "mood": 20, "on": 100 } }
 > ```
 > A step key that is **absent means off at that step**; `true` means on; a number means on at
-> that brightness in percent. The `off` step is implicit. Sensor and occupancy entries keep the
+> that brightness in percent; an object `{level, kelvin}` means on at that brightness **and**
+> at that colour temperature (kelvin), for lamps that support white balance. The `off` step is
+> implicit. Sensor and occupancy entries keep the
 > plain string form — they have no steps and the page never touches them.
 > `parseEntry()` still reads the string form and translates a tier into the steps it used to
 > imply, so an old config keeps working. That translation is where the old model was least
@@ -366,12 +370,17 @@ preserved. Order matters — the floorplan generator uses it to place a lamp tha
 position of its own yet.
 
 This used to live on a dedicated `web/config.html` page; it was folded into the dashboard and
-the page removed. The `cfg*` functions in `web/scripts/home.js` render and save it.
+the page removed. The `cfg*` functions in `web/scripts/home.js` render and save it. A lamp
+whose HA state reports a `min/max_color_temp_kelvin` range also gets a **kelvin** input per
+step, stored as `{level, kelvin}`; kelvin is clamped to that lamp's own range (a lamp that has
+never reported one falls back to the apartment's shared 2202–4000 K).
 
 - `GET /config/zones` → one row per switchable device per zone: `steps`, the HA friendly name,
-  and `dimmable`.
-- `POST /config/zones` with `{zone: {device: steps}}` → validates, backs up, writes, reloads
-  in-process and broadcasts a fresh `device.all` so open dashboards follow immediately.
+  `dimmable`, and `colorMin`/`colorMax` (the lamp's own kelvin range, or `null`).
+- `POST /config/zones` with `{zone: {device: steps}}` → validates (a step is `true`, a whole
+  percent 1–100, or `{level, kelvin}` with the kelvin clamped to the lamp's range), backs up,
+  writes, reloads in-process and broadcasts a fresh `device.all` so open dashboards follow
+  immediately.
 
 ⚠ **Both routes are registered below `cookieMiddleware`, and must stay there** — in this file
 the registration order *is* the authorization model, and above the gate these would let anyone
@@ -421,7 +430,9 @@ Rejects an unknown zone and an `undefined` value with a log line. Then, for ever
 
 ⚠⚠ **`toggle()` no longer publishes per device.** It sends the room's whole scene as **one**
 MQTT message to `webapp/scene/<zone>/set`, with the JSON payload of `sceneFor(zone, value)` —
-an array of `{entity, state}` / `{entity, level}`. The per-device loop used to mean N queued HA
+an array of `{entity, state}` / `{entity, level}` / `{entity, level, kelvin}`. The kelvin form
+carries white balance: it is emitted only when a step is authored as `{level, kelvin}` (a
+white-capable lamp). The per-device loop used to mean N queued HA
 automation runs (one `light.turn_on`/`homeassistant.turn_*` each, acknowledged and serialised
 one at a time); the batch lets HA act on the room in one sweep. Dispatch happens in
 **`script.rumsscen`** (`scripts.yaml`) and the trigger in **`(mqtt in) Rumsscen`**
@@ -547,14 +558,16 @@ captured by any of the repo's tests. The full implementation is reproduced below
 lost, and each part is annotated with the landmines that were paid for in blood.
 
 **Contract, in one table.** The payload is `sceneFor(zone, step)` verbatim — a JSON array of
-`{entity, state|level}`. `state` is `'on'`|`'off'`; `level` is a brightness in percent (1–100).
+`{entity, state|level[|kelvin]}`. `state` is `'on'`|`'off'`; `level` is a brightness in percent
+(1–100); `kelvin` is a colour temperature present only on a `{level, kelvin}` step (white-capable
+lamps only).
 
 | item → entity shape | transport (from `integration_entities('zwave_js')`) | dispatch |
 |---|---|---|
 | `{entity: 'light.*', level: N}` | Z-Wave (`zwave_js`) | CC 38 · endpoint 1 · `targetValue` = `round(N·99/100)`, grouped by `N`, chunked |
 | `{entity: 'light.*', state: 'off'}` | Z-Wave | CC 32 · endpoint 1 · value `0` |
 | `{entity: 'switch.*', state: 'on'\|'off'}` | Z-Wave | CC 37 · endpoint 0 · `true`/`false`, grouped by state, chunked |
-| any | not Z-Wave (`mqtt`·`tradfri`·`plejd`·`switch_as_x`) | `light.turn_on` (with `level` + `transition: secs`) / `homeassistant.turn_on` / `homeassistant.turn_off` |
+| any | not Z-Wave (`mqtt`·`tradfri`·`plejd`·`switch_as_x`) | `light.turn_on` (brightness with `transition: secs`; then for a `{level,kelvin}` item, `pause` = `secs + 0.1` later a second `light.turn_on` with `color_temp_kelvin` + `transition: secs`) / `homeassistant.turn_on` / `homeassistant.turn_off` |
 
 Invariants an edit must preserve: `scene` is **already a parsed list** (never `from_json` it
 unconditionally); multicast is **unacknowledged** and chunked to `batch(4)` with a 3 s gap; a
@@ -602,12 +615,22 @@ rumsscen:
     zsw: "{{ items | selectattr('entity', 'in', zwave) | selectattr('entity', 'match', '^switch\\.') | list }}"
     other: "{{ items | rejectattr('entity', 'in', zwave) | list }}"
     secs: "{{ duration | replace('s', '') | float }}"
+    pause: "{{ (duration | replace('s', '') | float) + 0.1 }}"
   sequence:
   # 1. Non-Z-Wave: one acknowledged call per device.
   - repeat:
       for_each: "{{ other }}"
       sequence:
       - choose:
+        - conditions: "{{ 'level' in repeat.item and 'kelvin' in repeat.item }}"
+          sequence:
+          - action: light.turn_on
+            target: {entity_id: "{{ repeat.item.entity }}"}
+            data: {brightness_pct: "{{ repeat.item.level }}", transition: "{{ secs }}"}
+          - delay: "{{ pause }}"
+          - action: light.turn_on
+            target: {entity_id: "{{ repeat.item.entity }}"}
+            data: {color_temp_kelvin: "{{ repeat.item.kelvin }}", transition: "{{ secs }}"}
         - conditions: "{{ 'level' in repeat.item }}"
           sequence:
           - action: light.turn_on
@@ -704,6 +727,18 @@ ones most likely to be re-discovered the hard way:
   secs` (a float seconds) to their `light.turn_on`. A bare `brightness_pct` without that is the
   bug that was paid for when ZigBee lamps ignored the room fade. Switches still fade nothing:
   on/off has no level to ramp.
+- **Kelvin rides only the non-Z-Wave `light.turn_on`.** White balance is a `color_temp`
+  feature, so it reaches the same individual-call branch the fade does. The Z-Wave multicast
+  dimmer branch never sees a kelvin in practice (Z-Wave dimmers don't report a colour range, so
+  the config page never authors one for them), and the script deliberately ignores `kelvin` on
+  that branch rather than reject it, matching the "silently skip non-white lamps" rule the
+  server also applies.
+- **Brightness lands first, then kelvin ~`duration + 0.1s` later.** A `{level, kelvin}` item is
+  two separate `light.turn_on` calls, not one: the brightness (with the fade `transition: secs`)
+  goes out, then a `pause` (`secs + 0.1`) separates it from a second call carrying only
+  `color_temp_kelvin` -- again with `transition: secs`, so the tint also ramps rather than
+  snapping. The order matters because setting tint in the same call as (or before) the
+  brightness makes some lights ignore one of the two; the buffer gives the fade a beat to finish.
 - **The app talks percent; Z-Wave talks 0–99.** `sceneFor()` emits `level` in percent
   (1–100, e.g. `100` for the `on` step). The script maps it with
   `round(level * 99 / 100)` before putting it on the wire (`100 → 99`, `20 → 20`, `10 → 10`),

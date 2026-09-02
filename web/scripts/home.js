@@ -820,6 +820,10 @@ const CONFIG_STEPS = [
 
 let roomConfigZone = null;
 let roomConfigDirty = {};   // {device: steps}
+//Keeps the row's config object reachable from its <tr> (colour range is needed
+//to clamp kelvin when the row is read back). A property on the element itself
+//fails the JSDoc typecheck, so it lives in a WeakMap instead.
+const cfgRowMeta = new WeakMap();
 
 function cfg$ (id) { return document.getElementById(id); }
 function cfgBtn(id) { return /** @type {HTMLButtonElement} */ (document.getElementById(id)); }
@@ -837,15 +841,38 @@ function cfgClampPct(v) {
 	return Math.min(100, Math.max(1, n));
 }
 
+//Kelvin is clamped to the lamp's own reported range; a lamp that has never
+//reported one gets the apartment's shared 2202-4000 K (IKEA colour_temp bulbs).
+function cfgKelvinRange(row) {
+	const min = Number.isFinite(row.colorMin) ? row.colorMin : 2202;
+	const max = Number.isFinite(row.colorMax) ? row.colorMax : 4000;
+	return [min, max];
+}
+
+function cfgClampKelvin(row, v) {
+	const [min, max] = cfgKelvinRange(row);
+	const n = Math.round(Number(v));
+	if (!Number.isFinite(n)) return max;
+	return Math.min(max, Math.max(min, n));
+}
+
 //A tick means: on. For a dimmable device that is a percentage -- always a
 //number, never `true`, as a plain turn_on would restore the last dim level.
+//A white-capable lamp adds a kelvin, stored as {level, kelvin} per step.
 function cfgReadRow(tr) {
+	const row = cfgRowMeta.get(tr);
 	const steps = {};
 	for (const { key } of CONFIG_STEPS) {
 		const box = cfgField(tr, `input[type=checkbox][data-step="${key}"]`);
 		if (!box?.checked) continue;
-		const pct = cfgField(tr, `input[type=number][data-step="${key}"]`);
-		steps[key] = pct ? cfgClampPct(pct.value) : true;
+		const pct = cfgField(tr, `input[type=range][data-step="${key}"]:not([data-kelvin])`);
+		const level = pct ? cfgClampPct(pct.value) : true;
+		const kel = cfgField(tr, `input[type=range][data-step="${key}"][data-kelvin]`);
+		if (kel && row && (row.colorMin != null || row.colorMax != null)) {
+			steps[key] = { level, kelvin: cfgClampKelvin(row, kel.value) };
+		} else {
+			steps[key] = level;
+		}
 	}
 	return steps;
 }
@@ -858,6 +885,8 @@ function cfgMarkDirty(device, tr) {
 
 function cfgBuildRow(row) {
 	const tr = document.createElement('tr');
+	cfgRowMeta.set(tr, row);
+	const white = row.colorMin != null || row.colorMax != null;
 
 	const name = document.createElement('td');
 	name.className = 'light';
@@ -871,6 +900,9 @@ function cfgBuildRow(row) {
 	for (const { key } of CONFIG_STEPS) {
 		const td = document.createElement('td');
 		const value = row.steps?.[key];
+		const lvl = typeof value === 'number' ? value
+			: (value !== null && typeof value === 'object' ? value.level : undefined);
+		const kel = value !== null && typeof value === 'object' ? value.kelvin : undefined;
 
 		const box = document.createElement('input');
 		box.type = 'checkbox';
@@ -881,20 +913,45 @@ function cfgBuildRow(row) {
 
 		if (row.dimmable) {
 			const pct = document.createElement('input');
-			pct.type = 'number';
+			pct.type = 'range';
 			pct.dataset.step = key;
 			pct.min = '1';
 			pct.max = '100';
 			pct.step = '1';
-			pct.value = String(typeof value === 'number' ? value : 100);
+			pct.value = String(typeof lvl === 'number' ? cfgClampPct(lvl) : 100);
 			pct.disabled = !box.checked;
 			pct.setAttribute('aria-label', `${row.name ?? row.device} ${key} procent`);
-			pct.addEventListener('change', () => {
-				pct.value = String(cfgClampPct(pct.value));
-				cfgMarkDirty(row.device, tr);
-			});
-			td.append(pct, Object.assign(document.createElement('span'), { className: 'pct', textContent: '%' }));
+			const pval = document.createElement('span');
+			pval.className = 'pct';
+			const pctLabel = () => { pval.textContent = `${cfgClampPct(pct.value)}%`; };
+			pctLabel();
+			pct.addEventListener('input', () => { pctLabel(); cfgMarkDirty(row.device, tr); });
+			td.append(pct, pval);
 			box.addEventListener('change', () => { pct.disabled = !box.checked; });
+		}
+
+		//White balance, only for lamps that report a colour-temperature range.
+		//A kelvin without a brightness does not exist here, so the box (on/off)
+		//still owns whether this step does anything at all.
+		if (white && row.dimmable) {
+			const [kmin, kmax] = cfgKelvinRange(row);
+			const kelv = document.createElement('input');
+			kelv.type = 'range';
+			kelv.dataset.step = key;
+			kelv.dataset.kelvin = '';
+			kelv.min = String(kmin);
+			kelv.max = String(kmax);
+			kelv.step = '1';
+			kelv.value = String(typeof kel === 'number' ? cfgClampKelvin(row, kel) : kmax);
+			kelv.disabled = !box.checked;
+			kelv.setAttribute('aria-label', `${row.name ?? row.device} ${key} kelvin`);
+			const kval = document.createElement('span');
+			kval.className = 'ktxt';
+			const kelLabel = () => { kval.textContent = `${cfgClampKelvin(row, kelv.value)}K`; };
+			kelLabel();
+			kelv.addEventListener('input', () => { kelLabel(); cfgMarkDirty(row.device, tr); });
+			td.append(kelv, kval);
+			box.addEventListener('change', () => { kelv.disabled = !box.checked; });
 		}
 
 		box.addEventListener('change', () => cfgMarkDirty(row.device, tr));

@@ -40,9 +40,10 @@
  */
 
 /**
- * One thing to publish: a plain on/off, or a brightness.
- * @typedef {{entity: string, state: string, level?: undefined}
- *         | {entity: string, level: number, state?: undefined}} Action
+ * One thing to publish: a plain on/off, or a brightness (optionally with a
+ * white balance / colour temperature in kelvin).
+ * @typedef {{entity: string, state: string, level?: undefined, kelvin?: undefined}
+ *         | {entity: string, level: number, kelvin?: number, state?: undefined}} Action
  */
 
 /**
@@ -58,9 +59,12 @@
 
 /**
  * What a device does at each named step. A key that is absent means OFF at that
- * step; `true` means on; a number means on at that brightness, in percent.
+ * step; `true` means on; a number means on at that brightness, in percent; an
+ * object `{level, kelvin}` means on at that brightness AND at that colour
+ * temperature (kelvin), for lamps that support white balance.
  * The `off` step is implicit and always means everything off.
- * @typedef {{night?: true|number, mood?: true|number, on?: true|number}} Steps
+ * @typedef {{level: number, kelvin: number}} StepLevel
+ * @typedef {{night?: true|number|StepLevel, mood?: true|number|StepLevel, on?: true|number|StepLevel}} Steps
  */
 
 /** @typedef {Record<string, DeviceState>} ZoneModel */
@@ -171,12 +175,20 @@ export function parseZone(entries) {
 export function sceneFor(entries, step) {
 	return parseZone(entries).filter(isSwitchable).map(e => {
 		const v = step === 'off' ? undefined : e.steps?.[/** @type {'night'|'mood'|'on'} */ (step)];
-		//A number is a brightness. ⚠ It must be published even at `on`, and the
-		//config page writes 100 there for a dimmable device rather than `true`,
-		//because a plain turn_on restores whatever level the lamp last had -- so
-		//`on` after a dimmed step would otherwise leave it dimmed. Measured on
-		//the real dimmer 2026-08-27.
+		//A number is a brightness; an object is a brightness + a kelvin. ⚠ The
+		//level must be published even at `on`, and the config page writes 100 there
+		//for a dimmable device rather than `true`, because a plain turn_on restores
+		//whatever level the lamp last had -- so `on` after a dimmed step would
+		//otherwise leave it dimmed. Measured on the real dimmer 2026-08-27.
 		if (typeof v === 'number') return { entity: e.entity, level: v };
+		if (v !== null && typeof v === 'object') {
+			const level = Number(v.level);
+			const kelvin = Number(v.kelvin);
+			if (!Number.isFinite(level)) return { entity: e.entity, state: 'off' };
+			return Number.isFinite(kelvin)
+				? { entity: e.entity, level, kelvin }
+				: { entity: e.entity, level };
+		}
 		return { entity: e.entity, state: v ? 'on' : 'off' };
 	});
 }
@@ -220,9 +232,13 @@ export function stepOf(zoneModel) {
 		if (!m.onoff) return false;
 		//A brightness only counts as matched when the lamp is actually near it.
 		//Without this a room at 20% and the same room at 100% are the same state,
-		//which is what made a dimmed bathroom report itself fully on.
-		if (typeof want === 'number' && m.dim !== undefined) {
-			return Math.abs(m.dim - want / 100 * 255) < 255 * 0.15;
+		//which is what made a dimmed bathroom report itself fully on. An object
+		//step `{level, kelvin}` matches on its level (kelvin never changes which
+		//step a room is in -- the step is brightness/onoff, not tint).
+		const wantLevel = typeof want === 'number' ? want
+			: (want !== null && typeof want === 'object' && Number.isFinite(Number(want.level)) ? Number(want.level) : undefined);
+		if (wantLevel !== undefined && m.dim !== undefined) {
+			return Math.abs(m.dim - wantLevel / 100 * 255) < 255 * 0.15;
 		}
 		return true;
 	});

@@ -313,6 +313,10 @@ app.get('/config/zones', wrap(async (req, res) => {
 			//Whether a percentage is meaningful, straight from HA's
 			//supported_color_modes rather than from a hardcoded model list.
 			dimmable: dimmableFrom(devices[e.device]),
+			//White balance: the lamp's own kelvin range (or nulls when the lamp
+			//has never reported it), so the modal can offer a sensible slider.
+			colorMin: kelvinOf(devices[e.device], 'min_color_temp_kelvin') ?? null,
+			colorMax: kelvinOf(devices[e.device], 'max_color_temp_kelvin') ?? null,
 			name: friendlyName(devices[e.device]),
 		}));
 		if (rows.length) out[zone] = rows;
@@ -347,11 +351,6 @@ app.post('/config/zones', wrap(async (req, res) => {
 		if (!devs || typeof devs !== 'object') continue;
 
 		for (const [device, steps] of Object.entries(devs)) {
-			const bad = validateSteps(steps);
-			if (bad) {
-				res.statusCode = 400;
-				return res.end(JSON.stringify({ error: `${zone}/${device}: ${bad}` }));
-			}
 			const i = entries.findIndex(e => parseEntry(e).device === device);
 			if (i < 0) {
 				res.statusCode = 400;
@@ -361,6 +360,15 @@ app.post('/config/zones', wrap(async (req, res) => {
 			if (!isSwitchable(e)) {
 				res.statusCode = 400;
 				return res.end(JSON.stringify({ error: `${device} is a ${e.type}, not switchable` }));
+			}
+			//Kelvin is clamped to the lamp's own supported range, read live from
+			//its observed colour attributes.
+			const d = devices[e.device];
+			const range = [kelvinOf(d, 'min_color_temp_kelvin'), kelvinOf(d, 'max_color_temp_kelvin')];
+			const bad = validateSteps(steps, range);
+			if (bad) {
+				res.statusCode = 400;
+				return res.end(JSON.stringify({ error: `${zone}/${device}: ${bad}` }));
 			}
 			//Always written in the object form, so a saved config stops depending
 			//on the legacy string parsing.
@@ -871,13 +879,28 @@ function getDevice(dev) {
 //A step value is `true` (on), a whole percent 1-100, or absent (off at that
 //step). Anything else is refused rather than written -- db/config.json is read
 //unguarded at boot, so a bad value written here is a startup crash later.
-function validateSteps(steps) {
+function validateSteps(steps, range) {
 	if (steps === null || typeof steps !== 'object' || Array.isArray(steps)) return 'steps must be an object';
 	for (const [k, v] of Object.entries(steps)) {
 		if (!['night', 'mood', 'on'].includes(k)) return `unknown step ${k}`;
 		if (v === true) continue;
-		if (typeof v === 'number' && Number.isInteger(v) && v >= 1 && v <= 100) continue;
-		return `${k} must be true or a whole percent 1-100`;
+		if (typeof v === 'number') {
+			if (Number.isInteger(v) && v >= 1 && v <= 100) continue;
+			return `${k} must be true or a whole percent 1-100`;
+		}
+		//White balance: {level, kelvin} -- on at a brightness AND a colour
+		//temperature. Kelvin is clamped to the lamp's own supported range when
+		//it is known (shapeOf exposes colorMin/colorMax), else accepted as-is.
+		if (v !== null && typeof v === 'object' && !Array.isArray(v)) {
+			const { level, kelvin } = v;
+			if (!Number.isInteger(level) || level < 1 || level > 100) return `${k}.level must be a whole percent 1-100`;
+			if (!Number.isFinite(kelvin) || kelvin < 1) return `${k}.kelvin must be a positive number`;
+			const [min, max] = range ?? [];
+			if (Number.isFinite(min) && kelvin < min) return `${k}.kelvin ${kelvin} below lamp range ${min}`;
+			if (Number.isFinite(max) && kelvin > max) return `${k}.kelvin ${kelvin} above lamp range ${max}`;
+			continue;
+		}
+		return `${k} must be true, a whole percent 1-100, or {level, kelvin}`;
 	}
 	return undefined;
 }

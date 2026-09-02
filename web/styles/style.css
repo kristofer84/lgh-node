@@ -684,29 +684,47 @@ body.nightmode #btn-fullscreen i {
   accent-color: #ffcc00;
 }
 
-#room-config-grid input[type="number"] {
-  width: 3.2rem;
-  margin-left: 0.3rem;
-  padding: 0.15rem 0.3rem;
-  background: #262626;
-  color: #e8e8e8;
-  border: 1px solid #454545;
-  border-radius: 4px;
-  font: inherit;
-  text-align: right;
+#room-config-grid input[type="range"] {
+  width: 5.5rem;
+  margin-left: 0.35rem;
+  vertical-align: middle;
+  accent-color: #ffcc00;
+  cursor: pointer;
 }
 
-#room-config-grid input[type="number"]:disabled {
+#room-config-grid input[type="range"]:disabled {
   opacity: 0.35;
+  cursor: default;
 }
 
 #room-config-grid .pct {
-  color: #7d7d7d;
+  color: #e8e8e8;
   font-size: 0.8em;
-  margin-left: 0.15rem;
+  margin-left: 0.3rem;
+  min-width: 2.4rem;
+  display: inline-block;
+  text-align: right;
 }
 
-#room-config-grid input[type="number"]:disabled + .pct {
+#room-config-grid input[type="range"]:disabled ~ .pct {
+  opacity: 0.35;
+}
+
+/* Kelvin runs to four digits, so it needs a hair more room than a percent. */
+#room-config-grid input[data-kelvin] {
+  width: 6rem;
+}
+
+#room-config-grid .ktxt {
+  color: #e8e8e8;
+  font-size: 0.8em;
+  margin-left: 0.3rem;
+  min-width: 2.8rem;
+  display: inline-block;
+  text-align: right;
+}
+
+#room-config-grid input[data-kelvin]:disabled ~ .ktxt {
   opacity: 0.35;
 }
 
