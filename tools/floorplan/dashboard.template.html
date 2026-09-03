@@ -66,9 +66,9 @@
           <thead>
             <tr>
               <th class="light">Lampa</th>
-              <th>Natt</th>
-              <th>Dämpat</th>
-              <th>På</th>
+              <th>Natt <button type="button" class="capture" data-step="night" title="Sätt till nuvarande"><i class="fas fa-crosshairs"></i></button></th>
+              <th>Dämpat <button type="button" class="capture" data-step="mood" title="Sätt till nuvarande"><i class="fas fa-crosshairs"></i></button></th>
+              <th>På <button type="button" class="capture" data-step="on" title="Sätt till nuvarande"><i class="fas fa-crosshairs"></i></button></th>
             </tr>
           </thead>
           <tbody id="room-config-rows"></tbody>
@@ -81,6 +81,7 @@
       </div>
       <div id="room-config-foot">
         <button id="room-config-save" type="button" disabled>Spara</button>
+        <button id="room-config-cancel" type="button">Avbryt</button>
         <span id="room-config-status" role="status"></span>
       </div>
     </div>

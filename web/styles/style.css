@@ -734,11 +734,25 @@ body.nightmode #btn-fullscreen i {
   margin-top: 0.75rem;
 }
 
+/* "Sätt till nuvarande" in each mood column header. */
+#room-config-grid th .capture {
+  margin-left: 0.35rem;
+  padding: 0.05rem 0.3rem;
+  font-size: 0.75em;
+  vertical-align: middle;
+  color: #9a9a9a;
+}
+
+#room-config-grid th .capture:hover {
+  color: #e8e8e8;
+  background: #3d3d3d;
+}
+
 #room-config-foot {
   flex: 0 0 auto;
   display: flex;
   align-items: center;
-  gap: 0.75rem;
+  gap: 0.5rem;
   padding: 0.5rem 0.75rem;
   background: #262626;
   border-top: 1px solid #454545;

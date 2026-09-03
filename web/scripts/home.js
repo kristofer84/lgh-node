@@ -883,6 +883,41 @@ function cfgMarkDirty(device, tr) {
 	cfgSetStatus('Osparade ändringar', 'warn');
 }
 
+//"Sätt till nuvarande": copy the room's LIVE state (each lamp's on/off +
+//brightness + white balance) into one mood's step column, without saving. An
+//off lamp becomes unchecked (off at that step); an on lamp gets its dim % and,
+//where the lamp reports one, its kelvin.
+function cfgCapture(step) {
+	if (!roomConfigZone) return;
+	document.querySelectorAll('#room-config-rows tr').forEach(tr => {
+		const row = cfgRowMeta.get(tr);
+		if (!row) return;
+		const live = model[roomConfigZone]?.[row.device];
+		const box = cfgField(tr, `input[type=checkbox][data-step="${step}"]`);
+		if (!box) return;
+		const td = box.closest('td');
+		const on = !!(live?.onoff);
+		box.checked = on;
+
+		const pct = /** @type {HTMLInputElement | null} */ (td?.querySelector('input[type=range]:not([data-kelvin])'));
+		if (pct) {
+			pct.disabled = !on;
+			if (live?.dim !== undefined) pct.value = String(cfgClampPct(Math.round(Number(live.dim) / 255 * 100)));
+			td?.querySelector('.pct')?.replaceChildren(`${cfgClampPct(pct.value)}%`);
+		}
+
+		const kelv = /** @type {HTMLInputElement | null} */ (td?.querySelector('input[type=range][data-kelvin]'));
+		if (kelv && (row.colorMin != null || row.colorMax != null)) {
+			kelv.disabled = !on;
+			if (live?.colorTemp !== undefined) kelv.value = String(cfgClampKelvin(row, live.colorTemp));
+			td?.querySelector('.ktxt')?.replaceChildren(`${cfgClampKelvin(row, kelv.value)}K`);
+		}
+
+		cfgMarkDirty(row.device, tr);
+	});
+	cfgSetStatus(`Fyllde ${step} från nuvarande läge`, 'ok');
+}
+
 function cfgBuildRow(row) {
 	const tr = document.createElement('tr');
 	cfgRowMeta.set(tr, row);
@@ -1023,6 +1058,8 @@ async function cfgSave() {
 		roomConfigDirty = {};
 		await cfgLoad(roomConfigZone);
 		cfgSetStatus(`Sparat (${data.changed?.length ?? 0} lampor)`, 'ok');
+		//Save also closes the dialog, like the Avbryt and X buttons.
+		setTimeout(closeRoomConfig, 600);
 	} catch (err) {
 		cfgSetStatus(`Kunde inte spara: ${err.message}`, 'error');
 		cfgBtn('room-config-save').disabled = false;
@@ -1052,7 +1089,13 @@ $(document).ready(function () {
 
 	$('#room-config-close').on('click', closeRoomConfig);
 	$('#room-config-bg').on('click', closeRoomConfig);
+	$('#room-config-cancel').on('click', closeRoomConfig);
 	$('#room-config-save').on('click', cfgSave);
+	//One "Sätt till nuvarande" button per mood column header.
+	$('.capture').on('click', function () {
+		const step = this.dataset.step;
+		if (step) cfgCapture(step);
+	});
 });
 
 
