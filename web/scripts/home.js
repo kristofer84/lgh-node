@@ -376,7 +376,7 @@ function updateMap(data) {
 //Update view from model
 function updateView() {
 	Object.keys(model).forEach(zone => {
-		const { step: value, nattable, kvallable, dagable, lights } = stepOf(model[zone]);
+		const { step: value, nattable, kvallable, dagable, stadable, lights } = stepOf(model[zone]);
 
 		let ar = document.getElementById(zone);
 		//Zones without a room drawn for them (home, utomhus, moja, devices) are
@@ -394,9 +394,16 @@ function updateView() {
 			return;
 		}
 
-		if (dagable && !ar.hasAttribute("dagable")) ar.setAttribute("dagable", "dagable");
-		if (kvallable && !ar.hasAttribute("kvallable")) ar.setAttribute("kvallable", "kvallable");
-		if (nattable && !ar.hasAttribute("nattable")) ar.setAttribute("nattable", "nattable");
+		//Mirror availability onto the room group as attributes, CLEARING them when
+		//they flip false: the long-press menu reads these to decide which steps to
+		//offer, and a step that no lamp turns on at must disappear, not linger from
+		//an earlier render (e.g. stad once every lamp is ignore/false at it).
+		/** @type {[string, boolean][]} */
+		const flags = [['dagable', dagable], ['kvallable', kvallable], ['nattable', nattable], ['stadable', stadable]];
+		for (const [attr, flag] of flags) {
+			if (flag) ar.setAttribute(attr, attr);
+			else ar.removeAttribute(attr);
+		}
 
 		updateArea(ar, value);
 
@@ -436,6 +443,7 @@ function getNextStateRoom(element) {
 		nattable: element.getAttribute("nattable"),
 		kvallable: element.getAttribute("kvallable"),
 		dagable: element.getAttribute("dagable"),
+		stadable: element.getAttribute("stadable"),
 	});
 }
 
@@ -727,14 +735,17 @@ const ROOM_PRESETS = [
 
 let roomMenuZone = null;
 
-//A step is offered when the room's lamps can do it. `natt`/`kvall`/`dag` are
-//read off the room group's attributes (set by updateView from stepOf), `off`
-//and `stad` are always offered.
+//A step is offered when the room's lamps can do it: `natt`/`kvall`/`dag`/`stad`
+//are read off the room group's attributes (set by updateView from stepOf, and
+//true only when at least one lamp turns ON at that step); `off` is always
+//offered. A step left ignore/false on every lamp disappears rather than being
+//selectable to no effect.
 function roomAvailableSteps(roomEl) {
-	const out = ['off', 'stad'];
+	const out = ['off'];
 	if (roomEl.hasAttribute('nattable')) out.push('natt');
 	if (roomEl.hasAttribute('kvallable')) out.push('kvall');
 	if (roomEl.hasAttribute('dagable')) out.push('dag');
+	if (roomEl.hasAttribute('stadable')) out.push('stad');
 	return out;
 }
 

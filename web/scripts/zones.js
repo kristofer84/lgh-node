@@ -229,11 +229,12 @@ export function sceneFor(entries, step) {
 export function stepsAvailable(entries) {
 	const sw = parseZone(entries).filter(isSwitchable);
 	//"lit at" = the value turns the device ON (not false/absent): true, a number,
-	//or a {level, kelvin} object.
+	//or a {level, kelvin} object. `stad` is no different now: a room where no lamp
+	//turns on at `stad` cannot meaningfully press it, so it is not offered.
 	const lit = (/** @type {unknown} */ v) =>
 		v !== false && v !== undefined && v !== null;
-	const any = (/** @type {'natt'|'kvall'|'dag'} */ k) => sw.some(e => lit(e.steps?.[k]));
-	return { natt: any('natt'), kvall: any('kvall'), dag: any('dag'), stad: true };
+	const any = (/** @type {'natt'|'kvall'|'dag'|'stad'} */ k) => sw.some(e => lit(e.steps?.[k]));
+	return { natt: any('natt'), kvall: any('kvall'), dag: any('dag'), stad: any('stad') };
 }
 
 //--------------------------------------------- which step a zone is in now
@@ -248,7 +249,7 @@ export function stepsAvailable(entries) {
 //back as `step`.
 /**
  * @param {ZoneModel} zoneModel
- * @returns {{step: Step, nattable: boolean, kvallable: boolean, dagable: boolean, lights: string[]}}
+ * @returns {{step: Step, nattable: boolean, kvallable: boolean, dagable: boolean, stadable: boolean, lights: string[]}}
  */
 export function stepOf(zoneModel) {
 	const lights = Object.keys(zoneModel).filter(n => Object.hasOwn(zoneModel[n], 'onoff'));
@@ -257,6 +258,7 @@ export function stepOf(zoneModel) {
 	const nattable = lights.some(n => lit(zoneModel[n].steps?.natt));
 	const kvallable = lights.some(n => lit(zoneModel[n].steps?.kvall));
 	const dagable = lights.some(n => lit(zoneModel[n].steps?.dag));
+	const stadable = lights.some(n => lit(zoneModel[n].steps?.stad));
 
 	//Does the room currently match what this step prescribes? A lamp the step
 	//IGNORES (absent) imposes no constraint; `false` demands off; anything else
@@ -290,7 +292,7 @@ export function stepOf(zoneModel) {
 	//...otherwise `partial`: lit, but not in any scene the room defines. No press
 	//produces it; it only describes what is on screen.
 
-	return { step, nattable, kvallable, dagable, lights };
+	return { step, nattable, kvallable, dagable, stadable, lights };
 }
 
 //What each switchable device in a zone should LOOK LIKE (on/off) once `step`
@@ -429,25 +431,26 @@ export function nestGroupRows(groups, devices) {
 
 //What a press moves the room to, darkest to brightest: off -> natt -> kvall ->
 //dag -> stad -> off. A step is skipped when the room's lamps cannot do it (the
-//mood/night flags come from stepsAvailable via stepOf). `stad` is always
-//reachable.
+//mood/night flags come from stepsAvailable via stepOf). A step no lamp turns ON
+//at -- including `stad` -- is skipped the same way, so an empty `stad` falls
+//through to `off` rather than a press that lights nothing.
 /**
  * @param {string|null} current  the room's present step
- * @param {{nattable?: unknown, kvallable?: unknown, dagable?: unknown}} [opts]
+ * @param {{nattable?: unknown, kvallable?: unknown, dagable?: unknown, stadable?: unknown}} [opts]
  *   Truthiness is all that matters: home.js passes DOM attribute values, which
  *   are strings or null, not booleans.
  * @returns {Exclude<Step, 'partial'>|undefined} undefined when `current` is not a known step
  */
-export function nextStep(current, { nattable, kvallable, dagable } = {}) {
+export function nextStep(current, { nattable, kvallable, dagable, stadable } = {}) {
 	switch (current) {
 		case 'stad': return 'off';
 		//A partially-lit room presses to off, which is what it did while it was
 		//mislabelled as `on`. Pressing a room with something on should turn it off.
 		case 'partial': return 'off';
-		case 'off': return nattable ? 'natt' : kvallable ? 'kvall' : dagable ? 'dag' : 'stad';
-		case 'dag': return 'stad';
-		case 'kvall': return dagable ? 'dag' : 'stad';
-		case 'natt': return kvallable ? 'kvall' : dagable ? 'dag' : 'stad';
+		case 'off': return nattable ? 'natt' : kvallable ? 'kvall' : dagable ? 'dag' : (stadable ? 'stad' : 'off');
+		case 'dag': return stadable ? 'stad' : 'off';
+		case 'kvall': return dagable ? 'dag' : (stadable ? 'stad' : 'off');
+		case 'natt': return kvallable ? 'kvall' : dagable ? 'dag' : (stadable ? 'stad' : 'off');
 	}
 	return undefined;
 }

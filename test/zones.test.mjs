@@ -155,10 +155,27 @@ test('stepOf really is the inverse of sceneFor, for every step', () => {
 			if (step === 'natt' && !avail.natt) continue;
 			if (step === 'kvall' && !avail.kvall) continue;
 			if (step === 'dag' && !avail.dag) continue;
+			const actions = sceneFor(entries, step);
+			//A scene that IGNORES a switchable device (absent at this step)
+			//under-specifies the room: that device's state is arbitrary, so stepOf
+			//cannot uniquely reverse it and its dimmest-first reading (a dimmer step
+			//that leaves the lamp unconstrained) is as true as this one. The inverse
+			//property only holds for scenes that say something about EVERY device.
+			if (step !== 'off' && actions.length < sw.length) continue;
+			//Likewise, two steps that publish the SAME scene (a single-lamp room at
+			//100 in both `dag` and `stad`) are indistinguishable: stepOf reads the
+			//dimmer one, so the brighter is not reachable as a distinct reading.
+			const ORDER = ['off', 'natt', 'kvall', 'dag', 'stad'];
+			const cur = JSON.stringify(actions);
+			let dimmerCollides = false;
+			for (const s of ORDER.slice(0, ORDER.indexOf(step))) {
+				if (JSON.stringify(sceneFor(entries, s)) === cur) { dimmerCollides = true; break; }
+			}
+			if (dimmerCollides) continue;
 			//Build the model the room would be in after pressing `step`.
 			/** @type {ZoneModel} */
 			const m = {};
-			for (const a of sceneFor(entries, step)) {
+			for (const a of actions) {
 				const dev = a.entity.split('.')[1];
 				const e = sw.find(x => x.device === dev);
 				m[dev] = a.level !== undefined
@@ -243,19 +260,24 @@ test('sceneStates predicts each lamp for a room press', () => {
 });
 
 test('nextStep walks the cycle', () => {
-	const all = { nattable: true, kvallable: true, dagable: true };
+	const all = { nattable: true, kvallable: true, dagable: true, stadable: true };
 	assert.equal(nextStep('off', all), 'natt');
 	assert.equal(nextStep('natt', all), 'kvall');
 	assert.equal(nextStep('kvall', all), 'dag');
 	assert.equal(nextStep('dag', all), 'stad');
 	assert.equal(nextStep('stad', all), 'off');
-	//A zone with no moods is a plain two-step (off <-> stad).
-	assert.equal(nextStep('off', {}), 'stad');
-	assert.equal(nextStep('stad', {}), 'off');
+	//A zone with no moods is a plain two-step (off <-> stad) -- but only while
+	//`stad` actually turns anything on.
+	assert.equal(nextStep('off', { stadable: true }), 'stad');
+	assert.equal(nextStep('stad', { stadable: true }), 'off');
+	//A `stad` no lamp turns on at is skipped, stepping to off instead of a dead press.
+	assert.equal(nextStep('off', {}), 'off');
+	assert.equal(nextStep('dag', { dagable: true }), 'off');
+	assert.equal(nextStep('kvall', { kvallable: true }), 'off');
+	assert.equal(nextStep('natt', { nattable: true }), 'off');
 	//Skipping a mood the room cannot do.
-	assert.equal(nextStep('off', { kvallable: true, dagable: true }), 'kvall');
-	assert.equal(nextStep('kvall', { kvallable: true }), 'stad');
-	assert.equal(nextStep('natt', { nattable: true, dagable: true }), 'dag');
+	assert.equal(nextStep('off', { kvallable: true, dagable: true, stadable: true }), 'kvall');
+	assert.equal(nextStep('natt', { nattable: true, dagable: true, stadable: true }), 'dag');
 	//A partially-lit room presses to off, which is what it did while it was
 	//mislabelled as `stad`.
 	assert.equal(nextStep('partial', { dagable: true }), 'off');
