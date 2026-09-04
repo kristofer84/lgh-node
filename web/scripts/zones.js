@@ -293,6 +293,35 @@ export function stepOf(zoneModel) {
 	return { step, nattable, kvallable, dagable, lights };
 }
 
+//What each switchable device in a zone should LOOK LIKE (on/off) once `step`
+//has been applied -- the optimistic render for a room press, so the lamps do
+//not all flash off while the server echoes them back one by one. Mirrors
+//sceneFor(): `off` sweeps everything off; an ABSENT step leaves the device as it
+//is; `false` means off; anything else (true / number / {level, kelvin}) means on.
+/**
+ * @param {ZoneModel} zoneModel
+ * @param {Exclude<Step, 'partial'>} step
+ * @returns {Record<string, 'on'|'off'>}  only switchable devices, keyed by name
+ */
+export function sceneStates(zoneModel, step) {
+	/** @type {Record<string, 'on'|'off'>} */
+	const out = {};
+	for (const name of Object.keys(zoneModel)) {
+		if (!Object.hasOwn(zoneModel[name], 'onoff')) continue;
+		let on;
+		if (step === 'off') {
+			on = false;
+		} else {
+			const v = zoneModel[name].steps?.[/** @type {'natt'|'kvall'|'dag'|'stad'} */ (step)];
+			// ABSENT -> ignore: keep the device exactly as it is now.
+			if (v === undefined) on = !!zoneModel[name].onoff;
+			else on = v !== false;
+		}
+		out[name] = on ? 'on' : 'off';
+	}
+	return out;
+}
+
 //------------------------------------------------------------- the cycle
 
 //What a press moves the room to, darkest to brightest: off -> natt -> kvall ->
@@ -304,7 +333,7 @@ export function stepOf(zoneModel) {
  * @param {{nattable?: unknown, kvallable?: unknown, dagable?: unknown}} [opts]
  *   Truthiness is all that matters: home.js passes DOM attribute values, which
  *   are strings or null, not booleans.
- * @returns {Step|undefined} undefined when `current` is not a known step
+ * @returns {Exclude<Step, 'partial'>|undefined} undefined when `current` is not a known step
  */
 export function nextStep(current, { nattable, kvallable, dagable } = {}) {
 	switch (current) {

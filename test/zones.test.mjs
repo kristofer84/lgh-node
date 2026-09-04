@@ -6,7 +6,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { ROOT } from './helpers.mjs';
-import { parseEntry, sceneFor, stepOf, nextStep, stepsAvailable } from '../web/scripts/zones.js';
+import { parseEntry, sceneFor, stepOf, nextStep, stepsAvailable, sceneStates } from '../web/scripts/zones.js';
 
 /** @typedef {import('../web/scripts/zones.js').Steps} Steps */
 /** @typedef {import('../web/scripts/zones.js').ZoneModel} ZoneModel */
@@ -223,6 +223,23 @@ test('⚠ a room with only untiered lights on reads as partial, not stad', () =>
 	})).step, 'partial');
 	//`stad` still means every light, and nothing produces `partial` as a command.
 	assert.ok(!sceneFor(['a.light', 'b.light.mood'], 'partial').some(x => x.state === 'on'));
+});
+
+test('sceneStates predicts each lamp for a room press', () => {
+	//The optimistic render: what each switchable device should look like once the
+	//step has applied. `off` sweeps everything off; an ABSENT step leaves the
+	//device as it is; `false` means off; anything else means on. Sensors are
+	//skipped. This is what stops a room press blanking every lamp to off.
+	const z = model({
+		a: { onoff: true, steps: steps({ natt: false, kvall: 30, stad: 100 }) },
+		b: { onoff: false, steps: steps({ stad: 100 }) },            // natt/kvall/dag absent
+		c: { onoff: true, steps: steps({ stad: true, kvall: false }) },
+		hall_temperature: { state: '21.5' },
+	});
+	assert.deepEqual(sceneStates(z, 'stad'), { a: 'on', b: 'on', c: 'on' });
+	assert.deepEqual(sceneStates(z, 'kvall'), { a: 'on', b: 'off', c: 'off' });
+	assert.deepEqual(sceneStates(z, 'natt'), { a: 'off', b: 'off', c: 'on' });
+	assert.deepEqual(sceneStates(z, 'off'), { a: 'off', b: 'off', c: 'off' });
 });
 
 test('nextStep walks the cycle', () => {

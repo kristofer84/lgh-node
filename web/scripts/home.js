@@ -1,6 +1,6 @@
 //The step semantics live in zones.js, the same file the server and the
 //floorplan builder import, so all three cannot drift apart.
-import { stepOf, nextStep } from './zones.js';
+import { stepOf, nextStep, sceneStates } from './zones.js';
 
 //import Auth from './auth.js';
 
@@ -485,12 +485,6 @@ function setItemState(id, value) {
 	document.getElementById("glow-" + id)?.setAttribute("state", value);
 }
 
-/** @param {string} id */
-function clearItemState(id) {
-	document.getElementById(id)?.removeAttribute("state");
-	document.getElementById("glow-" + id)?.removeAttribute("state");
-}
-
 // END Update model and view
 
 // START Buttons
@@ -505,9 +499,11 @@ $(document).ready(function () {
 
 		//The lamps are drawn in their own layer above the plan, so they are no
 		//longer descendants of the room group and $(ar).find() no longer reaches
-		//them. Clear this zone's lamps by name instead, so the room-level render
-		//takes over until the server echoes the change back.
-		Object.keys(model[name] ?? {}).forEach(clearItemState);
+		//them. Set each lamp to the state the next step will PUT it in (sceneStates
+		//mirrors sceneFor), so nothing flashes "off" while the server echoes the
+		//devices back one by one. The room-level wash takes over via updateArea().
+		const predicted = sceneStates(model[name] ?? {}, nextState);
+		Object.keys(predicted).forEach(id => setItemState(id, predicted[id]));
 
 		var item = {
 			type: 'room',
@@ -797,9 +793,12 @@ function sendRoomStep(step) {
 	const roomEl = document.getElementById(roomMenuZone);
 	if (!roomEl) return;
 
-	//Same optimistic render a normal room press does: clear the zone's lamps by
-	//name and mark the area, then queue the toggle for the server.
-	Object.keys(model[roomMenuZone] ?? {}).forEach(clearItemState);
+	//Same optimistic render a normal room press does: set each lamp to the state
+	//the chosen step will put it in (sceneStates mirrors sceneFor), then mark the
+	//area and queue the toggle for the server. Lamps that the step IGNORES keep
+	//their present state, so nothing flashes off while the echo settles.
+	const predicted = sceneStates(model[roomMenuZone] ?? {}, step);
+	Object.keys(predicted).forEach(id => setItemState(id, predicted[id]));
 	updateArea(roomEl, step);
 
 	queue({
