@@ -149,6 +149,13 @@ publishes its kelvin alongside its brightness, and only for lamps whose `steps` 
 object. Home Assistant's `(mqtt in) Rumsscen` automation receives it and hands it to
 `script.rumsscen`, which splits the batch into Z-Wave multicast vs individual calls — see §7.
 
+A **whole-flat** scene does not go through `publish()` either. Home Assistant's Scene Mode
+Automation publishes `mqtt.publish` to `webapp/sceneset/<dag|kvall|stad|natt|off>`; lgh-node
+subscribes to `#` and, in the message handler, expands `db/config.json`'s `scenes` map (a
+`{ room -> mood }` table) and calls `toggle(room, mood)` for each room. So mood **values** live
+in exactly one place (`db/config.json`), and the HA scene buttons + physical Fibaro buttons
+only select a scene *name*.
+
 ## 5. `db/config.json` (gitignored — not in the repo)
 
 ```jsonc
@@ -160,9 +167,22 @@ object. Home Assistant's `(mqtt in) Rumsscen` automation receives it and hands i
   "defaults": { "hsv": { "h": 0, "s": 0, "v": 100 } },      // read by nothing
   "zones": {
     "<zone>": [ "<device>.<type>[.<flag>]", … ]
+  },
+  "scenes": {
+    "dag":   { "vardagsrum": "dag", "kok": "dag", … },   // whole-flat scene → room → mood
+    "kvall": { "vardagsrum": "kvall", "kok": "kvall", … },
+    "stad":  { … },
+    "natt":  { … },
+    "off":   { "sov1": "off", … }   // every room listed, to guarantee full dark
   }
 }
 ```
+
+The **`scenes`** map is the single source of truth for whole-flat scenes. A scene maps each
+room to one of its moods (`off`/`natt`/`kvall`/`dag`/`stad`); a room **not** listed in a scene
+is left untouched. HA's `input_select.scene_mode` (dag/kvall/stad/natt/off) and the physical
+Fibaro buttons select a scene *name*; lgh-node expands it through `publishScene()` →
+`toggle()`, so the actual brightness/kelvin values are read only from the room `steps` above.
 
 ### The device string
 
@@ -187,18 +207,34 @@ object. Home Assistant's `(mqtt in) Rumsscen` automation receives it and hands i
 > ⚠ **The string form above is the LEGACY one.** Since 2026-08-28 a switchable entry is an
 > **object**, which is what the config page reads and writes:
 > ```json
-> { "device": "badrum_1_tak", "type": "light", "steps": { "mood": 20, "on": 100 } }
+> { "device": "badrum_1_tak", "type": "light", "steps": { "kvall": 20, "dag": 70, "stad": 100 } }
 > ```
-> A step key that is **absent means off at that step**; `true` means on; a number means on at
-> that brightness in percent; an object `{level, kelvin}` means on at that brightness **and**
-> at that colour temperature (kelvin), for lamps that support white balance. The `off` step is
-> implicit. Sensor and occupancy entries keep the
+> A step key is **three-state**:
+>   - **absent** → **ignore**: the scene leaves the lamp exactly as it is, untouched.
+>   - `false` → **off**: the scene turns the lamp off.
+>   - `true` → on; a number → on at that brightness in percent; an object `{level, kelvin}` → on
+>     at that brightness **and** at that colour temperature (kelvin), for lamps that support
+>     white balance.
+> The `off` step (the whole-flat all-off, and a room's off press) is implicit and ALWAYS turns
+> every switchable device off, regardless of these keys. Sensor and occupancy entries keep the
 > plain string form — they have no steps and the page never touches them.
+>
+> **Step names (since 2026-09-03) mirror HA's `scene_mode`: `natt`, `kvall`, `dag`, `stad`.**
+> They were renamed from `night`, `mood`, `on` (+ a new `dag`) so a whole-flat scene maps 1:1 onto
+> room moods. The cycle is darkest→brightest `off → natt → kvall → dag → stad`.
 > `parseEntry()` still reads the string form and translates a tier into the steps it used to
-> imply, so an old config keeps working. That translation is where the old model was least
+> imply (`night`→`natt` + `kvall` + `stad`; `mood`→`kvall` + `stad`; none→`stad`), so an old
+> config keeps working. That translation is where the old model was least
 > obvious: **`night` also lit at `mood`**, and **`on` lit everything regardless of tier**.
 > ⚠ The step values are now authoritative and independent, which is the point: a device can be
-> lit at `night` but not `mood`, or left out of `on` entirely. Neither was expressible before.
+> lit at `natt` but not `kvall`, or left out of `stad` entirely. Neither was expressible before.
+>
+> ⚠ **The three-state semantics were introduced 2026-09-03** (before: absent meant OFF, there
+> was no "ignore"). `db/config.json` was migrated in one shot — every absent named step became
+> an explicit `false` — so no behaviour changed until you delete a `false` key (which turns it
+> back into "ignore"). The config page's per-step control became a three-way `<select>`: — / Av / På.
+> This is also what lets a whole-flat scene stop turning off lamps that were never meant to be
+> touched by it (e.g. the `z_lampor_alla` Zigbee group physically spans several rooms).
 
 - `[3]` **brightness** (optional, and only meaningful with `[2]`) — percent, e.g.
   `badrum_1_tak.light.mood.20`. Sets `devices[d].level`; makes that light dim to 20% at its
@@ -363,8 +399,9 @@ while it was mislabelled.
 ### The light-settings editor — inline on the dashboard, `/config/zones`
 
 Long-press a room to open the preset menu, tap its config symbol (the sliders icon in the
-menu header) and the room's step table opens as a modal (`#room-config`). Pick which lights
-each step turns on and type a percentage where the hardware takes one. It edits `steps` and
+menu header) and the room's step table opens as a modal (`#room-config`). Each step cell is a
+**three-way `<select>`**: `—` (ignore, leave the lamp alone), `Av` (off), or `På` (on) — and
+a percentage where the hardware takes one. It edits `steps` and
 nothing else: which devices are in a zone, **their order**, and the sensor entries are all
 preserved. Order matters — the floorplan generator uses it to place a lamp that has no
 position of its own yet.
@@ -377,8 +414,8 @@ never reported one falls back to the apartment's shared 2202–4000 K).
 
 - `GET /config/zones` → one row per switchable device per zone: `steps`, the HA friendly name,
   `dimmable`, and `colorMin`/`colorMax` (the lamp's own kelvin range, or `null`).
-- `POST /config/zones` with `{zone: {device: steps}}` → validates (a step is `true`, a whole
-  percent 1–100, or `{level, kelvin}` with the kelvin clamped to the lamp's range), backs up,
+- `POST /config/zones` with `{zone: {device: steps}}` → validates (a step is `false`, `true`, a
+  whole percent 1–100, or `{level, kelvin}` with the kelvin clamped to the lamp's range), backs up,
   writes, reloads in-process and broadcasts a fresh `device.all` so open dashboards follow
   immediately.
 
@@ -417,6 +454,34 @@ covers it, and reverting it to call `init()` makes that test fail.
 
 Writes go through `saveConfig()`: timestamped backup, temp file, atomic rename. `db/config.json`
 is read unguarded at boot, so a half-written file is a startup crash later.
+
+### The scene-membership editor — settings menu, `/config/scenes`
+
+Tap the layers icon in the settings menu (`#btn-scenes`) to open the whole-flat scene editor
+(`#scenes-config`). It is a checkbox grid: one row per room with a switchable device, one
+column per editable scene (`natt`/`kvall`/`dag`/`stad`). A checked room means that scene
+**touches** the room — turns its lights on or off per its mood — an unchecked room is left
+untouched. This edits **room membership only**, the `{ room -> mood }` values stay exactly as
+they are in `db/config.json`; a room checked *into* a scene for the first time defaults to that
+scene's own name as its mood.
+
+- `GET /config/scenes` → the raw `scenes` map from `db/config.json` (`{scene: {room: mood}}`).
+- `POST /config/scenes` with `{scene: [room, ...]}` → replaces that scene's room set: rooms in
+the list are kept (existing mood preserved, new rooms default to the scene name), rooms left
+out are removed so the scene stops touching them. Backs up, writes, regenerates
+`db/scenes.json`, and exposes nothing about the mood values (they are read back from the same
+file the request was applied to, so a concurrent hand-edit cannot be clobbered).
+
+⚠ **`off` is deliberately not editable.** It is the all-lights-out sweep and must always turn
+every switchable device off — that is its safety semantics. The editor rejects an `off` key
+with a 400.
+
+⚠ **Registered below `cookieMiddleware`, same as `/config/zones`, and must stay there.**
+
+⚠ **Saving touches `db/config.json` and re-runs `writeScenesJson()`**, so the hard-linked
+`/config/scenes.json` in Home Assistant picks the change up on the next scene press. Like the
+room editor it edits the on-disk copy (never the boot snapshot), so only the scenes named in
+the request change.
 
 ### `toggle(zone, value)` — room-level
 

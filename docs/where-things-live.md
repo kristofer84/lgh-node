@@ -422,6 +422,11 @@ light step publishes (`sceneFor`), of which step a room is currently in (`stepOf
 and of what a press moves it to (`nextStep`). Imported by all three consumers:
 `mqtt-web.js`, `tools/floorplan/generate.mjs`, and — in the browser — `web/scripts/home.js`.
 
+⚠ **A step value is three-state (since 2026-09-03):** absent = IGNORE (leave the lamp alone),
+`false` = off, `true`/number/`{level, kelvin}` = on (at a brightness, optionally a kelvin).
+`sceneFor` omits an ignored device entirely from the published scene. The `off` step always
+names every switchable device off.
+
 ⚠ **It has to live under `web/`.** There is no build step and no bundler; `express.static('./web')`
 serves it at `/scripts/zones.js` and `dashboard.html` loads `home.js` with `type="module"`, so
 that directory is the only path all three can import from. Keep it free of imports and of

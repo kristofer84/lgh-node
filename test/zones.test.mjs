@@ -18,12 +18,14 @@ const model = m => m;
 test('parseEntry: the legacy string form maps a tier onto the steps it implied', () => {
 	assert.deepEqual(parseEntry('sovrum_1_tak.light'), {
 		entry: 'sovrum_1_tak.light', device: 'sovrum_1_tak', type: 'light',
-		tier: undefined, level: undefined, steps: { on: true }, entity: 'light.sovrum_1_tak',
+		tier: undefined, level: undefined,
+		steps: { natt: false, kvall: false, dag: false, stad: true }, entity: 'light.sovrum_1_tak',
 	});
-	//⚠ night implied mood, and `on` lit everything regardless of tier.
-	assert.deepEqual(parseEntry('slinga.light.night').steps, { night: true, mood: true, on: true });
-	assert.deepEqual(parseEntry('lampa.light.mood').steps, { mood: true, on: true });
-	assert.deepEqual(parseEntry('tak.light.mood.20').steps, { mood: 20, on: 100 });
+	//⚠ night implied mood, and `stad` lit everything regardless of tier. The
+	//unlit steps are now explicit `false` (off), not absent -- absent means ignore.
+	assert.deepEqual(parseEntry('slinga.light.night').steps, { natt: true, kvall: true, dag: false, stad: true });
+	assert.deepEqual(parseEntry('lampa.light.mood').steps, { natt: false, kvall: true, dag: false, stad: true });
+	assert.deepEqual(parseEntry('tak.light.mood.20').steps, { natt: false, kvall: 20, dag: false, stad: 100 });
 	//A sensor has no steps at all and is never published to.
 	assert.deepEqual(parseEntry('hall_temperature.sensor').steps, {});
 	assert.equal(parseEntry('sang_hoger.switch.mood').tier, 'mood');
@@ -34,65 +36,72 @@ test('parseEntry: the legacy string form maps a tier onto the steps it implied',
 });
 
 test('parseEntry: the object form is taken as written', () => {
-	const e = parseEntry({ device: 'badrum_1_tak', type: 'light', steps: { mood: 20, on: 100 } });
+	const e = parseEntry({ device: 'badrum_1_tak', type: 'light', steps: { kvall: 20, stad: 100 } });
 	assert.equal(e.device, 'badrum_1_tak');
 	assert.equal(e.entity, 'light.badrum_1_tak');
-	assert.deepEqual(e.steps, { mood: 20, on: 100 });
+	assert.deepEqual(e.steps, { kvall: 20, stad: 100 });
 });
 
 test('parseEntry: the object form carries a {level, kelvin} step through untouched', () => {
-	const e = parseEntry({ device: 'golvlampa', type: 'light', steps: { mood: { level: 20, kelvin: 2700 }, on: 100 } });
+	const e = parseEntry({ device: 'golvlampa', type: 'light', steps: { kvall: { level: 20, kelvin: 2700 }, stad: 100 } });
 	assert.equal(e.device, 'golvlampa');
-	assert.deepEqual(e.steps, { mood: { level: 20, kelvin: 2700 }, on: 100 });
+	assert.deepEqual(e.steps, { kvall: { level: 20, kelvin: 2700 }, stad: 100 });
 });
 
 test('the explicit form expresses what a tier could not', () => {
-	//Neither of these was reachable before: a tier made `night` imply `mood`, and
-	//`on` always lit everything. These two cases are the reason for the format.
-	const nightOnly = [{ device: 'a', type: 'light', steps: { night: true } }];
-	assert.deepEqual(sceneFor(nightOnly, 'night'), [{ entity: 'light.a', state: 'on' }]);
-	assert.deepEqual(sceneFor(nightOnly, 'mood'), [{ entity: 'light.a', state: 'off' }]);
-	assert.deepEqual(sceneFor(nightOnly, 'on'), [{ entity: 'light.a', state: 'off' }]);
+	//Neither of these was reachable before: a tier made `natt` imply `kvall`, and
+	//`stad` always lit everything. Now a step absent = ignore, so a device lit
+	//only at `natt` is left alone at `kvall`/`stad` and, symmetrically, turned
+	//off explicitly only where `false` is written.
+	const nattOnly = [{ device: 'a', type: 'light', steps: { natt: true } }];
+	assert.deepEqual(sceneFor(nattOnly, 'natt'), [{ entity: 'light.a', state: 'on' }]);
+	assert.deepEqual(sceneFor(nattOnly, 'kvall'), []);     // absent -> ignore
+	assert.deepEqual(sceneFor(nattOnly, 'stad'), []);      // absent -> ignore
 
-	const notInOn = [{ device: 'b', type: 'light', steps: { mood: 30 } }];
-	assert.deepEqual(sceneFor(notInOn, 'mood'), [{ entity: 'light.b', level: 30 }]);
-	assert.deepEqual(sceneFor(notInOn, 'on'), [{ entity: 'light.b', state: 'off' }]);
+	const notInStad = [{ device: 'b', type: 'light', steps: { kvall: 30 } }];
+	assert.deepEqual(sceneFor(notInStad, 'kvall'), [{ entity: 'light.b', level: 30 }]);
+	assert.deepEqual(sceneFor(notInStad, 'stad'), []);     // absent -> ignore
+
+	//...and an explicit `false` really does turn it off.
+	const offAtKvall = [{ device: 'c', type: 'light', steps: { kvall: false } }];
+	assert.deepEqual(sceneFor(offAtKvall, 'kvall'), [{ entity: 'light.c', state: 'off' }]);
+	assert.deepEqual(sceneFor(offAtKvall, 'stad'), []);
 });
 
-test('sceneFor: mood lights anything tiered, on lights everything', () => {
+test('sceneFor: kvall lights anything tiered, stad lights everything', () => {
 	const zone = ['tak.light', 'lampa.light.mood', 'slinga.light.night'];
 	assert.deepEqual(sceneFor(zone, 'off'), [
 		{ entity: 'light.tak', state: 'off' },
 		{ entity: 'light.lampa', state: 'off' },
 		{ entity: 'light.slinga', state: 'off' },
 	]);
-	//night counts as mood -- the original reads "Night && mood"
-	assert.deepEqual(sceneFor(zone, 'mood'), [
+	//natt counts as kvall -- the original reads "Night && mood"
+	assert.deepEqual(sceneFor(zone, 'kvall'), [
 		{ entity: 'light.tak', state: 'off' },
 		{ entity: 'light.lampa', state: 'on' },
 		{ entity: 'light.slinga', state: 'on' },
 	]);
-	assert.deepEqual(sceneFor(zone, 'night'), [
+	assert.deepEqual(sceneFor(zone, 'natt'), [
 		{ entity: 'light.tak', state: 'off' },
 		{ entity: 'light.lampa', state: 'off' },
 		{ entity: 'light.slinga', state: 'on' },
 	]);
-	assert.deepEqual(sceneFor(zone, 'on'), [
+	assert.deepEqual(sceneFor(zone, 'stad'), [
 		{ entity: 'light.tak', state: 'on' },
 		{ entity: 'light.lampa', state: 'on' },
 		{ entity: 'light.slinga', state: 'on' },
 	]);
 });
 
-test('sceneFor: a level dims at its step and goes to 100 at on', () => {
+test('sceneFor: a level dims at its step and goes to 100 at stad', () => {
 	const zone = ['spegel.light', 'tak.light.mood.20'];
-	assert.deepEqual(sceneFor(zone, 'mood'), [
+	assert.deepEqual(sceneFor(zone, 'kvall'), [
 		{ entity: 'light.spegel', state: 'off' },
 		{ entity: 'light.tak', level: 20 },
 	]);
-	//⚠ `on` must say 100 out loud: a plain turn_on restores the level the lamp
-	//last had, so after a mood press it would come back at 20%.
-	assert.deepEqual(sceneFor(zone, 'on'), [
+	//⚠ `stad` must say 100 out loud: a plain turn_on restores the level the lamp
+	//last had, so after a kvall press it would come back at 20%.
+	assert.deepEqual(sceneFor(zone, 'stad'), [
 		{ entity: 'light.spegel', state: 'on' },
 		{ entity: 'light.tak', level: 100 },
 	]);
@@ -101,34 +110,37 @@ test('sceneFor: a level dims at its step and goes to 100 at on', () => {
 });
 
 test('sceneFor: a {level, kelvin} step publishes brightness AND a kelvin', () => {
-	const zone = [{ device: 'golvlampa', type: 'light', steps: { mood: { level: 20, kelvin: 2700 }, on: 100 } }];
-	assert.deepEqual(sceneFor(zone, 'mood'), [{ entity: 'light.golvlampa', level: 20, kelvin: 2700 }]);
-	//The same lamp at `on` (a plain number) carries no kelvin.
-	assert.deepEqual(sceneFor(zone, 'on'), [{ entity: 'light.golvlampa', level: 100 }]);
+	const zone = [{ device: 'golvlampa', type: 'light', steps: { kvall: { level: 20, kelvin: 2700 }, stad: 100 } }];
+	assert.deepEqual(sceneFor(zone, 'kvall'), [{ entity: 'light.golvlampa', level: 20, kelvin: 2700 }]);
+	//The same lamp at `stad` (a plain number) carries no kelvin.
+	assert.deepEqual(sceneFor(zone, 'stad'), [{ entity: 'light.golvlampa', level: 100 }]);
 	//A malformed object step (no level) is an off, not a NaN payload.
-	const broken = [{ device: 'x', type: 'light', steps: { mood: { kelvin: 2700 } } }];
-	assert.deepEqual(sceneFor(broken, 'mood'), [{ entity: 'light.x', state: 'off' }]);
+	const broken = [{ device: 'x', type: 'light', steps: { kvall: { kelvin: 2700 } } }];
+	assert.deepEqual(sceneFor(broken, 'kvall'), [{ entity: 'light.x', state: 'off' }]);
 });
 
 test('stepOf matches a {level, kelvin} step on its level, not its kelvin', () => {
-	const stepsValue = steps({ mood: { level: 20, kelvin: 2700 }, on: 100 });
-	assert.equal(stepOf(model({ gal: { onoff: true, dim: 52, steps: stepsValue } })).step, 'mood');
-	assert.equal(stepOf(model({ gal: { onoff: true, dim: 255, steps: stepsValue } })).step, 'on');
+	const stepsValue = steps({ kvall: { level: 20, kelvin: 2700 }, stad: 100 });
+	assert.equal(stepOf(model({ gal: { onoff: true, dim: 52, steps: stepsValue } })).step, 'kvall');
+	assert.equal(stepOf(model({ gal: { onoff: true, dim: 255, steps: stepsValue } })).step, 'stad');
 });
 
 test('sceneFor ignores sensors and occupancy', () => {
-	const out = sceneFor(['tak.light', 'hall_temperature.sensor', 'sensorer_alla.occupancy'], 'on');
+	const out = sceneFor(['tak.light', 'hall_temperature.sensor', 'sensorer_alla.occupancy'], 'stad');
 	assert.deepEqual(out, [{ entity: 'light.tak', state: 'on' }]);
 });
 
 test('stepOf is the inverse of sceneFor for a plain zone', () => {
-	const TAK = steps({ on: true }), LAMPA = steps({ mood: true, on: true });
+	//Explicit steps like the migrated config: an untiered light is OFF at the
+	//moods it cannot do (`false`), not ignored, so a room can still tell `kvall`
+	//(lampa on, tak off) from `stad` (both on).
+	const TAK = steps({ kvall: false, stad: true }), LAMPA = steps({ kvall: true, stad: true });
 	const m = (o) => model({ tak: { onoff: false, steps: TAK }, lampa: { onoff: false, steps: LAMPA }, ...o });
 	assert.equal(stepOf(m()).step, 'off');
-	assert.equal(stepOf(m({ lampa: { onoff: true, steps: LAMPA } })).step, 'mood');
-	assert.equal(stepOf(m({ tak: { onoff: true, steps: TAK }, lampa: { onoff: true, steps: LAMPA } })).step, 'on');
-	assert.equal(stepOf(m()).moodable, true);
-	assert.equal(stepOf(m()).nightable, false);
+	assert.equal(stepOf(m({ lampa: { onoff: true, steps: LAMPA } })).step, 'kvall');
+	assert.equal(stepOf(m({ tak: { onoff: true, steps: TAK }, lampa: { onoff: true, steps: LAMPA } })).step, 'stad');
+	assert.equal(stepOf(m()).kvallable, true);
+	assert.equal(stepOf(m()).nattable, false);
 });
 
 test('stepOf really is the inverse of sceneFor, for every step', () => {
@@ -138,10 +150,11 @@ test('stepOf really is the inverse of sceneFor, for every step', () => {
 	for (const [zone, entries] of Object.entries(cfg.zones)) {
 		const sw = entries.map(parseEntry).filter(e => e.type === 'light' || e.type === 'switch');
 		if (!sw.length) continue;
-		for (const step of ['off', 'night', 'mood', 'on']) {
+		for (const step of ['off', 'natt', 'kvall', 'dag', 'stad']) {
 			const avail = stepsAvailable(entries);
-			if (step === 'night' && !avail.night) continue;
-			if (step === 'mood' && !avail.mood) continue;
+			if (step === 'natt' && !avail.natt) continue;
+			if (step === 'kvall' && !avail.kvall) continue;
+			if (step === 'dag' && !avail.dag) continue;
 			//Build the model the room would be in after pressing `step`.
 			/** @type {ZoneModel} */
 			const m = {};
@@ -158,70 +171,76 @@ test('stepOf really is the inverse of sceneFor, for every step', () => {
 });
 
 test('stepOf tells a dimmed lamp from a full one', () => {
-	//The bug this exists for: bad3 has ONE light, so every(onoff) called it `on`
-	//whether it sat at 20% or 100%, and the room could never show its mood step.
-	const at = dim => stepOf(model({ tak: { onoff: true, steps: { mood: 20, on: 100 }, dim } })).step;
-	assert.equal(at(52), 'mood');    // 20% of 255
-	assert.equal(at(255), 'on');     // full
-	//Brightness not reported yet: both `mood` and `on` prescribe "lit", so the
+	//The bug this exists for: bad3 has ONE light, so every(onoff) called it `stad`
+	//whether it sat at 20% or 100%, and the room could never show its kvall step.
+	const at = dim => stepOf(model({ tak: { onoff: true, steps: { kvall: 20, stad: 100 }, dim } })).step;
+	assert.equal(at(52), 'kvall');    // 20% of 255
+	assert.equal(at(255), 'stad');     // full
+	//Brightness not reported yet: both `kvall` and `stad` prescribe "lit", so the
 	//state is genuinely ambiguous. Steps are checked dimmest-first, so the
 	//quieter reading wins -- the room shows a modest wash rather than claiming
 	//to be fully on, and corrects itself the moment brightness arrives.
-	assert.equal(at(undefined), 'mood');
-	assert.equal(stepOf(model({ tak: { onoff: false, steps: { mood: 20, on: 100 } } })).step, 'off');
+	assert.equal(at(undefined), 'kvall');
+	assert.equal(stepOf(model({ tak: { onoff: false, steps: { kvall: 20, stad: 100 } } })).step, 'off');
 });
 
 test('stepOf ignores entries with no onoff (sensors)', () => {
-	const s = stepOf(model({ tak: { onoff: true, steps: { on: true } }, hall_temperature: { state: '21.5' } }));
+	const s = stepOf(model({ tak: { onoff: true, steps: { stad: true } }, hall_temperature: { state: '21.5' } }));
 	assert.deepEqual(s.lights, ['tak']);
-	assert.equal(s.step, 'on');
+	assert.equal(s.step, 'stad');
 });
 
-test('⚠ a room with only untiered lights on reads as partial, not on', () => {
-	//The bug: this chain started at `let step = 'on'` and FELL THROUGH to it, so
+test('⚠ a room with only untiered lights on reads as partial, not stad', () => {
+	//The bug: this chain started at `let step = 'stad'` and FELL THROUGH to it, so
 	//one wardrobe light reported the whole room on -- full amber wash, and the
-	//per-lamp glows hidden by `.zone-lights[light="on"] .glow`, so the lamp you
-	//had just switched on became invisible. Adding a mood lamp then moved the
-	//room backwards from `on` to `mood`. Reachable only once untiered lights got
+	//per-lamp glows hidden by `.zone-lights[light="stad"] .glow`, so the lamp you
+	//had just switched on became invisible. Adding a kvall lamp then moved the
+	//room backwards from `stad` to `kvall`. Reachable only once untiered lights got
 	//their own tap targets.
+	//(An untiered light is OFF -- not ignored -- at the moods it cannot do, so a
+	//kvall lamp plus a lit untiered light still reads `partial`, not `kvall`.)
+	const TAK = steps({ natt: false, kvall: false, dag: false, stad: true });
+	const MIKKEL = steps({ natt: false, kvall: true, dag: false, stad: true });
+	const GARDEROB = steps({ natt: false, kvall: false, dag: false, stad: true });
 	const sov2 = on => model({
-		sovrum_2_tak: { onoff: on.includes('tak'), steps: steps({ on: true }) },
-		lampa_mikkel: { onoff: on.includes('lampa'), steps: steps({ mood: true, on: true }) },
-		mikkel_garderob: { onoff: on.includes('garderob'), steps: steps({ on: true }) },
+		sovrum_2_tak: { onoff: on.includes('tak'), steps: TAK },
+		lampa_mikkel: { onoff: on.includes('lampa'), steps: MIKKEL },
+		mikkel_garderob: { onoff: on.includes('garderob'), steps: GARDEROB },
 	});
 	assert.equal(stepOf(sov2([])).step, 'off');
 	assert.equal(stepOf(sov2(['garderob'])).step, 'partial');
-	assert.equal(stepOf(sov2(['lampa'])).step, 'mood');
-	assert.equal(stepOf(sov2(['garderob', 'lampa', 'tak'])).step, 'on');
-	//⚠ Since stepOf became an exact inverse of sceneFor, the mood scene plus an
-	//extra lamp is NOT the mood scene -- the wardrobe light is on where mood says
-	//off. That reads as `partial`, and it is the honest answer: pressing `mood`
+	assert.equal(stepOf(sov2(['lampa'])).step, 'kvall');
+	assert.equal(stepOf(sov2(['garderob', 'lampa', 'tak'])).step, 'stad');
+	//⚠ Since stepOf became an exact inverse of sceneFor, the kvall scene plus an
+	//extra lamp is NOT the kvall scene -- the wardrobe light is on where kvall says
+	//off. That reads as `partial`, and it is the honest answer: pressing `kvall`
 	//again would switch the wardrobe light back off.
 	assert.equal(stepOf(sov2(['garderob', 'lampa'])).step, 'partial');
-	//Same shape in a bathroom: mirror untiered, ceiling mood.
+	//Same shape in a bathroom: mirror untiered, ceiling kvall.
 	assert.equal(stepOf(model({
-		badrum_1_spegel: { onoff: true, steps: { on: true } },
-		badrum_1_tak: { onoff: false, steps: { mood: 20, on: 100 } },
+		badrum_1_spegel: { onoff: true, steps: steps({ natt: false, kvall: false, dag: false, stad: true }) },
+		badrum_1_tak: { onoff: false, steps: steps({ natt: false, kvall: 20, dag: false, stad: 100 }) },
 	})).step, 'partial');
-	//`on` still means every light, and nothing produces `partial` as a command.
+	//`stad` still means every light, and nothing produces `partial` as a command.
 	assert.ok(!sceneFor(['a.light', 'b.light.mood'], 'partial').some(x => x.state === 'on'));
 });
 
 test('nextStep walks the cycle', () => {
-	const both = { moodable: true, nightable: true, allowMax: true };
-	assert.equal(nextStep('off', both), 'night');
-	assert.equal(nextStep('night', both), 'mood');
-	assert.equal(nextStep('mood', both), 'on');
-	assert.equal(nextStep('on', both), 'off');
-	//A zone with neither tier is a plain two-step.
-	assert.equal(nextStep('off', {}), 'on');
-	assert.equal(nextStep('on', {}), 'off');
-	//⚠ Without Max brightness the `on` step is unreachable -- which for a room
-	//whose lights all carry a level means full brightness is too.
-	assert.equal(nextStep('mood', { moodable: true, allowMax: false }), 'off');
-	assert.equal(nextStep('mood', { moodable: true, allowMax: true }), 'on');
+	const all = { nattable: true, kvallable: true, dagable: true };
+	assert.equal(nextStep('off', all), 'natt');
+	assert.equal(nextStep('natt', all), 'kvall');
+	assert.equal(nextStep('kvall', all), 'dag');
+	assert.equal(nextStep('dag', all), 'stad');
+	assert.equal(nextStep('stad', all), 'off');
+	//A zone with no moods is a plain two-step (off <-> stad).
+	assert.equal(nextStep('off', {}), 'stad');
+	assert.equal(nextStep('stad', {}), 'off');
+	//Skipping a mood the room cannot do.
+	assert.equal(nextStep('off', { kvallable: true, dagable: true }), 'kvall');
+	assert.equal(nextStep('kvall', { kvallable: true }), 'stad');
+	assert.equal(nextStep('natt', { nattable: true, dagable: true }), 'dag');
 	//A partially-lit room presses to off, which is what it did while it was
-	//mislabelled as `on`.
-	assert.equal(nextStep('partial', { moodable: true, allowMax: true }), 'off');
+	//mislabelled as `stad`.
+	assert.equal(nextStep('partial', { dagable: true }), 'off');
 	assert.equal(nextStep('partial', {}), 'off');
 });

@@ -66,23 +66,44 @@
           <thead>
             <tr>
               <th class="light">Lampa</th>
-              <th>Natt <button type="button" class="capture" data-step="night" title="Sätt till nuvarande"><i class="fas fa-crosshairs"></i></button></th>
-              <th>Dämpat <button type="button" class="capture" data-step="mood" title="Sätt till nuvarande"><i class="fas fa-crosshairs"></i></button></th>
-              <th>På <button type="button" class="capture" data-step="on" title="Sätt till nuvarande"><i class="fas fa-crosshairs"></i></button></th>
+              <th>Natt <button type="button" class="capture" data-step="natt" title="Sätt till nuvarande"><i class="fas fa-crosshairs"></i></button></th>
+              <th>Kväll <button type="button" class="capture" data-step="kvall" title="Sätt till nuvarande"><i class="fas fa-crosshairs"></i></button></th>
+              <th>Dag <button type="button" class="capture" data-step="dag" title="Sätt till nuvarande"><i class="fas fa-crosshairs"></i></button></th>
+              <th>Städ <button type="button" class="capture" data-step="stad" title="Sätt till nuvarande"><i class="fas fa-crosshairs"></i></button></th>
             </tr>
           </thead>
           <tbody id="room-config-rows"></tbody>
         </table>
         <p class="hint">
-          En bock tänder lampan i det läget. För dimbara lampor anger procenten hur
-          mycket; för lampor med vitbalans anger K också färgtonen (kelvin). Omarkerad
-          betyder släckt i det läget — <em>av</em> släcker alltid allt.
+          Välj <em>På</em> för att tända lampan i det läget, <em>Av</em> för att släcka den,
+          eller <em>—</em> för att lämna den orörd. För dimbara lampor anger procenten hur
+          mycket; för lampor med vitbalans anger K också färgtonen (kelvin).
+          <em>Av</em> som hel-scen släcker alltid allt.
         </p>
       </div>
       <div id="room-config-foot">
         <button id="room-config-save" type="button" disabled>Spara</button>
         <button id="room-config-cancel" type="button">Avbryt</button>
         <span id="room-config-status" role="status"></span>
+      </div>
+    </div>
+    <div class="raw-common removed" id="scenes-config-bg"></div>
+    <div class="raw-common removed" id="scenes-config">
+      <div id="scenes-config-head">
+        <span>Scener</span>
+        <button id="scenes-config-close" type="button">St&auml;ng</button>
+      </div>
+      <div id="scenes-config-body">
+        <p class="hint">
+          Välj vilka rum varje scen tänder/släcker. Ett rum som lämnas omarkerat
+          rörs inte av scenen. <em>Av</em> går inte att ändra — den släcker alltid allt.
+        </p>
+        <div id="scenes-config-grid"></div>
+      </div>
+      <div id="scenes-config-foot">
+        <button id="scenes-config-save" type="button" disabled>Spara</button>
+        <button id="scenes-config-cancel" type="button">Avbryt</button>
+        <span id="scenes-config-status" role="status"></span>
       </div>
     </div>
     <div class="raw-common removed" id="dimmer">
@@ -112,6 +133,7 @@
         <!--			<label><input id="cb-energy" name="Show power usage" type="checkbox" /><i class="fas fa-bolt fa-2x"></i></label> -->
         <label><input id="cb-raw" name="Raw messages" type="checkbox" /><i class="fas fa-stream fa-2x"></i></label>
         <button id="btn-fullscreen" type="button" title="Fullskärm"><i class="fas fa-expand fa-2x"></i></button>
+        <button id="btn-scenes" type="button" title="Scener" ><i class="fas fa-layer-group fa-2x"></i></button>
         <label><input id="cb-nightmode" name="Nightmode" type="checkbox" /><i class="fas fa-moon fa-2x"></i></label>
       </div>
     </div>

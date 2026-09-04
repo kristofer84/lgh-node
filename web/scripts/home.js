@@ -376,7 +376,7 @@ function updateMap(data) {
 //Update view from model
 function updateView() {
 	Object.keys(model).forEach(zone => {
-		const { step: value, moodable, nightable, lights } = stepOf(model[zone]);
+		const { step: value, nattable, kvallable, dagable, lights } = stepOf(model[zone]);
 
 		let ar = document.getElementById(zone);
 		//Zones without a room drawn for them (home, utomhus, moja, devices) are
@@ -394,8 +394,9 @@ function updateView() {
 			return;
 		}
 
-		if (moodable && !ar.hasAttribute("moodable")) ar.setAttribute("moodable", "moodable");
-		if (nightable && !ar.hasAttribute("nightable")) ar.setAttribute("nightable", "nightable");
+		if (dagable && !ar.hasAttribute("dagable")) ar.setAttribute("dagable", "dagable");
+		if (kvallable && !ar.hasAttribute("kvallable")) ar.setAttribute("kvallable", "kvallable");
+		if (nattable && !ar.hasAttribute("nattable")) ar.setAttribute("nattable", "nattable");
 
 		updateArea(ar, value);
 
@@ -432,11 +433,9 @@ function get() {
 
 function getNextStateRoom(element) {
 	return nextStep(element.getAttribute("light"), {
-		moodable: element.getAttribute("moodable"),
-		nightable: element.getAttribute("nightable"),
-		//Full brightness is always reachable now -- the "Max brightness"
-		//checkbox (#cb-mood, the sun icon) is gone.
-		allowMax: true,
+		nattable: element.getAttribute("nattable"),
+		kvallable: element.getAttribute("kvallable"),
+		dagable: element.getAttribute("dagable"),
 	});
 }
 
@@ -724,20 +723,22 @@ function sendDimmerCt(value) {
 //`toggle` message a normal room press sends, only with the chosen step value.
 const ROOM_PRESETS = [
 	{ key: 'off', label: 'Av' },
-	{ key: 'night', label: 'Natt' },
-	{ key: 'mood', label: 'Dämpat' },
-	{ key: 'on', label: 'På' },
+	{ key: 'natt', label: 'Natt' },
+	{ key: 'kvall', label: 'Kväll' },
+	{ key: 'dag', label: 'Dag' },
+	{ key: 'stad', label: 'Städ' },
 ];
 
 let roomMenuZone = null;
 
-//A step is offered when the room's lamps can do it. `night`/`mood` are read off
-//the room group's attributes (set by updateView from stepOf), `off` and `on`
-//are always offered.
+//A step is offered when the room's lamps can do it. `natt`/`kvall`/`dag` are
+//read off the room group's attributes (set by updateView from stepOf), `off`
+//and `stad` are always offered.
 function roomAvailableSteps(roomEl) {
-	const out = ['off', 'on'];
-	if (roomEl.hasAttribute('nightable')) out.push('night');
-	if (roomEl.hasAttribute('moodable')) out.push('mood');
+	const out = ['off', 'stad'];
+	if (roomEl.hasAttribute('nattable')) out.push('natt');
+	if (roomEl.hasAttribute('kvallable')) out.push('kvall');
+	if (roomEl.hasAttribute('dagable')) out.push('dag');
 	return out;
 }
 
@@ -754,7 +755,7 @@ function openRoomMenu(id) {
 	roomMenuZone = id;
 	$('#room-menu-title').textContent = id;
 
-	//Build the buttons in cycle order: off, night, mood, on.
+	//Build the buttons in cycle order: off, natt, kvall, dag, stad.
 	const body = $('#room-menu-body');
 	body.empty();
 	ROOM_PRESETS.forEach((/** @type {{key: string, label: string}} */ p) => {
@@ -813,9 +814,10 @@ function sendRoomStep(step) {
 //room-menu's config symbol; edits `steps` and nothing else, then saves through
 //the same GET/POST /config/zones endpoint config.html used.
 const CONFIG_STEPS = [
-	{ key: 'night', label: 'Natt' },
-	{ key: 'mood', label: 'Dämpat' },
-	{ key: 'on', label: 'På' },
+	{ key: 'natt', label: 'Natt' },
+	{ key: 'kvall', label: 'Kväll' },
+	{ key: 'dag', label: 'Dag' },
+	{ key: 'stad', label: 'Städ' },
 ];
 
 let roomConfigZone = null;
@@ -856,15 +858,19 @@ function cfgClampKelvin(row, v) {
 	return Math.min(max, Math.max(min, n));
 }
 
-//A tick means: on. For a dimmable device that is a percentage -- always a
-//number, never `true`, as a plain turn_on would restore the last dim level.
-//A white-capable lamp adds a kelvin, stored as {level, kelvin} per step.
+//Each step cell is a 3-state select: ignore (leave alone), off, or on. On a
+//dimmable device "on" is a percentage (always a number, never `true`, as a
+//plain turn_on would restore the last dim level); a white-capable lamp also
+//adds a kelvin, stored as {level, kelvin} per step. "off" is false; "ignore"
+//omits the key entirely so the scene leaves the lamp alone.
 function cfgReadRow(tr) {
 	const row = cfgRowMeta.get(tr);
 	const steps = {};
 	for (const { key } of CONFIG_STEPS) {
-		const box = cfgField(tr, `input[type=checkbox][data-step="${key}"]`);
-		if (!box?.checked) continue;
+		const sel = cfgField(tr, `select[data-step="${key}"]`);
+		const mode = sel?.value;
+		if (mode === '') continue;               // ignore: omit the key
+		if (mode === 'off') { steps[key] = false; continue; }
 		const pct = cfgField(tr, `input[type=range][data-step="${key}"]:not([data-kelvin])`);
 		const level = pct ? cfgClampPct(pct.value) : true;
 		const kel = cfgField(tr, `input[type=range][data-step="${key}"][data-kelvin]`);
@@ -884,31 +890,30 @@ function cfgMarkDirty(device, tr) {
 }
 
 //"Sätt till nuvarande": copy the room's LIVE state (each lamp's on/off +
-//brightness + white balance) into one mood's step column, without saving. An
-//off lamp becomes unchecked (off at that step); an on lamp gets its dim % and,
-//where the lamp reports one, its kelvin.
+//brightness + white balance) into one mood's step column, without saving. A
+//lamp that is off becomes "off" (false) at that step; an on lamp becomes "on"
+//and gets its dim % and, where the lamp reports one, its kelvin.
 function cfgCapture(step) {
 	if (!roomConfigZone) return;
 	document.querySelectorAll('#room-config-rows tr').forEach(tr => {
 		const row = cfgRowMeta.get(tr);
 		if (!row) return;
 		const live = model[roomConfigZone]?.[row.device];
-		const box = cfgField(tr, `input[type=checkbox][data-step="${step}"]`);
-		if (!box) return;
-		const td = box.closest('td');
+		const sel = cfgField(tr, `select[data-step="${step}"]`);
+		if (!sel) return;
+		const td = sel.closest('td');
 		const on = !!(live?.onoff);
-		box.checked = on;
+		sel.value = on ? 'on' : 'off';
+		sel.dispatchEvent(new Event('change'));
 
 		const pct = /** @type {HTMLInputElement | null} */ (td?.querySelector('input[type=range]:not([data-kelvin])'));
 		if (pct) {
-			pct.disabled = !on;
 			if (live?.dim !== undefined) pct.value = String(cfgClampPct(Math.round(Number(live.dim) / 255 * 100)));
 			td?.querySelector('.pct')?.replaceChildren(`${cfgClampPct(pct.value)}%`);
 		}
 
 		const kelv = /** @type {HTMLInputElement | null} */ (td?.querySelector('input[type=range][data-kelvin]'));
 		if (kelv && (row.colorMin != null || row.colorMax != null)) {
-			kelv.disabled = !on;
 			if (live?.colorTemp !== undefined) kelv.value = String(cfgClampKelvin(row, live.colorTemp));
 			td?.querySelector('.ktxt')?.replaceChildren(`${cfgClampKelvin(row, kelv.value)}K`);
 		}
@@ -935,16 +940,37 @@ function cfgBuildRow(row) {
 	for (const { key } of CONFIG_STEPS) {
 		const td = document.createElement('td');
 		const value = row.steps?.[key];
+		//Which 3-state mode this step is in: absent -> ignore, false -> off,
+		//anything else -> on.
+		const mode = value === undefined ? '' : (value === false ? 'off' : 'on');
 		const lvl = typeof value === 'number' ? value
 			: (value !== null && typeof value === 'object' ? value.level : undefined);
 		const kel = value !== null && typeof value === 'object' ? value.kelvin : undefined;
 
-		const box = document.createElement('input');
-		box.type = 'checkbox';
-		box.dataset.step = key;
-		box.checked = value !== undefined;
-		box.setAttribute('aria-label', `${row.name ?? row.device} ${key}`);
-		td.append(box);
+		const sel = document.createElement('select');
+		sel.dataset.step = key;
+		sel.setAttribute('aria-label', `${row.name ?? row.device} ${key}`);
+		const optIgnore = document.createElement('option');
+		optIgnore.value = '';
+		optIgnore.textContent = '—';
+		optIgnore.title = 'Ignorera (lämna orörd)';
+		const optOff = document.createElement('option');
+		optOff.value = 'off';
+		optOff.textContent = 'Av';
+		const optOn = document.createElement('option');
+		optOn.value = 'on';
+		optOn.textContent = 'På';
+		sel.append(optIgnore, optOff, optOn);
+		sel.value = mode;
+		td.append(sel);
+
+		//The sliders stay disabled unless the lamp is actually ON at this step.
+		const setSliders = (disabled) => {
+			const pct = /** @type {HTMLInputElement | null} */ (td.querySelector('input[type=range]:not([data-kelvin])'));
+			const kelv = /** @type {HTMLInputElement | null} */ (td.querySelector('input[type=range][data-kelvin]'));
+			if (pct) pct.disabled = disabled;
+			if (kelv) kelv.disabled = disabled;
+		};
 
 		if (row.dimmable) {
 			const pct = document.createElement('input');
@@ -954,7 +980,6 @@ function cfgBuildRow(row) {
 			pct.max = '100';
 			pct.step = '1';
 			pct.value = String(typeof lvl === 'number' ? cfgClampPct(lvl) : 100);
-			pct.disabled = !box.checked;
 			pct.setAttribute('aria-label', `${row.name ?? row.device} ${key} procent`);
 			const pval = document.createElement('span');
 			pval.className = 'pct';
@@ -962,12 +987,11 @@ function cfgBuildRow(row) {
 			pctLabel();
 			pct.addEventListener('input', () => { pctLabel(); cfgMarkDirty(row.device, tr); });
 			td.append(pct, pval);
-			box.addEventListener('change', () => { pct.disabled = !box.checked; });
 		}
 
 		//White balance, only for lamps that report a colour-temperature range.
-		//A kelvin without a brightness does not exist here, so the box (on/off)
-		//still owns whether this step does anything at all.
+		//A kelvin without a brightness does not exist here, so the select still
+		//owns whether this step does anything at all.
 		if (white && row.dimmable) {
 			const [kmin, kmax] = cfgKelvinRange(row);
 			const kelv = document.createElement('input');
@@ -978,7 +1002,6 @@ function cfgBuildRow(row) {
 			kelv.max = String(kmax);
 			kelv.step = '1';
 			kelv.value = String(typeof kel === 'number' ? cfgClampKelvin(row, kel) : kmax);
-			kelv.disabled = !box.checked;
 			kelv.setAttribute('aria-label', `${row.name ?? row.device} ${key} kelvin`);
 			const kval = document.createElement('span');
 			kval.className = 'ktxt';
@@ -986,10 +1009,14 @@ function cfgBuildRow(row) {
 			kelLabel();
 			kelv.addEventListener('input', () => { kelLabel(); cfgMarkDirty(row.device, tr); });
 			td.append(kelv, kval);
-			box.addEventListener('change', () => { kelv.disabled = !box.checked; });
 		}
 
-		box.addEventListener('change', () => cfgMarkDirty(row.device, tr));
+		//A step is editable only when "on"; ignore/off leave the sliders out.
+		setSliders(mode !== 'on');
+		sel.addEventListener('change', () => {
+			setSliders(sel.value !== 'on');
+			cfgMarkDirty(row.device, tr);
+		});
 		tr.append(td);
 	}
 
@@ -1066,6 +1093,141 @@ async function cfgSave() {
 	}
 }
 
+//------------------------------------------ whole-flat scene membership
+//Which rooms each whole-flat scene (dag/kvall/stad/natt) touches. This only
+//edits room membership -- the moods stay in db/config.json and are read back
+//unchanged on save. `off` is deliberately absent: it always turns everything off.
+const SCENE_EDIT = [
+	{ key: 'natt', label: 'Natt' },
+	{ key: 'kvall', label: 'Kväll' },
+	{ key: 'dag', label: 'Dag' },
+	{ key: 'stad', label: 'Städ' },
+];
+
+let scenesDirty = false;
+let scenesRooms = [];            // {zone, name?} in a stable order
+let scenesMembership = {};       // {scene: Set<zone>}
+
+function scenes$ (id) { return document.getElementById(id); }
+function scenesBtn(id) { return /** @type {HTMLButtonElement} */ (document.getElementById(id)); }
+function scenesStatus(text, kind) {
+	const el = scenes$('scenes-config-status');
+	el.textContent = text ?? '';
+	el.className = kind ?? '';
+}
+
+function scenesMarkDirty() {
+	scenesDirty = true;
+	scenesBtn('scenes-config-save').disabled = false;
+	scenesStatus('Osparade ändringar', 'warn');
+}
+
+function scenesBuild() {
+	const grid = scenes$('scenes-config-grid');
+	grid.textContent = '';
+
+	//Header row: room labels down the left, one column per scene.
+	const head = document.createElement('div');
+	head.className = 'scenes-row scenes-head';
+	head.append(Object.assign(document.createElement('span'), { className: 'scenes-room', textContent: '' }));
+	for (const s of SCENE_EDIT) {
+		head.append(Object.assign(document.createElement('span'), { className: 'scenes-col', textContent: s.label }));
+	}
+	grid.append(head);
+
+	for (const room of scenesRooms) {
+		const row = document.createElement('div');
+		row.className = 'scenes-row';
+		row.append(Object.assign(document.createElement('span'), { className: 'scenes-room', textContent: room.zone }));
+		for (const s of SCENE_EDIT) {
+			const chk = document.createElement('input');
+			chk.type = 'checkbox';
+			chk.dataset.scene = s.key;
+			chk.dataset.room = room.zone;
+			chk.checked = scenesMembership[s.key]?.has(room.zone) ?? false;
+			chk.setAttribute('aria-label', `${room.zone} ${s.label}`);
+			chk.addEventListener('change', () => {
+				if (!scenesMembership[s.key]) scenesMembership[s.key] = new Set();
+				if (chk.checked) scenesMembership[s.key].add(room.zone);
+				else scenesMembership[s.key].delete(room.zone);
+				scenesMarkDirty();
+			});
+			const cell = document.createElement('span');
+			cell.className = 'scenes-col';
+			cell.append(chk);
+			row.append(cell);
+		}
+		grid.append(row);
+	}
+}
+
+async function scenesLoad() {
+	//Rooms = every zone with at least one switchable device, from /config/zones.
+	const [zRes, sRes] = await Promise.all([fetch('/config/zones'), fetch('/config/scenes')]);
+	if (!zRes.ok || !sRes.ok) {
+		scenesStatus('Kunde inte hämta inställningar.', 'error');
+		return;
+	}
+	const zones = await zRes.json();
+	const scenes = await sRes.json();
+
+	scenesRooms = Object.keys(zones).map(zone => ({ zone }));
+	scenesMembership = {};
+	for (const s of SCENE_EDIT) {
+		scenesMembership[s.key] = new Set(Object.keys(scenes[s.key] ?? {}));
+	}
+	scenesBuild();
+}
+
+function openScenesConfig() {
+	scenesDirty = false;
+	scenesBtn('scenes-config-save').disabled = true;
+	scenesStatus('');
+
+	$('#scenes-config').removeClass('removed');
+	$('#scenes-config-bg').removeClass('removed');
+	setTimeout(() => {
+		$('#scenes-config').addClass('display');
+		$('#scenes-config-bg').addClass('display');
+	}, 20);
+
+	scenesLoad();
+}
+
+function closeScenesConfig() {
+	scenesDirty = false;
+	$('#scenes-config').removeClass('display');
+	$('#scenes-config-bg').removeClass('display');
+	setTimeout(() => {
+		$('#scenes-config').addClass('removed');
+		$('#scenes-config-bg').addClass('removed');
+	}, 350);
+}
+
+async function scenesSave() {
+	if (!scenesDirty) return;
+	scenesBtn('scenes-config-save').disabled = true;
+	scenesStatus('Sparar…');
+	try {
+		const body = {};
+		for (const s of SCENE_EDIT) body[s.key] = [...(scenesMembership[s.key] ?? [])];
+		const res = await fetch('/config/scenes', {
+			method: 'POST',
+			headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify(body),
+		});
+		const data = await res.json().catch(() => ({}));
+		if (!res.ok) throw new Error(data.error ?? `HTTP ${res.status}`);
+
+		scenesDirty = false;
+		scenesStatus('Sparat', 'ok');
+		setTimeout(closeScenesConfig, 600);
+	} catch (err) {
+		scenesStatus(`Kunde inte spara: ${err.message}`, 'error');
+		scenesBtn('scenes-config-save').disabled = false;
+	}
+}
+
 $(document).ready(function () {
 	bindHold();
 
@@ -1096,6 +1258,12 @@ $(document).ready(function () {
 		const step = this.dataset.step;
 		if (step) cfgCapture(step);
 	});
+
+	$('#btn-scenes').on('click', openScenesConfig);
+	$('#scenes-config-close').on('click', closeScenesConfig);
+	$('#scenes-config-bg').on('click', closeScenesConfig);
+	$('#scenes-config-cancel').on('click', closeScenesConfig);
+	$('#scenes-config-save').on('click', scenesSave);
 });
 
 

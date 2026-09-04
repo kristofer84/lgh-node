@@ -119,6 +119,7 @@ function init() {
 }
 
 init();
+writeScenesJson();
 //`config` and `devices` are assigned by init(), which tsc cannot see running
 //before this line -- hence the assertions. If init() has not run the process is
 //dead anyway: it reads db/config.json synchronously and unguarded.
@@ -378,12 +379,79 @@ app.post('/config/zones', wrap(async (req, res) => {
 	}
 
 	await saveConfig(disk);
-	//Memory now follows disk, so the next save starts from the same place and the
-	//running model reflects the file that was just written.
+	//Memory must follow disk BEFORE the scenes file is expanded: writeScenesJson
+	//reads the module-level `config`, so regenerating it on the stale snapshot
+	//would leave db/scenes.json one save behind the dashboard edit.
 	config = disk;
 	reloadConfig();
+	writeScenesJson();
 	io.emit('device.all', JSON.stringify(getDevice(null), null, 2));
 	log(`config saved by ${req.user?.preferred_username ?? 'unknown'}: ${changed.length} device(s)`);
+	res.end(JSON.stringify({ status: 'ok', changed }));
+}));
+
+//---- the scene-membership editor's two routes (same auth gate) -------------
+//The whole-flat scenes are a `config.scenes` map of {scene -> {room -> mood}}.
+//This editor only changes WHICH rooms a scene touches (the keys); each room's
+//mood is preserved, and a room newly added to a scene defaults to that scene's
+//own name as its mood. Shuffling room membership without ever reaching past the
+//moods keeps the per-lamp values in db/config.json the single source of truth.
+
+//List the scenes and, for each, which rooms it touches. The client only needs
+//the room keys; the moods are read back from the same file on save so no
+//round-trip can drift them.
+app.get('/config/scenes', wrap(async (req, res) => {
+	const disk = JSON.parse((await fs.readFile('./db/config.json')).toString());
+	res.end(JSON.stringify(disk.scenes ?? {}));
+}));
+
+//Expects {scene: [room, ...]}. Each named scene's membership is replaced by
+//exactly that room list: a room present is kept with its existing mood (or the
+//scene's own name when it was not there before), a room left out is removed, so
+//the scene no longer touches it. `off` is deliberately NOT editable -- it always
+//turns every switchable device off, which is its safety semantics.
+app.post('/config/scenes', wrap(async (req, res) => {
+	const body = req.body;
+	if (!body || typeof body !== 'object' || Array.isArray(body)) {
+		res.statusCode = 400;
+		return res.end(JSON.stringify({ error: 'expected {scene: [room, ...]}' }));
+	}
+
+	//See the /config/zones save: edit the on-disk copy, never the boot snapshot.
+	const disk = JSON.parse((await fs.readFile('./db/config.json')).toString());
+	const scenes = disk.scenes ?? (disk.scenes = {});
+
+	const changed = [];
+	for (const [scene, rooms] of Object.entries(body)) {
+		if (scene === 'off') {
+			res.statusCode = 400;
+			return res.end(JSON.stringify({ error: 'off is not editable; it always turns everything off' }));
+		}
+		if (!Array.isArray(rooms) || !rooms.every(r => typeof r === 'string')) {
+			res.statusCode = 400;
+			return res.end(JSON.stringify({ error: `${scene}: expected a room-name array` }));
+		}
+
+		const prev = typeof scenes[scene] === 'object' && scenes[scene] !== null ? scenes[scene] : {};
+		const next = {};
+		for (const room of rooms) {
+			if (!Array.isArray(disk.zones?.[room])) {
+				//Unknown room: reject rather than silently write a scene that can
+				//never expand (writeScenesJson skips rooms missing from config.zones).
+				res.statusCode = 400;
+				return res.end(JSON.stringify({ error: `${scene}: unknown room ${room}` }));
+			}
+			//Preserve the room's existing mood, defaulting to the scene's own name.
+			next[room] = prev[room] ?? scene;
+		}
+		scenes[scene] = next;
+		changed.push(scene);
+	}
+
+	await saveConfig(disk);
+	config = disk;
+	writeScenesJson();
+	log(`scene membership saved by ${req.user?.preferred_username ?? 'unknown'}: ${changed.join(', ')}`);
 	res.end(JSON.stringify({ status: 'ok', changed }));
 }));
 
@@ -876,17 +944,18 @@ function getDevice(dev) {
 	return retObj;
 }
 
-//A step value is `true` (on), a whole percent 1-100, or absent (off at that
-//step). Anything else is refused rather than written -- db/config.json is read
-//unguarded at boot, so a bad value written here is a startup crash later.
+//A step value is `false` (off), `true` (on), a whole percent 1-100, or absent
+//(ignore -- the scene leaves the device alone). Anything else is refused rather
+//than written -- db/config.json is read unguarded at boot, so a bad value written
+//here is a startup crash later.
 function validateSteps(steps, range) {
 	if (steps === null || typeof steps !== 'object' || Array.isArray(steps)) return 'steps must be an object';
 	for (const [k, v] of Object.entries(steps)) {
-		if (!['night', 'mood', 'on'].includes(k)) return `unknown step ${k}`;
-		if (v === true) continue;
+		if (!['natt', 'kvall', 'dag', 'stad'].includes(k)) return `unknown step ${k}`;
+		if (v === true || v === false) continue;
 		if (typeof v === 'number') {
 			if (Number.isInteger(v) && v >= 1 && v <= 100) continue;
-			return `${k} must be true or a whole percent 1-100`;
+			return `${k} must be true, false, or a whole percent 1-100`;
 		}
 		//White balance: {level, kelvin} -- on at a brightness AND a colour
 		//temperature. Kelvin is clamped to the lamp's own supported range when
@@ -900,7 +969,7 @@ function validateSteps(steps, range) {
 			if (Number.isFinite(max) && kelvin > max) return `${k}.kelvin ${kelvin} above lamp range ${max}`;
 			continue;
 		}
-		return `${k} must be true, a whole percent 1-100, or {level, kelvin}`;
+		return `${k} must be false, true, a whole percent 1-100, or {level, kelvin}`;
 	}
 	return undefined;
 }
@@ -921,6 +990,25 @@ async function saveConfig(next) {
 	await fs.copyFile('./db/config.json', `./db/config.json.bak-${stamp}`);
 	await fs.writeFile('./db/config.json.tmp', json);
 	await fs.rename('./db/config.json.tmp', './db/config.json');
+}
+
+//Precompute the whole-flat scenes into db/scenes.json, expanded with sceneFor,
+//so Home Assistant can read a STATIC file (via a symlink into /config) and
+//publish each room's webapp/scene/<room>/set without a round-trip through this
+//process at trigger time. Written on boot and after every config save -- the
+//only two points db/config.json changes. HA's python_script reads this file, so
+//the sceneFor logic is NOT duplicated; it runs here, once, at write time.
+function writeScenesJson() {
+	const out = {};
+	for (const [name, rooms] of Object.entries(config.scenes ?? {})) {
+		out[name] = {};
+		for (const [room, mood] of Object.entries(rooms)) {
+			const entries = config.zones[room];
+			if (!entries) continue;
+			out[name][room] = sceneFor(entries, mood);
+		}
+	}
+	writeFileSync('./db/scenes.json', JSON.stringify(out, null, 2) + '\n');
 }
 
 //Re-stamp the model from the config WITHOUT init()'s other half, which reloads

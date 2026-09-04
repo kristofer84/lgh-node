@@ -84,7 +84,7 @@ test('⚠ the snapshot and the per-device payload agree', () => {
 });
 
 test('toggle() publishes the whole room scene as one message, for every zone and step', () => {
-	for (const step of ['off', 'night', 'mood', 'on']) {
+	for (const step of ['off', 'natt', 'kvall', 'dag', 'stad']) {
 		const { result, published, scenes } = load(
 			['init', 'brightnessOf', 'kelvinOf', 'dimmableFrom', 'friendlyName', 'shapeOf', 'getDevice', 'toggle'],
 			`init(); const zones = Object.keys(config.zones);
@@ -105,25 +105,26 @@ test('toggle() publishes the whole room scene as one message, for every zone and
 
 test('toggle() rejects an unknown zone and a missing value without publishing', () => {
 	const { published, scenes } = load(['init', 'brightnessOf', 'kelvinOf', 'dimmableFrom', 'friendlyName', 'shapeOf', 'getDevice', 'toggle'],
-		`init(); toggle('no_such_zone', 'on'); toggle(Object.keys(config.zones)[0], undefined); return null;`,
+		`init(); toggle('no_such_zone', 'stad'); toggle(Object.keys(config.zones)[0], undefined); return null;`,
 		{ parseEntry, sceneFor });
 	assert.deepEqual(published, []);
 	assert.deepEqual(scenes, []);
 });
 
 test('every zone has steps that differ from one another', () => {
-	//⚠ The untiered devices are what makes `on` differ from `mood`. kok and bad3
+	//⚠ The untiered devices are what makes `stad` differ from `kvall`. kok and bad3
 	//once had every light tiered, so the two steps published an identical scene
-	//and the extra press did nothing. orangeri had the same at night-vs-mood.
+	//and the extra press did nothing. orangeri had the same at natt-vs-kvall.
 	const { result } = boot('return config;');
 	for (const [zone, entries] of Object.entries(result.zones)) {
 		const scenes = {};
-		for (const step of ['night', 'mood', 'on']) scenes[step] = JSON.stringify(sceneFor(entries, step));
-		if (!JSON.parse(scenes.on).length) continue;
-		assert.notEqual(scenes.mood, scenes.on, `${zone}: mood and on publish the same scene`);
+		for (const step of ['natt', 'kvall', 'dag', 'stad']) scenes[step] = JSON.stringify(sceneFor(entries, step));
+		if (!JSON.parse(scenes.stad).length) continue;
+		assert.notEqual(scenes.kvall, scenes.stad, `${zone}: kvall and stad publish the same scene`);
+		assert.notEqual(scenes.dag, scenes.stad, `${zone}: dag and stad publish the same scene`);
 		const tiers = entries.map(parseEntry).filter(e => e.tier);
 		if (tiers.some(e => e.tier === 'night') && tiers.some(e => e.tier === 'mood'))
-			assert.notEqual(scenes.night, scenes.mood, `${zone}: night and mood publish the same scene`);
+			assert.notEqual(scenes.natt, scenes.kvall, `${zone}: natt and kvall publish the same scene`);
 	}
 });
 
@@ -274,25 +275,25 @@ test('kelvinOf reads colour-temperature attributes as numbers or nothing', () =>
 
 test('validateSteps accepts {level, kelvin} and clamps kelvin to the lamp range', () => {
 	const { result } = load(['validateSteps'], `return [
-		validateSteps({ mood: 20 }),
-		validateSteps({ mood: { level: 20, kelvin: 2700 } }, [2202, 4000]),
-		validateSteps({ on: { level: 100, kelvin: 4000 } }, [2202, 4000]),
-		validateSteps({ mood: { level: 20, kelvin: 5000 } }, [2202, 4000]),
-		validateSteps({ mood: { level: 20, kelvin: 1000 } }, [2202, 4000]),
-		validateSteps({ mood: { kelvin: 2700 } }),
-		validateSteps({ mood: { level: 0, kelvin: 2700 } }),
-		validateSteps({ mood: { level: 20, kelvin: 'warm' } }),
+		validateSteps({ kvall: 20 }),
+		validateSteps({ kvall: { level: 20, kelvin: 2700 } }, [2202, 4000]),
+		validateSteps({ stad: { level: 100, kelvin: 4000 } }, [2202, 4000]),
+		validateSteps({ kvall: { level: 20, kelvin: 5000 } }, [2202, 4000]),
+		validateSteps({ kvall: { level: 20, kelvin: 1000 } }, [2202, 4000]),
+		validateSteps({ kvall: { kelvin: 2700 } }),
+		validateSteps({ kvall: { level: 0, kelvin: 2700 } }),
+		validateSteps({ kvall: { level: 20, kelvin: 'warm' } }),
 		validateSteps({ bogus: true }),
 	];`);
 	assert.deepEqual(result, [
 		undefined,
 		undefined,
 		undefined,
-		'mood.kelvin 5000 above lamp range 4000',
-		'mood.kelvin 1000 below lamp range 2202',
-		'mood.level must be a whole percent 1-100',
-		'mood.level must be a whole percent 1-100',
-		'mood.kelvin must be a positive number',
+		'kvall.kelvin 5000 above lamp range 4000',
+		'kvall.kelvin 1000 below lamp range 2202',
+		'kvall.level must be a whole percent 1-100',
+		'kvall.level must be a whole percent 1-100',
+		'kvall.kelvin must be a positive number',
 		'unknown step bogus',
 	]);
 });

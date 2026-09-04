@@ -102,9 +102,11 @@ body.nightmode input[type="checkbox"]:checked ~ i {
   color: lawngreen;
 }
 
-/* The fullscreen button mirrors the menu's checkbox icons: a bare icon that
-   tints with nightmode, but it is a momentary action, not a persisted state. */
-#btn-fullscreen {
+/* The fullscreen and scenes buttons mirror the menu's checkbox icons: a bare
+   icon that tints with nightmode, but each is a momentary action, not a
+   persisted state. */
+#btn-fullscreen,
+#btn-scenes {
   background: none;
   border: none;
   padding: 0;
@@ -112,12 +114,14 @@ body.nightmode input[type="checkbox"]:checked ~ i {
   font: inherit;
 }
 
-#btn-fullscreen i {
+#btn-fullscreen i,
+#btn-scenes i {
   color: lightgray;
   transition: color 0.3s;
 }
 
-body.nightmode #btn-fullscreen i {
+body.nightmode #btn-fullscreen i,
+body.nightmode #btn-scenes i {
   color: #333;
 }
 
@@ -135,9 +139,9 @@ body.nightmode #btn-fullscreen i {
   opacity: 0;
   transition: top 1s ease, opacity 0.8s ease;
   position: absolute;
-  width: 200px;
+  width: 230px;
   top: -60px;
-  right: 55px;
+  right: 25px;
 }
 
 #settings.slide #menu {
@@ -684,6 +688,21 @@ body.nightmode #btn-fullscreen i {
   accent-color: #ffcc00;
 }
 
+/* The 3-state step select: ignore (-) / off (Av) / on (På). */
+#room-config-grid select {
+  background: #333;
+  color: #e8e8e8;
+  border: 1px solid #555;
+  border-radius: 4px;
+  padding: 0.1rem 0.2rem;
+  font: inherit;
+  cursor: pointer;
+}
+
+#room-config-grid select:focus {
+  outline: 1px solid #ffcc00;
+}
+
 #room-config-grid input[type="range"] {
   width: 5.5rem;
   margin-left: 0.35rem;
@@ -795,6 +814,182 @@ body.nightmode #btn-fullscreen i {
 
 /* Room light-settings editor end */
 
+/* Whole-flat scene membership editor — same overlay mechanics as #room-config */
+#scenes-config-bg {
+  left: 0;
+  right: 0;
+  top: 0;
+  bottom: 0;
+  z-index: 630;
+  background: black;
+}
+
+#scenes-config-bg.display {
+  opacity: 0.5;
+  pointer-events: auto;
+}
+
+#scenes-config {
+  flex-direction: column;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: min(94vw, 520px);
+  max-height: 82vh;
+  background: #1b1b1b;
+  color: #e8e8e8;
+  border: 1px solid #454545;
+  border-radius: 8px;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.55);
+  font: 14px/1.5 Roboto, system-ui, sans-serif;
+  z-index: 640;
+  overflow: hidden;
+}
+
+#scenes-config-head {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex: 0 0 auto;
+  padding: 0.5rem 0.75rem;
+  background: #262626;
+  border-bottom: 1px solid #454545;
+}
+
+#scenes-config-head span {
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  user-select: none;
+}
+
+#scenes-config button {
+  font: inherit;
+  color: #e8e8e8;
+  background: #333;
+  border: 1px solid #555;
+  border-radius: 5px;
+  padding: 0.2rem 0.7rem;
+  cursor: pointer;
+  user-select: none;
+}
+
+#scenes-config button:hover:not(:disabled) {
+  background: #3d3d3d;
+}
+
+#scenes-config button:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+#scenes-config-body {
+  flex: 1 1 auto;
+  overflow: auto;
+  padding: 0.75rem 1rem;
+}
+
+#scenes-config .hint {
+  color: #7d7d7d;
+  font-size: 0.9em;
+  margin-bottom: 0.75rem;
+}
+
+#scenes-config-grid {
+  display: flex;
+  flex-direction: column;
+}
+
+.scenes-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) repeat(4, 3.5rem);
+  align-items: center;
+  border-bottom: 1px solid #333;
+  padding: 0.25rem 0;
+}
+
+.scenes-row.scenes-head {
+  border-bottom: 1px solid #454545;
+}
+
+.scenes-room {
+  text-align: left;
+  color: #e8e8e8;
+  user-select: none;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  padding-right: 0.5rem;
+}
+
+.scenes-head .scenes-col {
+  color: #9a9a9a;
+  font-weight: 600;
+  user-select: none;
+}
+
+.scenes-col {
+  text-align: center;
+}
+
+.scenes-col input[type="checkbox"] {
+  display: inline-block;
+  width: 1rem;
+  height: 1rem;
+  cursor: pointer;
+  accent-color: #ffcc00;
+}
+
+#scenes-config-foot {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 0.75rem;
+  background: #262626;
+  border-top: 1px solid #454545;
+}
+
+#scenes-config-save {
+  background: #ffcc00;
+  color: #1b1b1b;
+  border-color: #ffcc00;
+  font-weight: 600;
+}
+
+#scenes-config-status {
+  flex: 1;
+  font-size: 0.9em;
+  user-select: none;
+}
+
+#scenes-config-status.ok {
+  color: lawngreen;
+}
+
+#scenes-config-status.warn {
+  color: #ffcc00;
+}
+
+#scenes-config-status.error {
+  color: #ff5c5c;
+}
+
+#scenes-config.display {
+  display: flex;
+  opacity: 1;
+  pointer-events: auto;
+}
+
+#scenes-config.removed {
+  display: none;
+}
+
+/* Whole-flat scene membership editor end */
+
 stop {
   --sc: #ffcc00;
 }
@@ -860,13 +1055,14 @@ body.nightmode #base-plan [fill="#000000"] {
   fill: #8c8c8c;
 }
 
-.room[light="on"] .room-outline {
+.room[light="stad"] .room-outline {
   fill: #ffcc00;
   fill-opacity: 0.6;
 }
 
-.room[light="mood"] .room-outline,
-.room[light="night"] .room-outline {
+.room[light="natt"] .room-outline,
+.room[light="kvall"] .room-outline,
+.room[light="dag"] .room-outline {
   fill: #ffcc00;
   fill-opacity: 0.22;
 }
@@ -893,19 +1089,20 @@ body.nightmode .room[light="partial"] .room-outline {
   fill-opacity: 0.07;
 }
 
-body.nightmode .room[light="mood"] .room-outline,
-body.nightmode .room[light="night"] .room-outline {
+body.nightmode .room[light="natt"] .room-outline,
+body.nightmode .room[light="kvall"] .room-outline,
+body.nightmode .room[light="dag"] .room-outline {
   fill: #ffd966;
   fill-opacity: 0.14;
 }
 
-body.nightmode .room[light="on"] .room-outline {
+body.nightmode .room[light="stad"] .room-outline {
   fill: #ffd966;
   fill-opacity: 0.26;
 }
 /* End room outline */
 
-.room[light="on"] text {
+.room[light="stad"] text {
   fill: black;
 }
 
@@ -914,11 +1111,9 @@ body.nightmode .room[light="on"] .room-outline {
   fill-opacity: 0.8;
 }
 
-[light="night"] .glow.night,
-[light="mood"] .glow.mood,
-[light="mood"] .glow.night {
-  opacity: 1;
-}
+/* Glows are driven purely by each lamp's `state` attribute now (`[state="on"]
+   .glow` below). The old `night`/`mood` tier classes (`glow.mood`/`glow.night`)
+   were removed when the steps were renamed to `natt`/`kvall`/`dag`/`stad`. */
 
 /* Furniture a light sits under -- the vardagsrum bench. Drawn so the shelf LED
    reads as spilling out from beneath it rather than lighting through it. */
@@ -981,14 +1176,15 @@ body.nightmode [state="on"] .point {
   opacity: 1 !important;
 }
 
-/* A room at the `on` step is washed amber already -- every lamp in it is lit, so
-   the individual glows add nothing and only muddy the wash. Drop them there and
-   keep the symbols, which still say where the lamps are. Higher specificity than
-   the [state="on"] rule above, so it wins between the two !important rules.
-   `.zone-lights` is the zone's group inside #lights; updateArea() mirrors the
-   room's `light` value onto it, because the lamps are not descendants of the
-   room group and no selector can walk from one to the other. */
-.zone-lights[light="on"] .glow {
+/* A room at the `stad` (full) step is washed amber already -- every lamp in it
+   is lit, so the individual glows add nothing and only muddy the wash. Drop them
+   there and keep the symbols, which still say where the lamps are. Higher
+   specificity than the [state="on"] rule above, so it wins between the two
+   !important rules. `.zone-lights` is the zone's group inside #lights;
+   updateArea() mirrors the room's `light` value onto it, because the lamps are
+   not descendants of the room group and no selector can walk from one to the
+   other. */
+.zone-lights[light="stad"] .glow {
   opacity: 0 !important;
 }
 

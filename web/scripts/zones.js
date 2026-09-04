@@ -58,13 +58,20 @@
  */
 
 /**
- * What a device does at each named step. A key that is absent means OFF at that
- * step; `true` means on; a number means on at that brightness, in percent; an
- * object `{level, kelvin}` means on at that brightness AND at that colour
- * temperature (kelvin), for lamps that support white balance.
- * The `off` step is implicit and always means everything off.
+ * What a device does at each named step. Three possibilities, distinguished by
+ * which form the key takes:
+ *   - ABSENT            -> ignore: the scene leaves this device exactly as it is.
+ *   - `false`           -> off: the scene turns the device off.
+ *   - `true`            -> on (full).
+ *   - a number          -> on at that brightness, in percent.
+ *   - `{level, kelvin}` -> on at that brightness AND at that colour temperature
+ *                          (kelvin), for lamps that support white balance.
+ * The `off` step (whole-flat all-off, and a room's off press) is implicit and
+ * ALWAYS turns every switchable device off, regardless of these keys.
+ * The four named steps mirror Home Assistant's scene_mode: `natt` (night),
+ * `kvall` (evening), `dag` (day), `stad` (cleaning/full).
  * @typedef {{level: number, kelvin: number}} StepLevel
- * @typedef {{night?: true|number|StepLevel, mood?: true|number|StepLevel, on?: true|number|StepLevel}} Steps
+ * @typedef {{natt?: true|false|number|StepLevel, kvall?: true|false|number|StepLevel, dag?: true|false|number|StepLevel, stad?: true|false|number|StepLevel}} Steps
  */
 
 /** @typedef {Record<string, DeviceState>} ZoneModel */
@@ -74,7 +81,7 @@
  * of them, and none of the ones that are on belongs to a mood/night scene. No
  * press produces it -- sceneFor() never sees it -- it only describes what the
  * room currently looks like.
- * @typedef {'off'|'night'|'mood'|'on'|'partial'} Step
+ * @typedef {'off'|'natt'|'kvall'|'dag'|'stad'|'partial'} Step
  */
 
 //----------------------------------------------------------------- grammar
@@ -84,24 +91,30 @@
 //old configs keep working).
 //
 //Object form -- one row of the config page's table:
-//    { "device": "badrum_1_tak", "type": "light", "steps": { "mood": 20, "on": 100 } }
+//    { "device": "badrum_1_tak", "type": "light", "steps": { "kvall": 20, "stad": 100 } }
 //  device  matches split[2] of the MQTT topic (post-`climate` remap)
 //  type    light | switch | sensor | occupancy
-//  steps   what the device does at each named step. A key that is ABSENT means
-//          off at that step; `true` means on; a number means on at that
-//          brightness, in percent. The `off` step is implicit.
+//  steps   what the device does at each named step. Three-state:
+//          ABSENT=ignore (left alone), `false`=off, `true`=on, a number=on at
+//          that percent, `{level, kelvin}`=on at brightness + white balance.
+//          The `off` step is implicit and always turns everything off.
 //
 //String form -- `device.type[.tier[.level]]`, e.g. `sovrum_1_tak.light`,
 //`sang_hoger.switch.mood`, `badrum_1_tak.light.mood.20`. A tier is translated to
 //the steps it used to imply, which is where the old model was least obvious:
 //`night` also lit at `mood` (the comment in toggle() read "Night && mood"), and
-//`on` lit EVERYTHING regardless of tier. Written out, that is:
-//    (no tier)     -> { on: true }
-//    .mood         -> { mood: true,             on: true }
-//    .night        -> { night: true, mood: true, on: true }
-//    .mood.20      -> { mood: 20,               on: 100 }
+//`on` lit EVERYTHING regardless of tier. The legacy tiers are `mood` and `night`;
+//they map onto the new HA-derived names: `night`→`natt`, `mood`→`kvall`, `on`→`stad`.
+//Written out, that is:
+//    (no tier)     -> { natt: false, kvall: false, dag: false,                       stad: true }
+//    .mood         -> { natt: false, kvall: true,  dag: false,                       stad: true }
+//    .night        -> { natt: true,  kvall: true,  dag: false,                       stad: true }
+//    .mood.20      -> { natt: false, kvall: 20,    dag: false,                       stad: 100 }
+//⚠ The unlit steps are written as explicit `false` (off) rather than left absent,
+//because absent now means IGNORE (leave alone); the old string form meant the
+//device off at every step it did not light, which is `false`, not absent.
 //⚠ The step values are now authoritative and independent: a device can be lit at
-//`night` but not `mood`, or left out of `on` entirely. Neither was expressible
+//`natt` but not `kvall`, or left out of `stad` entirely. Neither was expressible
 //before, and both are why the config page needed this form.
 /**
  * @param {string|object} entry
@@ -125,16 +138,20 @@ export function parseEntry(entry) {
 	const level = p[3] === undefined ? undefined : Number(p[3]);
 	//db/config.json is hand-edited and unvalidated, so this is an assertion, not
 	//a guarantee. A typo like `.moood` parses to a tier nothing matches, which
-	//reads as untiered -- the device then only comes on at `on`.
+	//reads as untiered -- the device then only comes on at `stad`.
 	const tier = /** @type {'mood'|'night'|undefined} */ (p[2]);
 	const lvl = Number.isFinite(level) ? level : undefined;
 
 	/** @type {Steps} */
 	const steps = {};
 	if (p[1] === 'light' || p[1] === 'switch') {
-		if (tier === 'night') steps.night = lvl ?? true;
-		if (tier === 'night' || tier === 'mood') steps.mood = lvl ?? true;
-		steps.on = lvl === undefined ? true : 100;
+		//The unlit named steps are explicit `false` (off), because absent now means
+		//IGNORE and the string form meant the device off at every step it did not
+		//light. `stad` always lights. `off` is implicit (always off).
+		steps.natt = tier === 'night' ? (lvl ?? true) : false;
+		steps.kvall = (tier === 'night' || tier === 'mood') ? (lvl ?? true) : false;
+		steps.dag = false;
+		steps.stad = lvl === undefined ? true : 100;
 	}
 
 	return { entry, device: p[0], type: p[1], tier, level: lvl, steps, entity: `${p[1]}.${p[0]}` };
@@ -161,48 +178,62 @@ export function parseZone(entries) {
 //------------------------------------------------- what a step publishes
 
 //Given a zone's config entries and a step, what should go out on MQTT. Returns
-//one action per switchable device: `{entity, state}` for a plain on/off, or
-//`{entity, level}` for a brightness. The caller does the publishing.
-//
-//Every switchable device is named in every scene -- the ones the step does not
-//light are published `off`, not omitted -- so pressing a step always puts the
-//room into exactly that state rather than adding to whatever was already on.
+//one action per switchable device EXCEPT those whose step is absent (= ignore,
+//left alone): the scene only names the lights it turns on or off, so pressing a
+//step changes exactly the lights it says something about and leaves the rest as
+//they are. The `off` step is the exception -- it is the all-off sweep and names
+//EVERY switchable device as off.
 /**
  * @param {readonly (string|object)[] | undefined} entries
- * @param {string} step  off | night | mood | on
+ * @param {string} step  off | natt | kvall | dag | stad
  * @returns {Action[]}
  */
 export function sceneFor(entries, step) {
-	return parseZone(entries).filter(isSwitchable).map(e => {
-		const v = step === 'off' ? undefined : e.steps?.[/** @type {'night'|'mood'|'on'} */ (step)];
+	/** @type {Action[]} */
+	const out = [];
+	for (const e of parseZone(entries).filter(isSwitchable)) {
+		//The all-off sweep always names every device, regardless of its step keys.
+		if (step === 'off') { out.push({ entity: e.entity, state: 'off' }); continue; }
+
+		const v = e.steps?.[/** @type {'natt'|'kvall'|'dag'|'stad'} */ (step)];
+		//ABSENT -> ignore: omit the device, leave it exactly as it is.
+		if (v === undefined) continue;
+		//`false` -> explicit off. `true` -> on.
+		if (v === false) { out.push({ entity: e.entity, state: 'off' }); continue; }
 		//A number is a brightness; an object is a brightness + a kelvin. ⚠ The
 		//level must be published even at `on`, and the config page writes 100 there
 		//for a dimmable device rather than `true`, because a plain turn_on restores
 		//whatever level the lamp last had -- so `on` after a dimmed step would
 		//otherwise leave it dimmed. Measured on the real dimmer 2026-08-27.
-		if (typeof v === 'number') return { entity: e.entity, level: v };
+		if (typeof v === 'number') { out.push({ entity: e.entity, level: v }); continue; }
 		if (v !== null && typeof v === 'object') {
 			const level = Number(v.level);
 			const kelvin = Number(v.kelvin);
-			if (!Number.isFinite(level)) return { entity: e.entity, state: 'off' };
-			return Number.isFinite(kelvin)
+			if (!Number.isFinite(level)) { out.push({ entity: e.entity, state: 'off' }); continue; }
+			out.push(Number.isFinite(kelvin)
 				? { entity: e.entity, level, kelvin }
-				: { entity: e.entity, level };
+				: { entity: e.entity, level });
+			continue;
 		}
-		return { entity: e.entity, state: v ? 'on' : 'off' };
-	});
+		out.push({ entity: e.entity, state: 'on' });
+	}
+	return out;
 }
 
 //Which steps this zone actually offers -- a step is available when at least one
-//device does something at it. `on` is always offered.
+//device is lit at it (has a value that turns it on). `stad` is always offered.
 /**
  * @param {readonly (string|object)[] | undefined} entries
- * @returns {{night: boolean, mood: boolean, on: boolean}}
+ * @returns {{natt: boolean, kvall: boolean, dag: boolean, stad: boolean}}
  */
 export function stepsAvailable(entries) {
 	const sw = parseZone(entries).filter(isSwitchable);
-	const any = (/** @type {'night'|'mood'} */ k) => sw.some(e => e.steps?.[k] !== undefined);
-	return { night: any('night'), mood: any('mood'), on: true };
+	//"lit at" = the value turns the device ON (not false/absent): true, a number,
+	//or a {level, kelvin} object.
+	const lit = (/** @type {unknown} */ v) =>
+		v !== false && v !== undefined && v !== null;
+	const any = (/** @type {'natt'|'kvall'|'dag'} */ k) => sw.some(e => lit(e.steps?.[k]));
+	return { natt: any('natt'), kvall: any('kvall'), dag: any('dag'), stad: true };
 }
 
 //--------------------------------------------- which step a zone is in now
@@ -217,18 +248,24 @@ export function stepsAvailable(entries) {
 //back as `step`.
 /**
  * @param {ZoneModel} zoneModel
- * @returns {{step: Step, moodable: boolean, nightable: boolean, lights: string[]}}
+ * @returns {{step: Step, nattable: boolean, kvallable: boolean, dagable: boolean, lights: string[]}}
  */
 export function stepOf(zoneModel) {
 	const lights = Object.keys(zoneModel).filter(n => Object.hasOwn(zoneModel[n], 'onoff'));
-	const moodable = lights.some(n => zoneModel[n].steps?.mood !== undefined);
-	const nightable = lights.some(n => zoneModel[n].steps?.night !== undefined);
+	//A step is "available" when at least one lamp is lit at it (not false/absent).
+	const lit = (/** @type {unknown} */ v) => v !== false && v !== undefined && v !== null;
+	const nattable = lights.some(n => lit(zoneModel[n].steps?.natt));
+	const kvallable = lights.some(n => lit(zoneModel[n].steps?.kvall));
+	const dagable = lights.some(n => lit(zoneModel[n].steps?.dag));
 
-	//Does the room currently match what this step prescribes?
-	const matches = (/** @type {'night'|'mood'|'on'} */ step) => lights.every(n => {
+	//Does the room currently match what this step prescribes? A lamp the step
+	//IGNORES (absent) imposes no constraint; `false` demands off; anything else
+	//demands on (at its brightness, when one is authored).
+	const matches = (/** @type {'natt'|'kvall'|'dag'|'stad'} */ step) => lights.every(n => {
 		const m = zoneModel[n];
 		const want = m.steps?.[step];
-		if (want === undefined) return !m.onoff;
+		if (want === undefined) return true;   // ignore: no constraint
+		if (want === false) return !m.onoff;    // explicit off
 		if (!m.onoff) return false;
 		//A brightness only counts as matched when the lamp is actually near it.
 		//Without this a room at 20% and the same room at 100% are the same state,
@@ -246,38 +283,39 @@ export function stepOf(zoneModel) {
 	/** @type {Step} */
 	let step = 'partial';
 	if (lights.every(n => !zoneModel[n].onoff)) step = 'off';
-	else if (nightable && matches('night')) step = 'night';
-	else if (moodable && matches('mood')) step = 'mood';
-	else if (matches('on')) step = 'on';
+	else if (nattable && matches('natt')) step = 'natt';
+	else if (kvallable && matches('kvall')) step = 'kvall';
+	else if (dagable && matches('dag')) step = 'dag';
+	else if (matches('stad')) step = 'stad';
 	//...otherwise `partial`: lit, but not in any scene the room defines. No press
 	//produces it; it only describes what is on screen.
 
-	return { step, moodable, nightable, lights };
+	return { step, nattable, kvallable, dagable, lights };
 }
 
 //------------------------------------------------------------- the cycle
 
-//What a press moves the room to. `allowMax` is whether the `on` step is
-//reachable. It used to be the "Max brightness" checkbox (#cb-mood, the sun
-//icon); that toggle is gone and home.js always passes true, but the parameter
-//stays so the cycle grammar remains explicit and testable. Without max, a room
-//whose lights all carry a level could never reach full brightness.
+//What a press moves the room to, darkest to brightest: off -> natt -> kvall ->
+//dag -> stad -> off. A step is skipped when the room's lamps cannot do it (the
+//mood/night flags come from stepsAvailable via stepOf). `stad` is always
+//reachable.
 /**
  * @param {string|null} current  the room's present step
- * @param {{moodable?: unknown, nightable?: unknown, allowMax?: unknown}} [opts]
+ * @param {{nattable?: unknown, kvallable?: unknown, dagable?: unknown}} [opts]
  *   Truthiness is all that matters: home.js passes DOM attribute values, which
  *   are strings or null, not booleans.
  * @returns {Step|undefined} undefined when `current` is not a known step
  */
-export function nextStep(current, { moodable, nightable, allowMax } = {}) {
+export function nextStep(current, { nattable, kvallable, dagable } = {}) {
 	switch (current) {
-		case 'on': return 'off';
+		case 'stad': return 'off';
 		//A partially-lit room presses to off, which is what it did while it was
 		//mislabelled as `on`. Pressing a room with something on should turn it off.
 		case 'partial': return 'off';
-		case 'off': return nightable ? 'night' : moodable ? 'mood' : 'on';
-		case 'mood': return allowMax ? 'on' : 'off';
-		case 'night': return moodable ? 'mood' : allowMax ? 'on' : 'off';
+		case 'off': return nattable ? 'natt' : kvallable ? 'kvall' : dagable ? 'dag' : 'stad';
+		case 'dag': return 'stad';
+		case 'kvall': return dagable ? 'dag' : 'stad';
+		case 'natt': return kvallable ? 'kvall' : dagable ? 'dag' : 'stad';
 	}
 	return undefined;
 }
