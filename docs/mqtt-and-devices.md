@@ -452,6 +452,37 @@ reading `log/mqtt.log` over `devices`, which would discard every state MQTT has 
 boot. reloadConfig() re-stamps only the `SCHEMA_KEYS` and leaves observations alone; a test
 covers it, and reverting it to call `init()` makes that test fail.
 
+### Zigbee groups — one command per physical lamp, enforced on save
+
+zigbee2mqtt casts a **group** as a single broadcast: `light.z_lampor_v` sets *both* `v1` and
+`v2` in one command, `light.z_lampor_vardagsrum` sets `matbord`/`golvlampa`/`v1`/`v2`/
+`unused_1`, and `light.z_lampor_alla` sets those plus the bedroom lamps. Addressing a group AND
+one of its members at the same step therefore sends the same physical lamp two commands by two
+routes, and the slower one wins, so the scene settles wrong.
+
+To stop that, the group map is **fetched from zigbee2mqtt at boot** (`loadZ2mGroups()` in
+`mqtt-web.js`): it reads `/media/storage/ha/zigbee2mqtt/data/database.db` (newline-delimited
+JSON, each `type: "Group"` record lists its member IEEE addresses) for membership, z2m's
+`configuration.yaml` for the per-group friendly name, and HA's `core.entity_registry` to turn
+a member IEEE address into lgh-node's own device name (which is how z2m's "Sovrum byrå" lands
+on `sovrum_1_byra`). The result is `{ groupDevice: [memberDevice, ...] }`; nothing is stored
+in `db/config.json`, so a re-zigbee2mqtt edit of group membership is picked up on the next
+restart.
+
+Two things read that map (`overlappingDevices()` in `zones.js`):
+
+- **`POST /config/zones`** — when a device is given a non-ignore value at a step, that same
+  step is cleared (made absent = ignore) on every device that shares a physical lamp with it,
+  across ALL zones (`z_lampor_alla` spans the flat). A step the request itself sets on the
+  overlapping device is left alone. The server is authoritative because a group's members live
+  in rooms too far apart for the single-room editor to see.
+- **The config editor** (`cfgClearOverlaps()` in `home.js`) — the same collapse within the
+  room being edited, so the `—` lands in a member's cell the moment you give its group a
+  value. `GET /config/zones` returns the map as a top-level `groups` key.
+
+The `—` (ignore) cell is therefore doing double duty: a lamp *you* left out of a scene, and a
+lamp deliberately not re-commanded because its group already covers it.
+
 Writes go through `saveConfig()`: timestamped backup, temp file, atomic rename. `db/config.json`
 is read unguarded at boot, so a half-written file is a startup crash later.
 

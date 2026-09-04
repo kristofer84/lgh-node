@@ -32,7 +32,7 @@ import { registerWebnMethods } from './server-webn.js';
 //The zone/device grammar and the step semantics. The same file is served to the
 //browser at /scripts/zones.js and imported by tools/floorplan/generate.mjs, so
 //all three agree by construction instead of by hand. See its header.
-import { parseEntry, parseZone, isSwitchable, sceneFor } from './web/scripts/zones.js';
+import { parseEntry, parseZone, isSwitchable, sceneFor, overlappingDevices } from './web/scripts/zones.js';
 
 process.stdin.resume();
 
@@ -40,6 +40,81 @@ process.stdin.resume();
 var devices;
 var config;
 
+//Zigbee groups, fetched from zigbee2mqtt's own store at boot so the overlap
+//between a group and its member lamps (each casts ONE command to every member)
+//is always what the radio actually has. Shape: { groupDeviceName: [memberDevice...] }
+//where memberDevice is lgh-node's device name (the HA entity_id minus `light.`),
+//resolved through HA's entity registry so names like `sovrum_1_byra` (which z2m
+//calls "Sovrum byrå") line up with the rest of the config.
+/** @type {Record<string, string[]>} */
+var groups = {};
+
+//Read the Zigbee group hierarchy straight from zigbee2mqtt's own store. z2m
+//keeps membership in database.db (Newline-Delimited JSON; each Group record
+//lists its member device IEEE addresses) and the friendly name per group id in
+//configuration.yaml. Member IEEE addresses are resolved to lgh-node device names
+//through HA's entity registry (unique_id `<ieee>_light_zigbee2mqtt` -> entity
+//`light.<name>`), so a z2m name like "Sovrum byrå" lands on `sovrum_1_byra`, the
+//same name the rest of db/config.json uses. Failure is non-fatal: no map just
+//means no collapse, and individual lamps are addressed as before.
+/** @returns {Record<string, string[]>} */
+function loadZ2mGroups() {
+	/** @type {Record<string, string[]>} */
+	const out = {};
+	try {
+		const z2mData = readFileSync('/media/storage/ha/zigbee2mqtt/data/database.db', 'utf8');
+		const z2mCfg = readFileSync('/media/storage/ha/zigbee2mqtt/data/configuration.yaml', 'utf8');
+		const reg = JSON.parse(readFileSync('/media/storage/ha/homeassistant/.storage/core.entity_registry', 'utf8'));
+
+		//ieee -> entity_id for zigbee2mqtt lights (unique_id is `<ieee>_light_zigbee2mqtt`).
+		/** @type {Record<string, string>} */
+		const ieeeToEntity = {};
+		for (const e of reg?.data?.entities ?? []) {
+			const uid = e.unique_id ?? '';
+			if (uid.endsWith('_light_zigbee2mqtt') && e.entity_id?.startsWith('light.')) {
+				ieeeToEntity[uid.slice(0, -'_light_zigbee2mqtt'.length)] = e.entity_id;
+			}
+		}
+
+		//groupID -> friendly name, from z2m configuration.yaml `groups:` block.
+		/** @type {Record<string, string>} */
+		const groupNames = {};
+		let currentGroup;
+		let inGroups = false;
+		for (const line of z2mCfg.split('\n')) {
+			const t = line.trim();
+			if (/^groups:\s*$/.test(t)) { inGroups = true; continue; }
+			//A top-level key (no leading whitespace) ends the `groups:` block.
+			if (inGroups && line && line[0] !== ' ' && line[0] !== '\t' && !t.startsWith('filtered_attributes')) { inGroups = false; continue; }
+			if (!inGroups) continue;
+			const m = t.match(/^'?(\d+)'?:\s*$/);
+			if (m) { currentGroup = m[1]; continue; }
+			const fm = t.match(/friendly_name:\s*(.+)/);
+			if (fm && currentGroup !== undefined) groupNames[currentGroup] = fm[1].trim();
+		}
+
+		//groupID -> [member device name] from the NDJSON database.
+		for (const line of z2mData.split('\n')) {
+			if (!line.trim()) continue;
+			let obj;
+			try { obj = JSON.parse(line); } catch { continue; }
+			if (obj.type !== 'Group') continue;
+			const name = groupNames[String(obj.groupID)];
+			if (!name) continue;
+			const device = name.toLowerCase().replace(/\s+/g, '_');
+			const members = (obj.members ?? [])
+				.map(m => ieeeToEntity[m.deviceIeeeAddr])
+				.filter(Boolean)
+				.map(e => e.slice('light.'.length));
+			out[device] = members;
+		}
+	} catch (err) {
+		//Not fatal: no group map just means no collapse -- individual lamps are
+		//addressed directly, exactly as before this feature existed.
+		log(`loadZ2mGroups: ${err.message}`);
+	}
+	return out;
+}
 
 //Everything init() stamps onto a device from db/config.json. These describe what
 //the device IS, not what it is doing, so they must never be persisted: the
@@ -89,6 +164,10 @@ function init() {
 
 	let buffer2 = readFileSync('./db/config.json');
 	config = JSON.parse(buffer2.toString());
+
+	//Fetch the Zigbee group map once at boot (see loadZ2mGroups). Available to
+	//the collapse logic on save and to the config editor via /config/zones.
+	groups = loadZ2mGroups();
 
 	//Save zone for each light for faster processing
 	Object.keys(config.zones).forEach(zone => {
@@ -322,6 +401,10 @@ app.get('/config/zones', wrap(async (req, res) => {
 		}));
 		if (rows.length) out[zone] = rows;
 	}
+	//The Zigbee group map, so the config editor can clear a step (set ignore) on
+	//every device that shares a physical lamp with the one you just set -- the
+	//`-` in a member's cell the moment you give its group a value.
+	out.groups = groups;
 	res.end(JSON.stringify(out));
 }));
 
@@ -378,6 +461,35 @@ app.post('/config/zones', wrap(async (req, res) => {
 		}
 	}
 
+	//Enforce the Zigbee group hierarchy across the WHOLE config. A device given a
+	//non-ignore value at a step claims every physical lamp it drives, so that same
+	//step must be cleared (made absent = ignore) on every OTHER device that shares
+	//a lamp with it -- otherwise the scene commands the lamp twice (a group and a
+	//member, or two overlapping groups). Cross-zone on purpose: z_lampor_alla spans
+	//the whole flat.
+	const collapsed = [];
+	for (const [device, steps] of Object.entries(body)) {
+		if (!steps || typeof steps !== 'object') continue;
+		for (const step of Object.keys(steps)) {
+			if (steps[step] === undefined) continue;   // ignore: no claim
+			for (const other of overlappingDevices(groups, device)) {
+				//If the user set `other` at this step in the SAME request, their
+				//explicit value wins; do not silently clear it out from under them.
+				if (bodyHasStep(body, other, step)) continue;
+				const oZone = findDeviceZone(disk, other);
+				if (!oZone) continue;
+				const oi = disk.zones[oZone].findIndex(en => parseEntry(en).device === other);
+				if (oi < 0) continue;
+				const oe = parseEntry(disk.zones[oZone][oi]);
+				const osteps = { ...(oe.steps ?? {}) };
+				if (!(step in osteps)) continue;
+				delete osteps[step];
+				disk.zones[oZone][oi] = { device: oe.device, type: oe.type, steps: osteps };
+				collapsed.push(`${oZone}/${other}@${step}`);
+			}
+		}
+	}
+
 	await saveConfig(disk);
 	//Memory must follow disk BEFORE the scenes file is expanded: writeScenesJson
 	//reads the module-level `config`, so regenerating it on the stale snapshot
@@ -386,8 +498,8 @@ app.post('/config/zones', wrap(async (req, res) => {
 	reloadConfig();
 	writeScenesJson();
 	io.emit('device.all', JSON.stringify(getDevice(null), null, 2));
-	log(`config saved by ${req.user?.preferred_username ?? 'unknown'}: ${changed.length} device(s)`);
-	res.end(JSON.stringify({ status: 'ok', changed }));
+	log(`config saved by ${req.user?.preferred_username ?? 'unknown'}: ${changed.length} device(s)${collapsed.length ? `, ${collapsed.length} group step(s) cleared` : ''}`);
+	res.end(JSON.stringify({ status: 'ok', changed, collapsed }));
 }));
 
 //---- the scene-membership editor's two routes (same auth gate) -------------
@@ -948,6 +1060,24 @@ function getDevice(dev) {
 //(ignore -- the scene leaves the device alone). Anything else is refused rather
 //than written -- db/config.json is read unguarded at boot, so a bad value written
 //here is a startup crash later.
+/** Does any zone in a save body set `device` at `step` to a non-ignore value? */
+function bodyHasStep(body, device, step) {
+	for (const devs of Object.values(body)) {
+		if (!devs || typeof devs !== 'object') continue;
+		const d = devs[device];
+		if (d && typeof d === 'object' && d[step] !== undefined) return true;
+	}
+	return false;
+}
+
+/** The zone a device lives in, across the whole on-disk config. */
+function findDeviceZone(disk, device) {
+	for (const [zone, entries] of Object.entries(disk.zones)) {
+		if (entries.some(en => parseEntry(en).device === device)) return zone;
+	}
+	return undefined;
+}
+
 function validateSteps(steps, range) {
 	if (steps === null || typeof steps !== 'object' || Array.isArray(steps)) return 'steps must be an object';
 	for (const [k, v] of Object.entries(steps)) {

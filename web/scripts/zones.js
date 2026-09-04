@@ -322,6 +322,48 @@ export function sceneStates(zoneModel, step) {
 	return out;
 }
 
+//------------------------------------------------------------ groups
+
+//Zigbee groups cast ONE command to every member lamp at once, so a scene that
+//addresses BOTH a group and one of its members (or two overlapping groups) sends
+//the same physical lamps two conflicting commands. The `groups` map records what
+//each group drives so the rest of the system can avoid that: a step given a value
+//on one device must be cleared (left absent = ignore) on every device that shares
+//a member lamp with it.
+//
+//`groups` is { groupName: [memberDevice, ...] } -- the member list is FLAT (the
+//physical lamps), and nesting/overlap is READ OUT of it: z_lampor_v (v1,v2) sits
+//inside z_lampor_vardagsrum (matbord,golvlampa,v1,v2,unused_1) because the latter
+//lists v1 and v2 too. A leaf device is any name that is not a group key.
+
+/** The physical lamps a config device drives: itself when it is a leaf, else its
+ *  group's member list. */
+/**
+ * @param {Record<string, string[]>} groups
+ * @param {string} device
+ * @returns {Set<string>}
+ */
+export function leafSet(groups, device) {
+	return new Set(groups[device] ?? [device]);
+}
+
+/** Every OTHER device whose physical lamps overlap `device`'s -- i.e. every group
+ *  that shares a member with it. Two leaf lamps never overlap. */
+/**
+ * @param {Record<string, string[]>} groups
+ * @param {string} device
+ * @returns {string[]}
+ */
+export function overlappingDevices(groups, device) {
+	const mine = leafSet(groups, device);
+	const out = [];
+	for (const [g, members] of Object.entries(groups)) {
+		if (g === device) continue;
+		if (members.some(m => mine.has(m))) out.push(g);
+	}
+	return out;
+}
+
 //------------------------------------------------------------- the cycle
 
 //What a press moves the room to, darkest to brightest: off -> natt -> kvall ->

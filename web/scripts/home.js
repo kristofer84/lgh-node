@@ -1,6 +1,6 @@
 //The step semantics live in zones.js, the same file the server and the
 //floorplan builder import, so all three cannot drift apart.
-import { stepOf, nextStep, sceneStates } from './zones.js';
+import { stepOf, nextStep, sceneStates, overlappingDevices } from './zones.js';
 
 //import Auth from './auth.js';
 
@@ -821,6 +821,11 @@ const CONFIG_STEPS = [
 
 let roomConfigZone = null;
 let roomConfigDirty = {};   // {device: steps}
+//The Zigbee group map (group -> member devices), read from GET /config/zones so
+//the editor can clear a step on every device that shares a physical lamp with
+//the one you just set.
+/** @type {Record<string, string[]>} */
+let cfgGroups = {};
 //Keeps the row's config object reachable from its <tr> (colour range is needed
 //to clamp kelvin when the row is read back). A property on the element itself
 //fails the JSDoc typecheck, so it lives in a WeakMap instead.
@@ -922,6 +927,23 @@ function cfgCapture(step) {
 	cfgSetStatus(`Fyllde ${step} från nuvarande läge`, 'ok');
 }
 
+//When a device's step is given a value (on/off), every OTHER device that shares
+//a physical lamp with it must drop to ignore at that step -- the group command
+//already covers those lamps. Mirror the server-side collapse here so the user
+//sees the `-` land in the same room's rows as they edit, without a round-trip.
+function cfgClearOverlaps(device, step) {
+	const others = overlappingDevices(cfgGroups, device);
+	if (!others.length) return;
+	document.querySelectorAll('#room-config-rows tr').forEach(tr => {
+		const row = cfgRowMeta.get(tr);
+		if (!row || !others.includes(row.device)) return;
+		const sel = cfgField(tr, `select[data-step="${step}"]`);
+		if (!sel || sel.value === '') return;   // already ignoring
+		sel.value = '';
+		sel.dispatchEvent(new Event('change'));
+	});
+}
+
 function cfgBuildRow(row) {
 	const tr = document.createElement('tr');
 	cfgRowMeta.set(tr, row);
@@ -1015,6 +1037,10 @@ function cfgBuildRow(row) {
 		sel.addEventListener('change', () => {
 			setSliders(sel.value !== 'on');
 			cfgMarkDirty(row.device, tr);
+			//Setting a step ON/OFF claims any shared lamp: clear the same step to
+			//ignore on overlapping devices. Guarded on the value so the clears we
+			//dispatch below do not recurse.
+			if (sel.value !== '') cfgClearOverlaps(row.device, key);
 		});
 		tr.append(td);
 	}
@@ -1033,6 +1059,7 @@ async function cfgLoad(zone) {
 		return;
 	}
 	const zones = await res.json();
+	cfgGroups = zones.groups ?? {};
 	const rows = zones[zone] ?? [];
 	for (const row of rows) cfg$('room-config-rows').append(cfgBuildRow(row));
 }

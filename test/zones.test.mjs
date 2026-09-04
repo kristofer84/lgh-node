@@ -6,7 +6,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { ROOT } from './helpers.mjs';
-import { parseEntry, sceneFor, stepOf, nextStep, stepsAvailable, sceneStates } from '../web/scripts/zones.js';
+import { parseEntry, sceneFor, stepOf, nextStep, stepsAvailable, sceneStates, overlappingDevices, leafSet } from '../web/scripts/zones.js';
 
 /** @typedef {import('../web/scripts/zones.js').Steps} Steps */
 /** @typedef {import('../web/scripts/zones.js').ZoneModel} ZoneModel */
@@ -260,4 +260,24 @@ test('nextStep walks the cycle', () => {
 	//mislabelled as `stad`.
 	assert.equal(nextStep('partial', { dagable: true }), 'off');
 	assert.equal(nextStep('partial', {}), 'off');
+});
+
+test('Zigbee group overlap: a device shares lamps with every group that lists it', () => {
+	//The group map is fetched from zigbee2mqtt at boot; members are the physical
+	//lamps each group casts one command to. Overlap (shared members) is what makes
+	//two devices conflict, so the editor/save clears one when the other is set.
+	const groups = {
+		z_lampor_v: ['v1', 'v2'],
+		z_lampor_vardagsrum: ['matbord', 'golvlampa', 'v1', 'v2', 'unused_1'],
+		z_lampor_alla: ['matbord', 'golvlampa', 'v1', 'v2', 'unused_1', 'lampa_mette', 'kai_garderob', 'mikkel_garderob', 'sovrum_1_byra'],
+	};
+	assert.deepEqual(leafSet(groups, 'z_lampor_v'), new Set(['v1', 'v2']));
+	//A group overlaps the bigger groups containing it, and a member overlaps its groups.
+	assert.deepEqual(overlappingDevices(groups, 'z_lampor_v').sort(), ['z_lampor_alla', 'z_lampor_vardagsrum']);
+	assert.deepEqual(overlappingDevices(groups, 'matbord').sort(), ['z_lampor_alla', 'z_lampor_vardagsrum']);
+	assert.deepEqual(overlappingDevices(groups, 'lampa_mette'), ['z_lampor_alla']);
+	//A lamp in no group overlaps nothing.
+	assert.deepEqual(overlappingDevices(groups, 'vardagsrum_vaggar'), []);
+	//Two unrelated lamps do not overlap each other.
+	assert.deepEqual(overlappingDevices(groups, 'golvlampa').filter(x => x === 'lampa_mette'), []);
 });

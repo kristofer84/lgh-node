@@ -11,7 +11,7 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { parseEntry, sceneFor } from '../web/scripts/zones.js';
 
-const boot = body => load(['init', 'brightnessOf', 'kelvinOf', 'dimmableFrom', 'friendlyName', 'shapeOf', 'getDevice', 'toggle'], `init();\n${body}`, { parseEntry, sceneFor });
+const boot = body => load(['init', 'brightnessOf', 'kelvinOf', 'dimmableFrom', 'friendlyName', 'shapeOf', 'getDevice', 'toggle', 'loadZ2mGroups'], `init();\n${body}`, { parseEntry, sceneFor });
 
 test('init() stamps zone, type and tier from the config', () => {
 	const { result } = boot('return { devices, config };');
@@ -46,7 +46,7 @@ test('⚠ init() CLEARS a tier the config no longer declares', () => {
 	//The stale keys include the pre-2026-08-28 names, which is exactly what an
 	//old log/mqtt.log contains.
 	const doctored = { [victim.device]: { mood: true, night: true, level: 99, steps: { night: true }, onoff: 'true' } };
-	const { result } = load(['init', 'brightnessOf', 'kelvinOf', 'dimmableFrom', 'friendlyName', 'shapeOf', 'getDevice', 'toggle'],
+	const { result } = load(['init', 'brightnessOf', 'kelvinOf', 'dimmableFrom', 'friendlyName', 'shapeOf', 'getDevice', 'toggle', 'loadZ2mGroups'],
 		'init(); return devices;',
 		{
 			parseEntry, sceneFor,
@@ -86,7 +86,7 @@ test('⚠ the snapshot and the per-device payload agree', () => {
 test('toggle() publishes the whole room scene as one message, for every zone and step', () => {
 	for (const step of ['off', 'natt', 'kvall', 'dag', 'stad']) {
 		const { result, published, scenes } = load(
-			['init', 'brightnessOf', 'kelvinOf', 'dimmableFrom', 'friendlyName', 'shapeOf', 'getDevice', 'toggle'],
+			['init', 'brightnessOf', 'kelvinOf', 'dimmableFrom', 'friendlyName', 'shapeOf', 'getDevice', 'toggle', 'loadZ2mGroups'],
 			`init(); const zones = Object.keys(config.zones);
 			 for (const z of zones) toggle(z, ${JSON.stringify(step)});
 			 return config;`,
@@ -104,7 +104,7 @@ test('toggle() publishes the whole room scene as one message, for every zone and
 });
 
 test('toggle() rejects an unknown zone and a missing value without publishing', () => {
-	const { published, scenes } = load(['init', 'brightnessOf', 'kelvinOf', 'dimmableFrom', 'friendlyName', 'shapeOf', 'getDevice', 'toggle'],
+	const { published, scenes } = load(['init', 'brightnessOf', 'kelvinOf', 'dimmableFrom', 'friendlyName', 'shapeOf', 'getDevice', 'toggle', 'loadZ2mGroups'],
 		`init(); toggle('no_such_zone', 'stad'); toggle(Object.keys(config.zones)[0], undefined); return null;`,
 		{ parseEntry, sceneFor });
 	assert.deepEqual(published, []);
@@ -333,7 +333,7 @@ test('⚠ reloadConfig() re-stamps the config without discarding observed state'
 	//throw away every state MQTT has reported since boot -- the whole model would
 	//blank until each device next published.
 	const { result } = load(
-		['init', 'brightnessOf', 'kelvinOf', 'dimmableFrom', 'friendlyName', 'shapeOf', 'getDevice', 'toggle', 'reloadConfig'],
+		['init', 'brightnessOf', 'kelvinOf', 'dimmableFrom', 'friendlyName', 'shapeOf', 'getDevice', 'toggle', 'loadZ2mGroups', 'reloadConfig'],
 		`init();
 		 const name = Object.keys(config.zones).flatMap(z => config.zones[z])
 			.map(parseEntry).find(e => e.type === 'light').device;
