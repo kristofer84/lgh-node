@@ -364,6 +364,67 @@ export function overlappingDevices(groups, device) {
 	return out;
 }
 
+//The group a device nests UNDER in the config editor, restricted to the devices
+//of ONE zone. A group nests under the SMALLEST other group whose member set
+//CONTAINS it (so z_lampor_v sits under z_lampor_vardagsrum, not z_lampor_alla);
+//a leaf member nests under the group that lists it. Returns the parent device
+//name, or null when the device sits at the top level of this zone.
+/**
+ * @param {Record<string, string[]>} groups
+ * @param {string} device
+ * @param {string[]} zoneDevices   the devices present in this one zone
+ * @returns {string|null}
+ */
+export function groupParent(groups, device, zoneDevices) {
+	const mine = leafSet(groups, device);
+	let best = null;
+	for (const g of zoneDevices) {
+		if (g === device || !(g in groups)) continue;
+		const gm = new Set(groups[g]);
+		//`g` contains `device` iff every physical lamp `device` drives is in g.
+		if ([...mine].every(m => gm.has(m))) {
+			if (best === null || groups[g].length < groups[best].length) best = g;
+		}
+	}
+	return best;
+}
+
+//Reorder a zone's device list into a tree for the config editor: each group is
+//followed by the members that nest under it (recursively), and each row carries
+//a `depth` so the UI can indent it. Top-level devices keep their config order;
+//a group's children keep theirs. Only nests within the SAME zone -- a group
+//whose members live in other rooms (z_lampor_alla) shows them as separate rows
+//there, not here.
+/**
+ * @param {Record<string, string[]>} groups
+ * @param {string[]} devices
+ * @returns {{device: string, depth: number}[]}
+ */
+export function nestGroupRows(groups, devices) {
+	const set = new Set(devices);
+	const parentOf = /** @type {(d: string) => string|null} */ (d => {
+		const p = groupParent(groups, d, devices);
+		return p && set.has(p) ? p : null;
+	});
+	/** @type {Map<string, string[]>} */
+	const children = new Map();
+	for (const d of devices) {
+		const p = parentOf(d);
+		if (p) {
+			if (!children.has(p)) children.set(p, []);
+			children.get(p).push(d);
+		}
+	}
+	/** @type {{device: string, depth: number}[]} */
+	const out = [];
+	const visit = (/** @type {string} */ d, /** @type {number} */ depth) => {
+		out.push({ device: d, depth });
+		for (const c of children.get(d) ?? []) visit(c, depth + 1);
+	};
+	for (const r of devices) if (!parentOf(r)) visit(r, 0);
+	return out;
+}
+
 //------------------------------------------------------------- the cycle
 
 //What a press moves the room to, darkest to brightest: off -> natt -> kvall ->

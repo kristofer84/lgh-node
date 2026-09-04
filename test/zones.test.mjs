@@ -6,7 +6,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { ROOT } from './helpers.mjs';
-import { parseEntry, sceneFor, stepOf, nextStep, stepsAvailable, sceneStates, overlappingDevices, leafSet } from '../web/scripts/zones.js';
+import { parseEntry, sceneFor, stepOf, nextStep, stepsAvailable, sceneStates, overlappingDevices, leafSet, nestGroupRows, groupParent } from '../web/scripts/zones.js';
 
 /** @typedef {import('../web/scripts/zones.js').Steps} Steps */
 /** @typedef {import('../web/scripts/zones.js').ZoneModel} ZoneModel */
@@ -280,4 +280,23 @@ test('Zigbee group overlap: a device shares lamps with every group that lists it
 	assert.deepEqual(overlappingDevices(groups, 'vardagsrum_vaggar'), []);
 	//Two unrelated lamps do not overlap each other.
 	assert.deepEqual(overlappingDevices(groups, 'golvlampa').filter(x => x === 'lampa_mette'), []);
+});
+
+test('nestGroupRows: a zone\'s devices become a tree, members indented under their group', () => {
+	const groups = {
+		z_lampor_v: ['v1', 'v2'],
+		z_lampor_vardagsrum: ['matbord', 'golvlampa', 'v1', 'v2', 'unused_1'],
+		z_lampor_alla: ['matbord', 'golvlampa', 'v1', 'v2', 'unused_1', 'lampa_mette'],
+	};
+	const zone = ['vaggar', 'matbord', 'golvlampa', 'z_lampor_v', 'z_lampor_vardagsrum'];
+	const rows = nestGroupRows(groups, zone);
+	//The group nests its members; the subgroup z_lampor_v nests under it too.
+	assert.deepEqual(rows.map(r => r.device), ['vaggar', 'z_lampor_vardagsrum', 'matbord', 'golvlampa', 'z_lampor_v']);
+	assert.deepEqual(rows.map(r => r.depth), [0, 0, 1, 1, 1]);
+	//A group is the smallest containing group, so a member under z_lampor_alla
+	//whose only group-in-zone is z_lampor_vardagsrum nests there.
+	assert.equal(groupParent(groups, 'matbord', zone), 'z_lampor_vardagsrum');
+	assert.equal(groupParent(groups, 'z_lampor_v', zone), 'z_lampor_vardagsrum');
+	//A lamp in no group has no parent.
+	assert.equal(groupParent(groups, 'vaggar', zone), null);
 });

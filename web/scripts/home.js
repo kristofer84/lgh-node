@@ -1,6 +1,6 @@
 //The step semantics live in zones.js, the same file the server and the
 //floorplan builder import, so all three cannot drift apart.
-import { stepOf, nextStep, sceneStates, overlappingDevices } from './zones.js';
+import { stepOf, nextStep, sceneStates, overlappingDevices, nestGroupRows } from './zones.js';
 
 //import Auth from './auth.js';
 
@@ -1061,7 +1061,17 @@ async function cfgLoad(zone) {
 	const zones = await res.json();
 	cfgGroups = zones.groups ?? {};
 	const rows = zones[zone] ?? [];
-	for (const row of rows) cfg$('room-config-rows').append(cfgBuildRow(row));
+	//Nest a Zigbee group's members under it (indent) instead of a flat list. The
+	//group map drives the tree; members in OTHER rooms are not pulled in here.
+	const order = nestGroupRows(cfgGroups, rows.map(r => r.device));
+	const byDevice = new Map(rows.map(r => [r.device, r]));
+	for (const node of order) {
+		const row = byDevice.get(node.device);
+		if (!row) continue;
+		const tr = cfgBuildRow(row);
+		if (node.depth > 0) tr.dataset.depth = String(node.depth);
+		cfg$('room-config-rows').append(tr);
+	}
 }
 
 function openRoomConfig(zone) {

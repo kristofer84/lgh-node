@@ -674,6 +674,15 @@ body.nightmode #btn-scenes i {
   user-select: none;
 }
 
+/* A Zigbee group's members nest under it in the config editor (nestGroupRows
+   stamps data-depth). Indent the name cell and draw a faint leader so the
+   parent/child relationship reads as a tree, not a flat list. */
+#room-config-grid tr[data-depth="1"] td.light { padding-left: 1.6rem; }
+#room-config-grid tr[data-depth="2"] td.light { padding-left: 3.2rem; }
+#room-config-grid tr[data-depth] td.light {
+  border-left: 2px solid #444;
+}
+
 #room-config-grid .id {
   display: block;
   color: #7d7d7d;
