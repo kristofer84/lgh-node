@@ -207,6 +207,28 @@ test('stepOf ignores entries with no onoff (sensors)', () => {
 	assert.equal(s.step, 'stad');
 });
 
+test('a step is offered unless every lamp is unset (ignore) at it', () => {
+	//`false` (off) is still a value: "turn everything off" is a real scene, so it
+	//keeps the step selectable. Only the ABSENCE (`-`/ignore) leaves a lamp out, so
+	//a step disappears only when no lamp says anything about it.
+	const off = steps({ natt: false, kvall: false, dag: false, stad: false });
+	const unset = steps({});
+	//All lamps `false`: every step is still selectable (all-off is meaningful).
+	assert.equal(stepOf(model({ a: { onoff: false, steps: off }, b: { onoff: false, steps: off } })).nattable, true);
+	assert.equal(stepOf(model({ a: { onoff: false, steps: off } })).stadable, true);
+	//Every lamp ignore (`{}`): nothing is said, so the step disappears.
+	const empty = stepOf(model({ a: { onoff: false, steps: unset }, b: { onoff: false, steps: unset } }));
+	assert.equal(empty.nattable, false);
+	assert.equal(empty.kvallable, false);
+	assert.equal(empty.dagable, false);
+	assert.equal(empty.stadable, false);
+	//One lamp `false` at natt, the rest unset: natt is still offered (it means
+	//"turn that one lamp off"), but dag is not (no lamp says anything at dag).
+	const mixed = stepOf(model({ a: { onoff: false, steps: steps({ natt: false }) }, b: { onoff: false, steps: unset } }));
+	assert.equal(mixed.nattable, true);
+	assert.equal(mixed.dagable, false);
+});
+
 test('⚠ a room with only untiered lights on reads as partial, not stad', () => {
 	//The bug: this chain started at `let step = 'stad'` and FELL THROUGH to it, so
 	//one wardrobe light reported the whole room on -- full amber wash, and the

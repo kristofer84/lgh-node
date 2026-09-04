@@ -228,12 +228,11 @@ export function sceneFor(entries, step) {
  */
 export function stepsAvailable(entries) {
 	const sw = parseZone(entries).filter(isSwitchable);
-	//"lit at" = the value turns the device ON (not false/absent): true, a number,
-	//or a {level, kelvin} object. `stad` is no different now: a room where no lamp
-	//turns on at `stad` cannot meaningfully press it, so it is not offered.
-	const lit = (/** @type {unknown} */ v) =>
-		v !== false && v !== undefined && v !== null;
-	const any = (/** @type {'natt'|'kvall'|'dag'|'stad'} */ k) => sw.some(e => lit(e.steps?.[k]));
+	//A step is offered when at least one lamp has it SET (`false`=off counts, only
+	//the absence/ignore `-` leaves the lamp out), so a step is hidden only when
+	//every lamp is `-` at it. A "turn everything off" step is still a real scene.
+	const set = (/** @type {unknown} */ v) => v !== undefined;
+	const any = (/** @type {'natt'|'kvall'|'dag'|'stad'} */ k) => sw.some(e => set(e.steps?.[k]));
 	return { natt: any('natt'), kvall: any('kvall'), dag: any('dag'), stad: any('stad') };
 }
 
@@ -253,12 +252,16 @@ export function stepsAvailable(entries) {
  */
 export function stepOf(zoneModel) {
 	const lights = Object.keys(zoneModel).filter(n => Object.hasOwn(zoneModel[n], 'onoff'));
-	//A step is "available" when at least one lamp is lit at it (not false/absent).
-	const lit = (/** @type {unknown} */ v) => v !== false && v !== undefined && v !== null;
-	const nattable = lights.some(n => lit(zoneModel[n].steps?.natt));
-	const kvallable = lights.some(n => lit(zoneModel[n].steps?.kvall));
-	const dagable = lights.some(n => lit(zoneModel[n].steps?.dag));
-	const stadable = lights.some(n => lit(zoneModel[n].steps?.stad));
+	//A step is "available" when at least one lamp has it SET -- i.e. it says
+	//SOMETHING about the lamp, whether off (`false`) or on (`true`/number/level).
+	//Only the ABSENCE (ignore, `-`) leaves the lamp out, so a step is hidden only
+	//when EVERY lamp is `-` at it -- a "turn everything off" step (all `false`) is
+	//still a real scene and stays selectable.
+	const set = (/** @type {unknown} */ v) => v !== undefined;
+	const nattable = lights.some(n => set(zoneModel[n].steps?.natt));
+	const kvallable = lights.some(n => set(zoneModel[n].steps?.kvall));
+	const dagable = lights.some(n => set(zoneModel[n].steps?.dag));
+	const stadable = lights.some(n => set(zoneModel[n].steps?.stad));
 
 	//Does the room currently match what this step prescribes? A lamp the step
 	//IGNORES (absent) imposes no constraint; `false` demands off; anything else
