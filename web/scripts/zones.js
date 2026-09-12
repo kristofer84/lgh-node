@@ -192,7 +192,19 @@ export function sceneFor(entries, step) {
 	/** @type {Action[]} */
 	const out = [];
 	for (const e of parseZone(entries).filter(isSwitchable)) {
-		//The all-off sweep always names every device, regardless of its step keys.
+		//⚠ A device that is `-` at EVERY step is outside the scene system entirely
+		//-- the all-off sweep included. The sweep used to name every device
+		//"regardless of its step keys", which meant `-` was honoured for the four
+		//steps but silently overridden by `off`. That reached `z_lampor_alla`, a
+		//Zigbee group whose members live in OTHER rooms: with `entre1` set to `off`
+		//in the `kvall` and `dag` scenes, its group-off fought the per-lamp `on`
+		//that `vardagsrum` issued in the same press, and golvlampa/matbord/v1/v2
+		//visibly blinked off and back on. Checked before the change: dropping it
+		//from the sweep loses nothing, the `off` scene still reaches all 45 lamps
+		//through the per-lamp entries and the two in-room groups.
+		//`-` now means never. To have a device turned off by a scene, give it an
+		//explicit `false` (`Av` in the room editor) at that step.
+		if (!e.steps || !Object.keys(e.steps).length) continue;
 		if (step === 'off') { out.push({ entity: e.entity, state: 'off' }); continue; }
 
 		const v = e.steps?.[/** @type {'natt'|'kvall'|'dag'|'stad'} */ (step)];

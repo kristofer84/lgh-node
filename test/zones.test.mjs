@@ -68,6 +68,28 @@ test('the explicit form expresses what a tier could not', () => {
 	assert.deepEqual(sceneFor(offAtKvall, 'stad'), []);
 });
 
+test('⚠ sceneFor: a device that is `-` everywhere is outside scenes, sweep included', () => {
+	//`z_lampor_alla` is a Zigbee group with `steps: {}` sitting in `entre1`, but
+	//its members live in other rooms. The all-off sweep used to name every device
+	//regardless of its steps, so `entre1: off` in the `kvall`/`dag` scenes fired a
+	//group-off that fought the per-lamp `on` from `vardagsrum` in the same press --
+	//golvlampa, matbord, v1 and v2 blinked off and back on.
+	const never = [{ device: 'grupp', type: 'light', steps: {} }];
+	for (const step of ['off', 'natt', 'kvall', 'dag', 'stad']) {
+		assert.deepEqual(sceneFor(never, step), [], `\`-\` everywhere must be ignored at ${step}`);
+	}
+
+	//An explicit `false` is how you ask for a device to be turned off; it is not
+	//the same as `-`, and the sweep still names anything that authors any step.
+	const authored = [{ device: 'lampa', type: 'light', steps: { kvall: false } }];
+	assert.deepEqual(sceneFor(authored, 'off'), [{ entity: 'light.lampa', state: 'off' }]);
+	assert.deepEqual(sceneFor(authored, 'kvall'), [{ entity: 'light.lampa', state: 'off' }]);
+
+	//A `-` device must not suppress its neighbours from the sweep either.
+	const mixed = [...never, ...authored];
+	assert.deepEqual(sceneFor(mixed, 'off'), [{ entity: 'light.lampa', state: 'off' }]);
+});
+
 test('sceneFor: kvall lights anything tiered, stad lights everything', () => {
 	const zone = ['tak.light', 'lampa.light.mood', 'slinga.light.night'];
 	assert.deepEqual(sceneFor(zone, 'off'), [

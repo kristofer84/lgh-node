@@ -525,6 +525,27 @@ what it was working around.
 every switchable device off — that is its safety semantics. The editor rejects an `off` key
 with a 400.
 
+⚠ **`Av` sweeps the room, but no longer overrides `-`.** The two are different controls and
+both are called "Av": the room's mood in *this* editor (the all-off sweep for that room) and a
+single device's step in the *room* editor (`false` — that lamp off at that step). `sceneFor()`
+used to name every device on the sweep "regardless of its step keys", so a device set to `-` at
+all four steps was still commanded off by it. That reached `z_lampor_alla`, a Zigbee group
+parked in `entre1` whose members live in **other rooms**: with `entre1: off` in `kvall` and
+`dag`, the group-off raced the per-lamp `on` that `vardagsrum` published in the same press, and
+`golvlampa`, `matbord`, `v1` and `v2` blinked off and back on (~140 ms apart — a group broadcast
+and a per-lamp unicast do not take the same path, so the order they land is not fixed).
+
+A device that authors **no** step is now outside the scene system entirely, sweep included, so
+`-` means never. To have a device turned off by a scene, give it an explicit `Av` at that step.
+Verified before the change: the `off` scene still reaches all 45 physical lamps without the
+group, through the per-lamp entries and the two in-room groups. Regression test:
+`test/zones.test.mjs`, "a device that is `-` everywhere is outside scenes, sweep included".
+
+⚠ **A consequence worth remembering:** `sov1`–`sov4` are not in the `kvall`/`dag` scenes, and
+that group sweep was what turned their lamps off. They are now left as they are. Add the rooms
+with the mood `Av` if that should come back.
+
+
 ⚠ **`GET /config/zones` is not only zones.** It appends a sibling `groups` key (the Zigbee
 group map) next to the room entries, so its response is `{zone: rows[], …, groups: {…}}`. The
 room editor reads one room by name (`zones[zone]`) and never meets it; the scene editor walks
