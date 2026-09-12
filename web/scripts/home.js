@@ -1140,20 +1140,26 @@ async function cfgSave() {
 	}
 }
 
-//------------------------------------------ whole-flat scene membership
-//Which rooms each whole-flat scene (dag/kvall/stad/natt) touches. This only
-//edits room membership -- the moods stay in db/config.json and are read back
-//unchanged on save. `off` is deliberately absent: it always turns everything off.
+//------------------------------------------ whole-flat scene editor
+//What each whole-flat scene (dag/kvall/stad/natt) does to each room. A cell is
+//three-valued: `-` leaves the room alone, `off` turns it off, and a step name
+//runs that room's own step -- the per-lamp levels stay in db/config.json and are
+//never touched from here. `off` (the scene) is absent: it always turns
+//everything off, and the server rejects an attempt to edit it.
 const SCENE_EDIT = [
 	{ key: 'natt', label: 'Natt' },
-	{ key: 'kvall', label: 'Kväll' },
+	{ key: 'kvall', label: 'Kv\u00e4ll' },
 	{ key: 'dag', label: 'Dag' },
-	{ key: 'stad', label: 'Städ' },
+	{ key: 'stad', label: 'St\u00e4d' },
 ];
 
+//Mood -> what the cell shows. '' is the ignore case; it is not a mood and is
+//never sent -- the room is simply left out of the scene.
+const MOOD_LABEL = { '': '\u2014', off: 'Av', natt: 'Natt', kvall: 'Kv\u00e4ll', dag: 'Dag', stad: 'St\u00e4d' };
+
 let scenesDirty = false;
-let scenesRooms = [];            // {zone, name?} in a stable order
-let scenesMembership = {};       // {scene: Set<zone>}
+let scenesRooms = [];            // {zone, steps: {natt, kvall, dag, stad}} in a stable order
+let scenesMoods = {};            // {scene: {zone: mood}}
 
 function scenes$ (id) { return document.getElementById(id); }
 function scenesBtn(id) { return /** @type {HTMLButtonElement} */ (document.getElementById(id)); }
@@ -1166,7 +1172,19 @@ function scenesStatus(text, kind) {
 function scenesMarkDirty() {
 	scenesDirty = true;
 	scenesBtn('scenes-config-save').disabled = false;
-	scenesStatus('Osparade ändringar', 'warn');
+	scenesStatus('Osparade \u00e4ndringar', 'warn');
+}
+
+//The moods this room can be given: ignore, off, and every step at least one of
+//its lamps authors. A step no lamp has would expand to an empty action list, so
+//offering it would be offering a no-op -- and the server rejects it anyway.
+//`current` is kept in the list even when the room no longer offers it, so a
+//stale config value is shown as-is rather than silently rewritten on save.
+function scenesOptionsFor(room, current) {
+	const out = ['', 'off'];
+	for (const s of SCENE_EDIT) if (room.steps?.[s.key]) out.push(s.key);
+	if (current && !out.includes(current)) out.push(current);
+	return out;
 }
 
 function scenesBuild() {
@@ -1187,21 +1205,31 @@ function scenesBuild() {
 		row.className = 'scenes-row';
 		row.append(Object.assign(document.createElement('span'), { className: 'scenes-room', textContent: room.zone }));
 		for (const s of SCENE_EDIT) {
-			const chk = document.createElement('input');
-			chk.type = 'checkbox';
-			chk.dataset.scene = s.key;
-			chk.dataset.room = room.zone;
-			chk.checked = scenesMembership[s.key]?.has(room.zone) ?? false;
-			chk.setAttribute('aria-label', `${room.zone} ${s.label}`);
-			chk.addEventListener('change', () => {
-				if (!scenesMembership[s.key]) scenesMembership[s.key] = new Set();
-				if (chk.checked) scenesMembership[s.key].add(room.zone);
-				else scenesMembership[s.key].delete(room.zone);
+			const current = scenesMoods[s.key]?.[room.zone] ?? '';
+			const sel = document.createElement('select');
+			sel.dataset.scene = s.key;
+			sel.dataset.room = room.zone;
+			sel.setAttribute('aria-label', `${room.zone} ${s.label}`);
+			for (const mood of scenesOptionsFor(room, current)) {
+				sel.append(Object.assign(document.createElement('option'), {
+					value: mood,
+					textContent: MOOD_LABEL[mood] ?? mood,
+				}));
+			}
+			sel.value = current;
+			//An ignored cell is dimmed, so a scene's real reach reads off the grid.
+			const paint = () => sel.classList.toggle('scenes-ignore', sel.value === '');
+			paint();
+			sel.addEventListener('change', () => {
+				if (!scenesMoods[s.key]) scenesMoods[s.key] = {};
+				if (sel.value === '') delete scenesMoods[s.key][room.zone];
+				else scenesMoods[s.key][room.zone] = sel.value;
+				paint();
 				scenesMarkDirty();
 			});
 			const cell = document.createElement('span');
 			cell.className = 'scenes-col';
-			cell.append(chk);
+			cell.append(sel);
 			row.append(cell);
 		}
 		grid.append(row);
@@ -1209,21 +1237,48 @@ function scenesBuild() {
 }
 
 async function scenesLoad() {
-	//Rooms = every zone with at least one switchable device, from /config/zones.
-	const [zRes, sRes] = await Promise.all([fetch('/config/zones'), fetch('/config/scenes')]);
-	if (!zRes.ok || !sRes.ok) {
-		scenesStatus('Kunde inte hämta inställningar.', 'error');
-		return;
-	}
-	const zones = await zRes.json();
-	const scenes = await sRes.json();
+	//⚠ Everything below runs inside the try: this is called from openScenesConfig()
+	//without an await, so a throw here used to be an unhandled rejection -- the
+	//grid just stayed empty with no message anywhere, which is exactly as much as
+	//the user got to see. Any failure now lands in the status line.
+	try {
+		//Rooms = every zone with at least one switchable device, from /config/zones.
+		//Its rows carry each lamp's `steps`, which is what decides the moods a room
+		//can be offered -- no second endpoint needed.
+		const [zRes, sRes] = await Promise.all([fetch('/config/zones'), fetch('/config/scenes')]);
+		if (!zRes.ok || !sRes.ok) {
+			scenesStatus(`Kunde inte h\u00e4mta inst\u00e4llningar (${zRes.status}/${sRes.status}).`, 'error');
+			return;
+		}
+		const zones = await zRes.json();
+		const scenes = await sRes.json();
 
-	scenesRooms = Object.keys(zones).map(zone => ({ zone }));
-	scenesMembership = {};
-	for (const s of SCENE_EDIT) {
-		scenesMembership[s.key] = new Set(Object.keys(scenes[s.key] ?? {}));
+		//⚠ /config/zones is not only zones: it carries a sibling `groups` key (the
+		//Zigbee group map). The room editor reads `zones[zone]` by name and so never
+		//meets it -- this is the first caller to walk every entry, and walking it
+		//blindly threw `rows.some is not a function` with nothing but an empty grid
+		//to show for it. Take the array-valued entries, so a sibling key added later
+		//cannot break the grid either.
+		scenesRooms = Object.entries(zones).filter(([, rows]) => Array.isArray(rows)).map(([zone, rows]) => ({
+			zone,
+			//A step is offered when at least one lamp in the room SETS it -- `false`
+			//(explicit off) counts, only an absent value leaves the lamp out. Mirrors
+			//stepsAvailable() in zones.js, over the row shape /config/zones sends.
+			steps: Object.fromEntries(SCENE_EDIT.map(s =>
+				[s.key, rows.some(r => r.steps?.[s.key] !== undefined)])),
+		}));
+		scenesMoods = {};
+		for (const s of SCENE_EDIT) scenesMoods[s.key] = { ...(scenes[s.key] ?? {}) };
+		scenesBuild();
+		//A header row with nothing under it looks like a broken dialog and reads as
+		//one. Say which side came back empty instead.
+		if (!scenesRooms.length) {
+			scenesStatus('Inga rum med styrbara enheter (/config/zones gav 0).', 'error');
+		}
+	} catch (err) {
+		console.error('scenesLoad', err);
+		scenesStatus(`Fel: ${err && err.message ? err.message : err}`, 'error');
 	}
-	scenesBuild();
 }
 
 function openScenesConfig() {
@@ -1256,8 +1311,10 @@ async function scenesSave() {
 	scenesBtn('scenes-config-save').disabled = true;
 	scenesStatus('Sparar…');
 	try {
+		//{scene: {room: mood}} -- a room left out is a room the scene stops
+		//touching, which is exactly what an ignored cell means.
 		const body = {};
-		for (const s of SCENE_EDIT) body[s.key] = [...(scenesMembership[s.key] ?? [])];
+		for (const s of SCENE_EDIT) body[s.key] = { ...(scenesMoods[s.key] ?? {}) };
 		const res = await fetch('/config/scenes', {
 			method: 'POST',
 			headers: { 'Content-Type': 'application/json' },

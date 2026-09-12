@@ -914,10 +914,15 @@ body.nightmode #btn-scenes i {
 
 .scenes-row {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) repeat(4, 3.5rem);
+  /* The room name gets a clamped column of its own -- wide enough for the
+     longest zone ("vardagsrum"), capped so it cannot starve the selects, which
+     then split whatever is left. Fixed rem columns for the selects squeezed the
+     name track to a single character on a phone. */
+  grid-template-columns: minmax(4.5rem, 6rem) repeat(4, minmax(0, 1fr));
   align-items: center;
   border-bottom: 1px solid #333;
   padding: 0.25rem 0;
+  gap: 0.2rem;
 }
 
 .scenes-row.scenes-head {
@@ -931,7 +936,9 @@ body.nightmode #btn-scenes i {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  padding-right: 0.5rem;
+  /* Counted into this track's width, so keep it tight -- it comes straight off
+     the room name. */
+  padding-right: 0.35rem;
 }
 
 .scenes-head .scenes-col {
@@ -944,12 +951,35 @@ body.nightmode #btn-scenes i {
   text-align: center;
 }
 
-.scenes-col input[type="checkbox"] {
-  display: inline-block;
-  width: 1rem;
-  height: 1rem;
+.scenes-col select {
+  font: inherit;
+  /* Slightly under the row font so "Kv\00e4ll" still clears the native arrow in
+     the narrower track. */
+  font-size: 0.95em;
+  width: 100%;
+  color: #e8e8e8;
+  background: #333;
+  border: 1px solid #555;
+  border-radius: 5px;
+  padding: 0.15rem 0.15rem;
   cursor: pointer;
-  accent-color: #ffcc00;
+  /* Firefox/Android render the popup list with the page default otherwise. */
+  color-scheme: dark;
+}
+
+.scenes-col select:hover {
+  background: #3d3d3d;
+}
+
+.scenes-col select:focus-visible {
+  outline: 2px solid #ffcc00;
+  outline-offset: 1px;
+}
+
+/* A cell the scene ignores: readable, but visibly not part of the scene. */
+.scenes-col select.scenes-ignore {
+  color: #7d7d7d;
+  background: #262626;
 }
 
 #scenes-config-foot {

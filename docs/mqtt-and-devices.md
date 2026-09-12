@@ -486,26 +486,53 @@ lamp deliberately not re-commanded because its group already covers it.
 Writes go through `saveConfig()`: timestamped backup, temp file, atomic rename. `db/config.json`
 is read unguarded at boot, so a half-written file is a startup crash later.
 
-### The scene-membership editor — settings menu, `/config/scenes`
+### The scene editor — settings menu, `/config/scenes`
 
 Tap the layers icon in the settings menu (`#btn-scenes`) to open the whole-flat scene editor
-(`#scenes-config`). It is a checkbox grid: one row per room with a switchable device, one
-column per editable scene (`natt`/`kvall`/`dag`/`stad`). A checked room means that scene
-**touches** the room — turns its lights on or off per its mood — an unchecked room is left
-untouched. This edits **room membership only**, the `{ room -> mood }` values stay exactly as
-they are in `db/config.json`; a room checked *into* a scene for the first time defaults to that
-scene's own name as its mood.
+(`#scenes-config`). It is a dropdown grid: one row per room with a switchable device, one
+column per editable scene (`natt`/`kvall`/`dag`/`stad`). Each cell sets that room's **mood** in
+that scene and is three-valued:
+
+| Cell | Stored as | What the scene does to the room |
+|---|---|---|
+| `—` | room absent from the map | nothing — the room is left exactly as it is |
+| `Av` | `"off"` | every switchable device off, whatever its `steps` say |
+| `Natt`/`Kväll`/`Dag`/`Städ` | `"natt"`/`"kvall"`/`"dag"`/`"stad"` | runs that room's own step, at the per-lamp levels in `config.zones` |
+
+A cell only offers the steps at least one lamp in the room authors (the same rule as
+`stepsAvailable()`); a step nobody authors would expand to an empty action list. A mood already
+on disk is always offered even if the room no longer authors it, so a stale value is shown
+rather than silently rewritten. The per-lamp **values** are not editable here — they live in
+the room editor, which stays their single source of truth.
 
 - `GET /config/scenes` → the raw `scenes` map from `db/config.json` (`{scene: {room: mood}}`).
-- `POST /config/scenes` with `{scene: [room, ...]}` → replaces that scene's room set: rooms in
-the list are kept (existing mood preserved, new rooms default to the scene name), rooms left
-out are removed so the scene stops touching them. Backs up, writes, regenerates
-`db/scenes.json`, and exposes nothing about the mood values (they are read back from the same
-file the request was applied to, so a concurrent hand-edit cannot be clobbered).
+- `POST /config/scenes` with `{scene: {room: mood}}` → replaces that scene's map outright:
+rooms present get the mood given, rooms left out are removed so the scene stops touching them.
+Backs up, writes, regenerates `db/scenes.json`. Applied to the file as re-read at request time,
+so a concurrent hand-edit of another scene cannot be clobbered. Rejects (400, writing nothing)
+an unknown room, an unknown mood, and a step the room does not author.
+- The older `{scene: [room, ...]}` membership form is still accepted: each listed room keeps its
+existing mood, defaulting to the scene's own name.
+
+⚠ **Membership alone was not enough, which is why the cells are dropdowns.** `gang` sat in
+`kvall` with the mood `off`, so its own `kvall: 10` step was unreachable: the checkbox grid
+could drop the room from the scene or pin it at the mood it already had, but could not move it
+from `off` to 10%. The only way through was to uncheck, save, re-check and save again — the
+re-add defaulted the mood to the scene name. If you find that dance in an old note, this is
+what it was working around.
 
 ⚠ **`off` is deliberately not editable.** It is the all-lights-out sweep and must always turn
 every switchable device off — that is its safety semantics. The editor rejects an `off` key
 with a 400.
+
+⚠ **`GET /config/zones` is not only zones.** It appends a sibling `groups` key (the Zigbee
+group map) next to the room entries, so its response is `{zone: rows[], …, groups: {…}}`. The
+room editor reads one room by name (`zones[zone]`) and never meets it; the scene editor walks
+every entry and must skip it — `Object.entries(zones)` over the raw response threw
+`rows.some is not a function`, and because `scenesLoad()` is called without an `await` that
+surfaced as an empty grid and no message at all. It now filters to the array-valued entries and
+reports any failure in the status line. Reconstructing the payload from `db/config.json` to test
+against will *not* reproduce this — the `groups` key only exists in the endpoint's output.
 
 ⚠ **Registered below `cookieMiddleware`, same as `/config/zones`, and must stay there.**
 

@@ -32,7 +32,7 @@ import { registerWebnMethods } from './server-webn.js';
 //The zone/device grammar and the step semantics. The same file is served to the
 //browser at /scripts/zones.js and imported by tools/floorplan/generate.mjs, so
 //all three agree by construction instead of by hand. See its header.
-import { parseEntry, parseZone, isSwitchable, sceneFor, overlappingDevices } from './web/scripts/zones.js';
+import { parseEntry, parseZone, isSwitchable, sceneFor, stepsAvailable, overlappingDevices } from './web/scripts/zones.js';
 
 process.stdin.resume();
 
@@ -502,59 +502,92 @@ app.post('/config/zones', wrap(async (req, res) => {
 	res.end(JSON.stringify({ status: 'ok', changed, collapsed }));
 }));
 
-//---- the scene-membership editor's two routes (same auth gate) -------------
+//---- the scene editor's two routes (same auth gate) -----------------------
 //The whole-flat scenes are a `config.scenes` map of {scene -> {room -> mood}}.
-//This editor only changes WHICH rooms a scene touches (the keys); each room's
-//mood is preserved, and a room newly added to a scene defaults to that scene's
-//own name as its mood. Shuffling room membership without ever reaching past the
-//moods keeps the per-lamp values in db/config.json the single source of truth.
+//The mood is what the room is set to when the scene runs: `off`, or one of the
+//room's own steps, which reads the per-lamp levels out of `config.zones`. A room
+//absent from the map is not touched by that scene at all.
+//
+//The cells are therefore three-valued (ignore / off / a step), not membership
+//checkboxes. ⚠ Membership alone could not express the case that motivated this:
+//`gang` sits in `kvall` with the mood `off`, so its own `kvall: 10` step was
+//unreachable -- the room could be dropped from the scene or pinned at whatever
+//mood it already had, never moved from `off` to 10%.
+//
+//The per-lamp values stay in db/config.json; this route never reaches past the
+//mood name, so the zone editor remains their single source of truth.
 
-//List the scenes and, for each, which rooms it touches. The client only needs
-//the room keys; the moods are read back from the same file on save so no
-//round-trip can drift them.
+//Moods a scene may hand a room. `off` is the all-off sweep (sceneFor names every
+//switchable device whatever its steps say); the other four index `steps`.
+const SCENE_MOODS = ['off', 'natt', 'kvall', 'dag', 'stad'];
+
+//List the scenes and, for each, its {room: mood} map -- straight off disk, so
+//the client edits exactly what is stored.
 app.get('/config/scenes', wrap(async (req, res) => {
 	const disk = JSON.parse((await fs.readFile('./db/config.json')).toString());
 	res.end(JSON.stringify(disk.scenes ?? {}));
 }));
 
-//Expects {scene: [room, ...]}. Each named scene's membership is replaced by
-//exactly that room list: a room present is kept with its existing mood (or the
-//scene's own name when it was not there before), a room left out is removed, so
-//the scene no longer touches it. `off` is deliberately NOT editable -- it always
-//turns every switchable device off, which is its safety semantics.
+//Expects {scene: {room: mood}}. Each named scene is replaced by exactly that
+//map: a room present gets the mood given, a room left out is removed, so the
+//scene no longer touches it. `off` (the scene) is deliberately NOT editable --
+//it always turns every switchable device off, which is its safety semantics.
+//The older {scene: [room, ...]} membership form is still accepted and keeps each
+//listed room's existing mood, defaulting to the scene's own name.
 app.post('/config/scenes', wrap(async (req, res) => {
 	const body = req.body;
 	if (!body || typeof body !== 'object' || Array.isArray(body)) {
 		res.statusCode = 400;
-		return res.end(JSON.stringify({ error: 'expected {scene: [room, ...]}' }));
+		return res.end(JSON.stringify({ error: 'expected {scene: {room: mood}}' }));
 	}
 
 	//See the /config/zones save: edit the on-disk copy, never the boot snapshot.
 	const disk = JSON.parse((await fs.readFile('./db/config.json')).toString());
 	const scenes = disk.scenes ?? (disk.scenes = {});
 
+	//Every rejection is a 400 that writes nothing -- the loop below bails on the
+	//first bad entry, before saveConfig, so a partly-valid body changes no scene.
+	const bad = (/** @type {string} */ msg) => {
+		res.statusCode = 400;
+		res.end(JSON.stringify({ error: msg }));
+		return null;
+	};
+
 	const changed = [];
 	for (const [scene, rooms] of Object.entries(body)) {
-		if (scene === 'off') {
-			res.statusCode = 400;
-			return res.end(JSON.stringify({ error: 'off is not editable; it always turns everything off' }));
-		}
-		if (!Array.isArray(rooms) || !rooms.every(r => typeof r === 'string')) {
-			res.statusCode = 400;
-			return res.end(JSON.stringify({ error: `${scene}: expected a room-name array` }));
-		}
+		if (scene === 'off') return bad('off is not editable; it always turns everything off');
 
 		const prev = typeof scenes[scene] === 'object' && scenes[scene] !== null ? scenes[scene] : {};
+
+		//Normalise both accepted shapes to {room: mood} first, so the validation
+		//below runs once and the array form cannot take a different path through it.
+		let want;
+		if (Array.isArray(rooms)) {
+			if (!rooms.every(r => typeof r === 'string')) return bad(`${scene}: expected a room-name array`);
+			want = Object.fromEntries(rooms.map(r => [r, prev[r] ?? scene]));
+		} else if (rooms !== null && typeof rooms === 'object') {
+			want = rooms;
+		} else {
+			return bad(`${scene}: expected {room: mood}`);
+		}
+
 		const next = {};
-		for (const room of rooms) {
+		for (const [room, mood] of Object.entries(want)) {
 			if (!Array.isArray(disk.zones?.[room])) {
 				//Unknown room: reject rather than silently write a scene that can
 				//never expand (writeScenesJson skips rooms missing from config.zones).
-				res.statusCode = 400;
-				return res.end(JSON.stringify({ error: `${scene}: unknown room ${room}` }));
+				return bad(`${scene}: unknown room ${room}`);
 			}
-			//Preserve the room's existing mood, defaulting to the scene's own name.
-			next[room] = prev[room] ?? scene;
+			if (typeof mood !== 'string' || !SCENE_MOODS.includes(mood)) {
+				return bad(`${scene}.${room}: unknown mood ${mood}`);
+			}
+			//A step no lamp in the room authors expands to an empty action list: a
+			//scene entry that can never do anything. Same reasoning as the unknown
+			//room above -- reject it here rather than write it and wonder later.
+			if (mood !== 'off' && !stepsAvailable(disk.zones[room])[mood]) {
+				return bad(`${scene}: ${room} has no ${mood} step`);
+			}
+			next[room] = mood;
 		}
 		scenes[scene] = next;
 		changed.push(scene);
@@ -563,7 +596,7 @@ app.post('/config/scenes', wrap(async (req, res) => {
 	await saveConfig(disk);
 	config = disk;
 	writeScenesJson();
-	log(`scene membership saved by ${req.user?.preferred_username ?? 'unknown'}: ${changed.join(', ')}`);
+	log(`scenes saved by ${req.user?.preferred_username ?? 'unknown'}: ${changed.join(', ')}`);
 	res.end(JSON.stringify({ status: 'ok', changed }));
 }));
 
